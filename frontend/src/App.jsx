@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { io } from 'socket.io-client'
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react"
 
-// For local testing. Change to your Render URL when pushing to Vercel!
+// ⚠️ CHANGE THIS BACK TO YOUR RENDER URL BEFORE YOU PUSH TO GITHUB/VERCEL
 const socket = io('http://localhost:3001')
 
 const TOOLBAR_OPTIONS = [
@@ -23,6 +23,7 @@ export default function App() {
   const wrapperRef = useRef(null)
   const quillRef = useRef(null)
 
+  // Load Quill styles and scripts
   useEffect(() => {
     const link = document.createElement('link')
     link.href = 'https://cdn.quilljs.com/1.3.6/quill.snow.css'
@@ -40,6 +41,7 @@ export default function App() {
     }
   }, [])
 
+  // Initialize Editor
   useEffect(() => {
     if (!joined || !wrapperRef.current || !quillLoaded) return;
     if (wrapperRef.current.innerHTML !== "") return;
@@ -57,6 +59,7 @@ export default function App() {
     quillRef.current = quill
   }, [joined, quillLoaded])
 
+  // Sync Logic
   useEffect(() => {
     if (!joined || !quillRef.current) return;
     const quill = quillRef.current;
@@ -99,6 +102,32 @@ export default function App() {
     }
   }
 
+  // --- EXPORT PDF FUNCTION ---
+  const downloadPDF = () => {
+    const element = document.querySelector('.ql-editor');
+    if (!element) return;
+
+    const opt = {
+      margin:       1, 
+      filename:     `${roomId}-workspace.pdf`, 
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 }, 
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    // Dynamically inject html2pdf script if it hasn't been loaded yet
+    if (typeof window.html2pdf === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      script.onload = () => {
+        window.html2pdf().set(opt).from(element).save();
+      };
+      document.head.appendChild(script);
+    } else {
+      window.html2pdf().set(opt).from(element).save();
+    }
+  }
+
   return (
     <>
       <SignedOut>
@@ -134,6 +163,15 @@ export default function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h1>Collab Docs</h1>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  
+                  {/* DOWNLOAD BUTTON */}
+                  <button 
+                    onClick={downloadPDF}
+                    style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    ↓ Export PDF
+                  </button>
+
                   <span style={{ backgroundColor: '#e2e8f0', padding: '5px 15px', borderRadius: '20px' }}>
                     Room: <strong>{roomId}</strong>
                   </span>
