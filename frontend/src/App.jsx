@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { io } from 'socket.io-client'
 
-const socket = io('http://localhost:3001')
+const socket = io('https://collab-workspace-cn0m.onrender.com')
 
 const TOOLBAR_OPTIONS = [
   [{ header: [1, 2, 3, 4, 5, 6, false] }],
