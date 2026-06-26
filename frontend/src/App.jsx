@@ -3,7 +3,7 @@ import { io } from 'socket.io-client'
 import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from "@clerk/clerk-react"
 
 // ⚠️ CHANGE TO YOUR RENDER URL FOR PRODUCTION!
-const socket = io('https://collab-workspace-cn0m.onrender.com')
+const socket = io('http://localhost:3001')
 
 const TOOLBAR_OPTIONS = [
   [{ header: [1, 2, 3, 4, 5, 6, false] }],
