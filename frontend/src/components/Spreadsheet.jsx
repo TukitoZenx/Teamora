@@ -79,7 +79,8 @@ export default function Spreadsheet({
   grid,
   activeCell,
   setActiveCell,
-  handleCellChange
+  handleCellChange,
+  spreadsheetCells = {}
 }) {
   const [formulaValue, setFormulaValue] = React.useState('');
   const cellRefs = React.useRef({});
@@ -284,12 +285,23 @@ export default function Spreadsheet({
                 </td>
                 {row.map((cell, cIdx) => {
                   const isActive = activeCell?.r === rIdx && activeCell?.c === cIdx;
+                  const otherUsersOnCell = Object.values(spreadsheetCells).filter(
+                    (c) => c.row === rIdx && c.col === cIdx
+                  );
+                  const hasOtherUsers = otherUsersOnCell.length > 0;
+                  const primaryOtherUser = otherUsersOnCell[0];
+
                   return (
                     <td 
                       key={cIdx} 
                       className={`w-28 h-7 border border-slate-200 dark:border-slate-800/80 p-0 relative transition-all ${
-                        isActive ? 'ring-2 ring-indigo-500 ring-inset z-10 bg-indigo-500/5' : ''
+                        isActive 
+                          ? 'ring-2 ring-indigo-500 ring-inset z-10 bg-indigo-500/5' 
+                          : hasOtherUsers
+                            ? 'z-10 shadow-inner'
+                            : ''
                       }`}
+                      style={!isActive && hasOtherUsers ? { boxShadow: `inset 0 0 0 2px ${primaryOtherUser.color}` } : {}}
                     >
                       <input
                         ref={(el) => { cellRefs.current[`${rIdx}-${cIdx}`] = el; }}
@@ -300,6 +312,15 @@ export default function Spreadsheet({
                         onKeyDown={(e) => handleCellKeyDown(e, rIdx, cIdx)}
                         className="w-full h-full bg-transparent border-none outline-none px-2 text-xs text-slate-800 dark:text-slate-200 font-mono focus:ring-0"
                       />
+                      {/* Name badge indicator */}
+                      {!isActive && hasOtherUsers && (
+                        <div 
+                          className="absolute -top-3.5 left-0 text-[8px] text-white px-1.5 py-0.5 rounded-t-md font-bold z-30 select-none pointer-events-none whitespace-nowrap"
+                          style={{ backgroundColor: primaryOtherUser.color }}
+                        >
+                          {primaryOtherUser.user}
+                        </div>
+                      )}
                     </td>
                   );
                 })}
