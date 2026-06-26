@@ -28,6 +28,8 @@ import Whiteboard from './components/Whiteboard'
 import Spreadsheet from './components/Spreadsheet'
 import Slides from './components/Slides'
 import Settings from './components/Settings'
+import useScreenShare from './hooks/useScreenShare'
+import ScreenViewer from './components/ScreenViewer'
 
 // Fallback to localhost if running locally
 const SOCKET_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -103,6 +105,21 @@ export default function App() {
       ...prev.slice(0, 19)
     ]);
   };
+
+  const [roomSettings, setRoomSettings] = useState({ screenShareAllowed: 'everyone' });
+
+  const {
+    isSharing,
+    presenter,
+    localStream,
+    remoteStream,
+    isLoading,
+    startSharing,
+    stopSharing,
+    forceStopShare
+  } = useScreenShare(socket, roomId, getDisplayName(), myColor);
+
+  const isHost = activeUsers[0] && activeUsers[0].socketId === socket.id;
 
 
   // Sheets States (15 rows, 8 columns)
@@ -207,13 +224,13 @@ export default function App() {
     }
   }, [user]);
 
-  const getDisplayName = () => {
+  function getDisplayName() {
     if (!user) return 'Guest';
     if (user.fullName) return user.fullName;
     if (user.firstName) return user.firstName;
     if (user.primaryEmailAddress) return user.primaryEmailAddress.emailAddress.split('@')[0];
     return 'Guest';
-  };
+  }
 
   // Load Quill
   useEffect(() => {
@@ -340,9 +357,14 @@ export default function App() {
       if (roomState.spreadsheet) setGrid(roomState.spreadsheet);
       if (roomState.slides) setSlides(roomState.slides);
       if (roomState.chat) setMessages(roomState.chat);
+      if (roomState.settings) setRoomSettings(roomState.settings);
       quill.enable();
     };
     socket.once('load-room', loadRoomHandler);
+
+    socket.on('receive-room-settings', (settings) => {
+      setRoomSettings(settings);
+    });
 
     const receiveHandler = (delta) => {
       quill.updateContents(delta);
@@ -473,6 +495,7 @@ export default function App() {
       socket.off('receive-slides-list');
       socket.off('receive-whiteboard-cursor');
       socket.off('receive-spreadsheet-cell');
+      socket.off('receive-room-settings');
       quill.off('text-change', textChangeHandler);
       quill.off('selection-change', selectionChangeHandler);
       clearInterval(saveInterval);
@@ -849,6 +872,10 @@ export default function App() {
               isConnected={isConnected}
               latency={latency}
               isSaving={isSaving}
+              isSharing={isSharing}
+              startSharing={startSharing}
+              stopSharing={stopSharing}
+              presenter={presenter}
             />
 
             {/* Layout Shell: Sidebar + Main Area + Right Panel */}
@@ -863,65 +890,89 @@ export default function App() {
 
               {/* Main Content Workspace */}
               <main className="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-900 transition-colors">
-                <div className="flex-1 flex overflow-hidden relative">
-                  {/* Keep all editors mounted to preserve state/Quill instances */}
-                  <div className={`w-full h-full ${activeApp === 'docs' ? 'block' : 'hidden'}`}>
-                    <Documents
-                      wrapperRef={wrapperRef}
-                      isSaving={isSaving}
-                      activeUsersCount={activeUsers.length}
-                    />
-                  </div>
+                <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+                  
+                  {/* Screen Share Viewport */}
+                  {presenter && activeApp !== 'settings' && (
+                    <div className="w-full lg:w-1/2 h-[45vh] lg:h-full p-4 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 shrink-0">
+                      <ScreenViewer
+                        stream={isSharing ? localStream : remoteStream}
+                        presenter={presenter}
+                        isLocal={isSharing}
+                        isLoading={isLoading}
+                        onStopSharing={forceStopShare}
+                        isHost={isHost}
+                        currentUserSocketId={socket.id}
+                      />
+                    </div>
+                  )}
 
-                  <div className={`w-full h-full ${activeApp === 'whiteboard' ? 'block' : 'hidden'}`}>
-                    <Whiteboard
-                      canvasRef={canvasRef}
-                      startDrawing={startDrawing}
-                      draw={draw}
-                      stopDrawing={() => setIsDrawing(false)}
-                      myColor={myColor}
-                      setMyColor={setMyColor}
-                      handleClearBoard={handleClearBoard}
-                      whiteboardTool={whiteboardTool}
-                      setWhiteboardTool={setWhiteboardTool}
-                      whiteboardSize={whiteboardSize}
-                      setWhiteboardSize={setWhiteboardSize}
-                      whiteboardCursors={whiteboardCursors}
-                    />
-                  </div>
+                  {/* Normal workspaces container */}
+                  <div className="flex-1 h-full overflow-hidden relative">
+                    {/* Keep all editors mounted to preserve state/Quill instances */}
+                    <div className={`w-full h-full ${activeApp === 'docs' ? 'block' : 'hidden'}`}>
+                      <Documents
+                        wrapperRef={wrapperRef}
+                        isSaving={isSaving}
+                        activeUsersCount={activeUsers.length}
+                      />
+                    </div>
 
-                  <div className={`w-full h-full ${activeApp === 'sheets' ? 'block' : 'hidden'}`}>
-                    <Spreadsheet
-                      grid={grid}
-                      activeCell={activeCell}
-                      setActiveCell={setActiveCell}
-                      handleCellChange={handleCellChange}
-                      spreadsheetCells={spreadsheetCells}
-                    />
-                  </div>
+                    <div className={`w-full h-full ${activeApp === 'whiteboard' ? 'block' : 'hidden'}`}>
+                      <Whiteboard
+                        canvasRef={canvasRef}
+                        startDrawing={startDrawing}
+                        draw={draw}
+                        stopDrawing={() => setIsDrawing(false)}
+                        myColor={myColor}
+                        setMyColor={setMyColor}
+                        handleClearBoard={handleClearBoard}
+                        whiteboardTool={whiteboardTool}
+                        setWhiteboardTool={setWhiteboardTool}
+                        whiteboardSize={whiteboardSize}
+                        setWhiteboardSize={setWhiteboardSize}
+                        whiteboardCursors={whiteboardCursors}
+                      />
+                    </div>
 
-                  <div className={`w-full h-full ${activeApp === 'slides' ? 'block' : 'hidden'}`}>
-                    <Slides
-                      slides={slides}
-                      activeSlide={activeSlide}
-                      setActiveSlide={setActiveSlide}
-                      isPresenting={isPresenting}
-                      setIsPresenting={setIsPresenting}
-                      addSlide={addSlide}
-                      handleSlideUpdate={handleSlideUpdate}
-                      roomId={roomId}
-                      socket={socket}
-                      activeUsers={activeUsers}
-                      setSlides={setSlides}
-                    />
-                  </div>
+                    <div className={`w-full h-full ${activeApp === 'sheets' ? 'block' : 'hidden'}`}>
+                      <Spreadsheet
+                        grid={grid}
+                        activeCell={activeCell}
+                        setActiveCell={setActiveCell}
+                        handleCellChange={handleCellChange}
+                        spreadsheetCells={spreadsheetCells}
+                      />
+                    </div>
 
-                  <div className={`w-full h-full ${activeApp === 'settings' ? 'block' : 'hidden'}`}>
-                    <Settings
-                      isDarkMode={isDarkMode}
-                      setIsDarkMode={setIsDarkMode}
-                      userName={getDisplayName()}
-                    />
+                    <div className={`w-full h-full ${activeApp === 'slides' ? 'block' : 'hidden'}`}>
+                      <Slides
+                        slides={slides}
+                        activeSlide={activeSlide}
+                        setActiveSlide={setActiveSlide}
+                        isPresenting={isPresenting}
+                        setIsPresenting={setIsPresenting}
+                        addSlide={addSlide}
+                        handleSlideUpdate={handleSlideUpdate}
+                        roomId={roomId}
+                        socket={socket}
+                        activeUsers={activeUsers}
+                        setSlides={setSlides}
+                      />
+                    </div>
+
+                    <div className={`w-full h-full ${activeApp === 'settings' ? 'block' : 'hidden'}`}>
+                      <Settings
+                        isDarkMode={isDarkMode}
+                        setIsDarkMode={setIsDarkMode}
+                        userName={getDisplayName()}
+                        roomId={roomId}
+                        socket={socket}
+                        roomSettings={roomSettings}
+                        setRoomSettings={setRoomSettings}
+                        isHost={isHost}
+                      />
+                    </div>
                   </div>
                 </div>
               </main>
