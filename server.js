@@ -31,14 +31,25 @@ const io = new Server(server, {
   }
 });
 
+// NEW: Object to keep track of users in each room
+const roomUsers = {};
+
 // --- REAL-TIME & DATABASE LOGIC ---
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
-  // 1. When a user joins a room
-  socket.on('join-room', async (roomId) => {
+  // 1. When a user joins a room (UPDATED to accept user data)
+  socket.on('join-room', async ({ roomId, user, imageUrl }) => {
     socket.join(roomId);
     
+    // Track the user for the presence avatars
+    if (!roomUsers[roomId]) roomUsers[roomId] = [];
+    roomUsers[roomId] = roomUsers[roomId].filter(u => u.socketId !== socket.id); // Remove dupes
+    roomUsers[roomId].push({ socketId: socket.id, user, imageUrl });
+    
+    // Broadcast the active users to everyone in this room
+    io.to(roomId).emit('active-users', roomUsers[roomId]);
+
     // Check the database: Does this document already exist?
     let document = await Document.findById(roomId);
     
@@ -79,6 +90,16 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    
+    // NEW: Remove user from the presence list and update others
+    for (const roomId in roomUsers) {
+      const initialLength = roomUsers[roomId].length;
+      roomUsers[roomId] = roomUsers[roomId].filter(u => u.socketId !== socket.id);
+      
+      if (roomUsers[roomId].length < initialLength) {
+        io.to(roomId).emit('active-users', roomUsers[roomId]); // Send updated list
+      }
+    }
   });
 });
 
