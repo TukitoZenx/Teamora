@@ -54,6 +54,57 @@ export default function Settings({ isDarkMode, setIsDarkMode, userName }) {
           </div>
         );
 
+      case 'workspace':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white">Workspace Settings</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Configure options for the current collaboration room.</p>
+            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/50 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Room ID</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={window.location.search.replace('?room=', '') || 'N/A'}
+                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-100 select-all"
+                  />
+                  <button
+                    onClick={() => {
+                      const id = window.location.search.replace('?room=', '');
+                      navigator.clipboard.writeText(id);
+                      toast.success('Room ID copied!');
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    Copy ID
+                  </button>
+                </div>
+              </div>
+              <div className="pt-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Workspace Share URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={window.location.href}
+                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-100 select-all"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success('Share link copied!');
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    Copy Link
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'appearance':
         return (
           <div className="space-y-6">

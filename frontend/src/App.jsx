@@ -29,8 +29,11 @@ import Spreadsheet from './components/Spreadsheet'
 import Slides from './components/Slides'
 import Settings from './components/Settings'
 
-// ⚠️ CHANGE TO YOUR RENDER URL FOR PRODUCTION!
-const socket = io('https://collab-workspace-cn0m.onrender.com')
+// Fallback to localhost if running locally
+const SOCKET_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3001'
+  : 'https://collab-workspace-cn0m.onrender.com';
+const socket = io(SOCKET_URL);
 
 const TOOLBAR_OPTIONS = [
   [{ header: [1, 2, 3, 4, 5, 6, false] }],
@@ -82,6 +85,11 @@ export default function App() {
   const [isDrawing, setIsDrawing] = useState(false)
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
   const [myColor, setMyColor] = useState('#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'))
+  const whiteboardStrokesRef = useRef([])
+  const [whiteboardTool, setWhiteboardTool] = useState('pen')
+  const [whiteboardSize, setWhiteboardSize] = useState(3)
+  const [whiteboardCursors, setWhiteboardCursors] = useState({})
+  const [spreadsheetCells, setSpreadsheetCells] = useState({})
 
   // New UI Upgrade States
   const [activities, setActivities] = useState([])
@@ -96,6 +104,7 @@ export default function App() {
     ]);
   };
 
+
   // Sheets States (15 rows, 8 columns)
   const [grid, setGrid] = useState(Array(15).fill().map(() => Array(8).fill('')))
   const [activeCell, setActiveCell] = useState(null)
@@ -107,6 +116,84 @@ export default function App() {
 
   const wrapperRef = useRef(null)
   const quillRef = useRef(null)
+
+  const roomStateRef = useRef(null);
+
+  const redrawWhiteboard = () => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    whiteboardStrokesRef.current.forEach(({ startX, startY, endX, endY, color, size }) => {
+      const isEraser = color === 'eraser';
+      if (isEraser) {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = size || 16;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = color || '#000000';
+        ctx.lineWidth = size || 3;
+      }
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    });
+    ctx.globalCompositeOperation = 'source-over';
+  };
+
+  useEffect(() => {
+    if (activeApp === 'whiteboard' && joined) {
+      setTimeout(redrawWhiteboard, 50);
+    }
+    if (joined) {
+      socket.emit('update-active-app', { roomId, activeApp });
+    }
+  }, [activeApp, joined, roomId]);
+
+  useEffect(() => {
+    if (joined && activeApp === 'slides') {
+      socket.emit('update-active-slide', { roomId, slideIndex: activeSlide });
+    }
+  }, [activeSlide, activeApp, joined, roomId]);
+
+  useEffect(() => {
+    if (joined && activeCell) {
+      socket.emit('spreadsheet-cell-move', { roomId, row: activeCell.r, col: activeCell.c, user: getDisplayName(), color: myColor });
+    }
+  }, [activeCell, joined, roomId]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setWhiteboardCursors(prev => {
+        const clean = {};
+        let changed = false;
+        for (const [id, data] of Object.entries(prev)) {
+          if (now - data.lastUpdated < 5000) {
+            clean[id] = data;
+          } else {
+            changed = true;
+          }
+        }
+        return changed ? clean : prev;
+      });
+      setSpreadsheetCells(prev => {
+        const clean = {};
+        let changed = false;
+        for (const [id, data] of Object.entries(prev)) {
+          if (now - data.lastUpdated < 15000) {
+            clean[id] = data;
+          } else {
+            changed = true;
+          }
+        }
+        return changed ? clean : prev;
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Load Recent Rooms & Auto-join
   useEffect(() => {
@@ -173,7 +260,13 @@ export default function App() {
       },
     })
 
-    quillRef.current = quill
+    quillRef.current = quill;
+
+    // Apply document if it was already loaded
+    if (roomStateRef.current && roomStateRef.current.document) {
+      quill.setContents(roomStateRef.current.document);
+      quill.enable();
+    }
   }, [joined, quillLoaded])
 
   // Connection and heartbeat checking
@@ -237,10 +330,19 @@ export default function App() {
       setActiveUsers(users);
     });
 
-    socket.once('load-document', (documentData) => {
-      if (documentData) quill.setContents(documentData);
+    const loadRoomHandler = (roomState) => {
+      roomStateRef.current = roomState;
+      if (roomState.document) quill.setContents(roomState.document);
+      if (roomState.whiteboard) {
+        whiteboardStrokesRef.current = roomState.whiteboard;
+        redrawWhiteboard();
+      }
+      if (roomState.spreadsheet) setGrid(roomState.spreadsheet);
+      if (roomState.slides) setSlides(roomState.slides);
+      if (roomState.chat) setMessages(roomState.chat);
       quill.enable();
-    });
+    };
+    socket.once('load-room', loadRoomHandler);
 
     const receiveHandler = (delta) => {
       quill.updateContents(delta);
@@ -279,22 +381,33 @@ export default function App() {
     });
 
     // Canvas, Sheets, Slides sync
-    socket.on('receive-draw-line', ({ startX, startY, endX, endY, color }) => {
+    socket.on('receive-draw-line', ({ startX, startY, endX, endY, color, size }) => {
       if (!canvasRef.current) return;
       const ctx = canvasRef.current.getContext('2d');
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 3;
+      const isEraser = color === 'eraser';
+      if (isEraser) {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = size || 16;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = size || 3;
+      }
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
       ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over'; // Reset
+
+      whiteboardStrokesRef.current.push({ startX, startY, endX, endY, color, size });
     });
 
     socket.on('receive-clear-board', () => {
       if (!canvasRef.current) return;
       const canvas = canvasRef.current;
       canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      whiteboardStrokesRef.current = [];
       toast.error('Brainstorm board was cleared by a collaborator', { icon: '🗑️' });
       addActivity('Collaborator', 'cleared the board', 'edit');
     });
@@ -312,7 +425,7 @@ export default function App() {
     socket.on('receive-slide-update', ({ slideIndex, field, value }) => {
       setSlides((prevSlides) => {
         const newSlides = [...prevSlides];
-        if (!newSlides[slideIndex]) newSlides[slideIndex] = { title: '', content: '' };
+        if (!newSlides[slideIndex]) newSlides[slideIndex] = { title: '', content: '', notes: '' };
         newSlides[slideIndex][field] = value;
         return newSlides;
       });
@@ -321,6 +434,25 @@ export default function App() {
 
     socket.on('receive-slide-change', (slideIndex) => setActiveSlide(slideIndex));
 
+    socket.on('receive-slides-list', (slidesList) => {
+      setSlides(slidesList);
+      addActivity('Collaborator', 'updated presentation slides', 'edit');
+    });
+
+    socket.on('receive-whiteboard-cursor', ({ socketId, x, y, user, color }) => {
+      setWhiteboardCursors(prev => ({
+        ...prev,
+        [socketId]: { x, y, user, color, lastUpdated: Date.now() }
+      }));
+    });
+
+    socket.on('receive-spreadsheet-cell', ({ socketId, row, col, user, color }) => {
+      setSpreadsheetCells(prev => ({
+        ...prev,
+        [socketId]: { row, col, user, color, lastUpdated: Date.now() }
+      }));
+    });
+
     const saveInterval = setInterval(() => {
       setIsSaving(true);
       socket.emit('save-document', { roomId, data: quill.getContents() });
@@ -328,15 +460,19 @@ export default function App() {
     }, SAVE_INTERVAL_MS);
 
     return () => {
+      socket.off('active-users');
+      socket.off('load-room', loadRoomHandler);
       socket.off('receive-changes', receiveHandler);
       socket.off('receive-cursor', receiveCursorHandler);
-      socket.off('active-users');
       socket.off('receive-message');
       socket.off('receive-draw-line');
       socket.off('receive-clear-board');
       socket.off('receive-spreadsheet');
       socket.off('receive-slide-update');
       socket.off('receive-slide-change');
+      socket.off('receive-slides-list');
+      socket.off('receive-whiteboard-cursor');
+      socket.off('receive-spreadsheet-cell');
       quill.off('text-change', textChangeHandler);
       quill.off('selection-change', selectionChangeHandler);
       clearInterval(saveInterval);
@@ -350,7 +486,13 @@ export default function App() {
   const handleJoinRoom = (targetRoomId) => {
     const roomToJoin = targetRoomId || roomId;
     if (roomToJoin.trim() !== '') {
-      socket.emit('join-room', { roomId: roomToJoin, user: getDisplayName(), imageUrl: user?.imageUrl });
+      socket.emit('join-room', { 
+        roomId: roomToJoin, 
+        user: getDisplayName(), 
+        imageUrl: user?.imageUrl,
+        color: myColor,
+        activeApp: activeApp
+      });
       setRoomId(roomToJoin);
       setJoined(true);
       toast.success(`Joined Room: ${roomToJoin}`);
@@ -419,23 +561,67 @@ export default function App() {
 
   // Whiteboard
   const startDrawing = (e) => {
-    const { offsetX, offsetY } = e.nativeEvent;
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scaleX = 1200 / rect.width;
+    const scaleY = 800 / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
     setIsDrawing(true);
-    setLastPos({ x: offsetX, y: offsetY });
+    setLastPos({ x, y });
   };
+  
+  const lastCursorEmitRef = useRef(0);
+  
   const draw = (e) => {
-    if (!isDrawing || activeApp !== 'whiteboard') return;
-    const { offsetX, offsetY } = e.nativeEvent;
+    if (activeApp !== 'whiteboard' || !canvasRef.current) return;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scaleX = 1200 / rect.width;
+    const scaleY = 800 / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
+    // Broadcast hover cursor position throttled
+    if (joined) {
+      const now = Date.now();
+      if (now - lastCursorEmitRef.current > 50) {
+        socket.emit('whiteboard-cursor-move', { roomId, x, y, user: getDisplayName(), color: myColor });
+        lastCursorEmitRef.current = now;
+      }
+    }
+    
+    if (!isDrawing) return;
+    
     const ctx = canvasRef.current.getContext('2d');
-    ctx.strokeStyle = myColor;
-    ctx.lineWidth = 3;
+    const isEraser = whiteboardTool === 'eraser';
+    if (isEraser) {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = whiteboardSize;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = myColor;
+      ctx.lineWidth = whiteboardSize;
+    }
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(lastPos.x, lastPos.y);
-    ctx.lineTo(offsetX, offsetY);
+    ctx.lineTo(x, y);
     ctx.stroke();
-    socket.emit('draw-line', { roomId, startX: lastPos.x, startY: lastPos.y, endX: offsetX, endY: offsetY, color: myColor });
-    setLastPos({ x: offsetX, y: offsetY });
+    ctx.globalCompositeOperation = 'source-over'; // Reset to default
+    
+    const strokeData = {
+      startX: lastPos.x,
+      startY: lastPos.y,
+      endX: x,
+      endY: y,
+      color: isEraser ? 'eraser' : myColor,
+      size: whiteboardSize
+    };
+    
+    socket.emit('draw-line', { roomId, ...strokeData });
+    whiteboardStrokesRef.current.push(strokeData);
+    setLastPos({ x, y });
   };
 
   return (
@@ -696,6 +882,11 @@ export default function App() {
                       myColor={myColor}
                       setMyColor={setMyColor}
                       handleClearBoard={handleClearBoard}
+                      whiteboardTool={whiteboardTool}
+                      setWhiteboardTool={setWhiteboardTool}
+                      whiteboardSize={whiteboardSize}
+                      setWhiteboardSize={setWhiteboardSize}
+                      whiteboardCursors={whiteboardCursors}
                     />
                   </div>
 
@@ -705,6 +896,7 @@ export default function App() {
                       activeCell={activeCell}
                       setActiveCell={setActiveCell}
                       handleCellChange={handleCellChange}
+                      spreadsheetCells={spreadsheetCells}
                     />
                   </div>
 
@@ -719,6 +911,8 @@ export default function App() {
                       handleSlideUpdate={handleSlideUpdate}
                       roomId={roomId}
                       socket={socket}
+                      activeUsers={activeUsers}
+                      setSlides={setSlides}
                     />
                   </div>
 

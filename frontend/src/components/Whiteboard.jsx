@@ -15,8 +15,7 @@ import {
   Hand,
   PenTool,
   Grid3X3,
-  Download,
-  Image as ImageIcon
+  Download
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,10 +26,13 @@ export default function Whiteboard({
   stopDrawing,
   myColor,
   setMyColor,
-  handleClearBoard
+  handleClearBoard,
+  whiteboardTool,
+  setWhiteboardTool,
+  whiteboardSize,
+  setWhiteboardSize,
+  whiteboardCursors = {}
 }) {
-  const [activeTool, setActiveTool] = React.useState('pen');
-  const [brushSize, setBrushSize] = React.useState(3);
   const [showGrid, setShowGrid] = React.useState(false);
   const [zoom, setZoom] = React.useState(100);
 
@@ -40,26 +42,25 @@ export default function Whiteboard({
   ];
 
   const selectTool = (tool) => {
-    setActiveTool(tool);
+    setWhiteboardTool(tool);
     if (tool === 'eraser') {
-      setMyColor('#ffffff');
-      setBrushSize(16);
+      setWhiteboardSize(16);
       toast('Eraser active', { icon: '🧹' });
     } else if (tool === 'marker') {
-      setMyColor(myColor === '#ffffff' ? '#3b82f6' : myColor);
-      setBrushSize(8);
+      setMyColor(myColor === '#ffffff' || myColor === 'eraser' ? '#3b82f6' : myColor);
+      setWhiteboardSize(8);
       toast('Marker active', { icon: '🖍️' });
     } else {
-      setMyColor(myColor === '#ffffff' ? '#3b82f6' : myColor);
-      setBrushSize(3);
+      setMyColor(myColor === '#ffffff' || myColor === 'eraser' ? '#3b82f6' : myColor);
+      setWhiteboardSize(3);
     }
   };
 
   const selectColor = (color) => {
     setMyColor(color);
-    if (activeTool === 'eraser') {
-      setActiveTool('pen');
-      setBrushSize(3);
+    if (whiteboardTool === 'eraser') {
+      setWhiteboardTool('pen');
+      setWhiteboardSize(3);
     }
   };
 
@@ -151,7 +152,7 @@ export default function Whiteboard({
           { id: 'text', icon: Type, label: 'Text' },
           { id: 'pan', icon: Hand, label: 'Pan' },
         ].map((tool) => {
-          const isActive = activeTool === tool.id;
+          const isActive = whiteboardTool === tool.id;
           return (
             <button
               key={tool.id}
@@ -199,12 +200,12 @@ export default function Whiteboard({
           <input 
             type="range" 
             min="1" 
-            max="20" 
-            value={brushSize}
-            onChange={(e) => setBrushSize(parseInt(e.target.value))}
+            max="40" 
+            value={whiteboardSize}
+            onChange={(e) => setWhiteboardSize(parseInt(e.target.value))}
             className="w-12 accent-indigo-600 cursor-pointer h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none"
           />
-          <span className="text-[10px] font-mono text-center text-slate-400">{brushSize}px</span>
+          <span className="text-[10px] font-mono text-center text-slate-400">{whiteboardSize}px</span>
         </div>
       </div>
 
@@ -221,17 +222,45 @@ export default function Whiteboard({
           />
         )}
 
-        <canvas
-          ref={canvasRef}
-          width={1200}
-          height={800}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseOut={stopDrawing}
-          className="cursor-crosshair shadow-2xl shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800/80 rounded-2xl bg-white dark:bg-slate-900 max-w-full max-h-full transition-all duration-300"
-          style={{ transform: `scale(${zoom / 100})` }}
-        />
+        <div className="relative border border-slate-200/50 dark:border-slate-800/80 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl shadow-slate-200/50 dark:shadow-none overflow-hidden" style={{ transform: `scale(${zoom / 100})`, width: 1200, height: 800, minWidth: 1200, minHeight: 800 }}>
+          <canvas
+            ref={canvasRef}
+            width={1200}
+            height={800}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseOut={stopDrawing}
+            className="cursor-crosshair w-full h-full"
+          />
+
+          {/* Floating Live Cursors layer */}
+          {Object.entries(whiteboardCursors).map(([id, cursor]) => (
+            <div 
+              key={id} 
+              className="absolute pointer-events-none transition-all duration-75 ease-out z-30" 
+              style={{ left: cursor.x, top: cursor.y }}
+            >
+              {/* Pointer Icon */}
+              <svg 
+                className="w-5 h-5 filter drop-shadow-sm select-none" 
+                viewBox="0 0 24 24" 
+                fill={cursor.color}
+                stroke="white"
+                strokeWidth="1.5"
+              >
+                <path d="M5.653 1.34A1 1 0 0 0 4 2.185v18.63a1 1 0 0 0 1.653.765l6.58-5.639h7.452a1 1 0 0 0 .765-1.653L5.653 1.34Z" />
+              </svg>
+              {/* User Name Badge */}
+              <div 
+                className="absolute left-3 top-3 text-[10px] text-white px-2 py-0.5 rounded-full font-bold shadow-md whitespace-nowrap"
+                style={{ backgroundColor: cursor.color }}
+              >
+                {cursor.user}
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* Floating Zoom Controls (Bottom Center) */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-full shadow-xl flex items-center gap-3 z-20 backdrop-blur-md transition-colors">

@@ -30,9 +30,10 @@ export default function Slides({
   addSlide,
   handleSlideUpdate,
   roomId,
-  socket
+  socket,
+  activeUsers = [],
+  setSlides
 }) {
-  const [slideNotes, setSlideNotes] = React.useState({});
   const [showNotes, setShowNotes] = React.useState(false);
   const [selectedTheme, setSelectedTheme] = React.useState('default');
   const [showThemePicker, setShowThemePicker] = React.useState(false);
@@ -63,11 +64,38 @@ export default function Slides({
   }, [isPresenting, setIsPresenting, activeSlide, slides.length, roomId, socket, setActiveSlide]);
 
   const handleDuplicateSlide = () => {
-    toast('Slide duplicated (UI placeholder)', { icon: '📋' });
+    const slideToDuplicate = slides[activeSlide];
+    if (!slideToDuplicate) return;
+    const newSlides = [...slides];
+    newSlides.splice(activeSlide + 1, 0, { 
+      title: slideToDuplicate.title, 
+      content: slideToDuplicate.content, 
+      notes: slideToDuplicate.notes || '' 
+    });
+    setSlides(newSlides);
+    setActiveSlide(activeSlide + 1);
+    socket.emit('update-slides-list', { roomId, slides: newSlides });
+    socket.emit('change-slide', { roomId, slideIndex: activeSlide + 1 });
+    toast.success('Slide duplicated');
   };
 
   const handleDeleteSlide = () => {
-    toast('Delete slide (UI placeholder)', { icon: '🗑️' });
+    if (slides.length <= 1) {
+      toast.error('Cannot delete the last slide');
+      return;
+    }
+    const newSlides = slides.filter((_, i) => i !== activeSlide);
+    const newActive = Math.max(0, activeSlide - 1);
+    setSlides(newSlides);
+    setActiveSlide(newActive);
+    socket.emit('update-slides-list', { roomId, slides: newSlides });
+    socket.emit('change-slide', { roomId, slideIndex: newActive });
+    toast.success('Slide deleted');
+  };
+
+  // Find users currently looking at slide index `slideIdx`
+  const getUsersOnSlide = (slideIdx) => {
+    return activeUsers.filter(u => u.activeApp === 'slides' && u.activeSlide === slideIdx);
   };
 
   return (
@@ -94,9 +122,9 @@ export default function Slides({
           </div>
 
           {/* Presenter Notes Bar */}
-          {slideNotes[activeSlide] && (
+          {slides[activeSlide]?.notes && (
             <div className="absolute bottom-24 left-1/2 -translate-x-1/2 max-w-lg w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-5 py-3">
-              <p className="text-xs text-white/60 leading-relaxed">{slideNotes[activeSlide]}</p>
+              <p className="text-xs text-white/60 leading-relaxed">{slides[activeSlide]?.notes}</p>
             </div>
           )}
 
@@ -237,8 +265,9 @@ export default function Slides({
           <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
             {slides.map((s, i) => {
               const isActive = activeSlide === i;
+              const usersHere = getUsersOnSlide(i);
               return (
-                <div key={i} className="flex gap-2 items-start group">
+                <div key={i} className="flex gap-2 items-start group relative">
                   <span className="text-[10px] font-bold text-slate-400 dark:text-slate-600 mt-2 w-4 text-right select-none">{i + 1}</span>
                   <button
                     onClick={() => {
@@ -254,6 +283,22 @@ export default function Slides({
                     <div className={`absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r ${theme.accent}`} />
                     <div className="text-[9px] font-bold text-slate-800 dark:text-slate-100 truncate w-full">{s.title || 'Untitled'}</div>
                     <div className="text-[7px] text-slate-400 dark:text-slate-500 line-clamp-2 mt-1 leading-snug">{s.content}</div>
+                    
+                    {/* Collaborative Users Badges */}
+                    {usersHere.length > 0 && (
+                      <div className="absolute bottom-1 right-1 flex -space-x-1.5 overflow-hidden z-10 p-0.5">
+                        {usersHere.map((u, uIdx) => (
+                          <img
+                            key={uIdx}
+                            className="inline-block h-4 w-4 rounded-full border bg-white object-cover"
+                            src={u.imageUrl || 'https://www.gravatar.com/avatar/?d=mp'}
+                            alt={u.user}
+                            title={u.user}
+                            style={{ borderColor: u.color || '#6366f1' }}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </button>
                 </div>
               );
@@ -295,8 +340,8 @@ export default function Slides({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Speaker Notes</span>
               </div>
               <textarea
-                value={slideNotes[activeSlide] || ''}
-                onChange={(e) => setSlideNotes(prev => ({ ...prev, [activeSlide]: e.target.value }))}
+                value={slides[activeSlide]?.notes || ''}
+                onChange={(e) => handleSlideUpdate('notes', e.target.value)}
                 placeholder="Add notes for this slide (only visible to presenter)..."
                 className="w-full h-16 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none transition-all"
               />
