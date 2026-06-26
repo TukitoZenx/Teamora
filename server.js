@@ -74,6 +74,18 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('receive-cursor', { range, user, color });
   });
 
+  socket.on('update-spreadsheet', ({ roomId , row , col , value }) => {
+    socket.to(roomId).emit('receive-spreadsheet', { row , col , value });
+  });
+
+  socket.on('update-slide' , ({ roomId , slideIndex , field , value }) => {
+    socket.to(roomId).emit('receive-slide-update' , { slideIndex , field , value });
+  });
+
+  socket.on('change-slide' , ({ roomId , slideIndex }) => {
+    socket.to(roomId).emit('receive-slide-change' , { slideIndex });
+  });
+
   // 4. NEW: Sync Chat Messages (Sidebar chat)
   socket.on('send-message', ({ roomId, message, user }) => {
     socket.to(roomId).emit('receive-message', {
@@ -82,6 +94,14 @@ io.on('connection', (socket) => {
       timestamp: new Date().toLocaleTimeString()
     });
   });
+
+  socket.on('draw-line', ({ roomId, startX, startY, endX, endY, color }) => {
+    socket.to(roomId).emit('receive-draw-line', { startX, startY, endX, endY, color });
+  });
+
+  socket.on('clear-board',(roomId) =>  {
+    socket.to(roomId).emit('receive-clear-board');
+  })
 
   // 5. Auto-save: Listen for the auto-save event from the frontend
   socket.on('save-document', async ({ roomId, data }) => {
