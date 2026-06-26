@@ -7,7 +7,6 @@ import {
   Hash,
   Copy,
   User as UserIcon,
-  LogIn,
   Plus,
   Lock,
   Moon,
@@ -28,6 +27,7 @@ import Documents from './components/Documents'
 import Whiteboard from './components/Whiteboard'
 import Spreadsheet from './components/Spreadsheet'
 import Slides from './components/Slides'
+import Settings from './components/Settings'
 
 // ⚠️ CHANGE TO YOUR RENDER URL FOR PRODUCTION!
 const socket = io('https://collab-workspace-cn0m.onrender.com')
@@ -47,15 +47,30 @@ export default function App() {
   const { user } = useUser();
   const [roomId, setRoomId] = useState('')
   const [workspaceName, setWorkspaceName] = useState('')
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('collabspace-dark-mode');
+    return saved ? JSON.parse(saved) : false;
+  })
   const [joined, setJoined] = useState(false)
   const [quillLoaded, setQuillLoaded] = useState(false)
   const [recentRooms, setRecentRooms] = useState([])
   const [activeUsers, setActiveUsers] = useState([])
 
   // App Navigation
-  const [activeApp, setActiveApp] = useState('docs') // 'docs', 'whiteboard', 'sheets', 'slides'
-  const [isAppMenuOpen, setIsAppMenuOpen] = useState(false)
+  const [activeApp, setActiveApp] = useState('docs') // 'docs', 'whiteboard', 'sheets', 'slides', 'settings'
+
+  // Right panel collapse state
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false)
+
+  // Persist dark mode
+  useEffect(() => {
+    localStorage.setItem('collabspace-dark-mode', JSON.stringify(isDarkMode));
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   // Chat States
   const [messages, setMessages] = useState([])
@@ -428,31 +443,12 @@ export default function App() {
       <Toaster position="top-right" toastOptions={{ className: 'dark:bg-slate-900 dark:text-slate-100 dark:border-slate-800' }} />
       {/* --- CSS Resets and Global Styles --- */}
       <style>{`
-        .ql-toolbar { background: white; border: none !important; border-bottom: 1px solid #e0e0e0 !important; border-radius: 8px 8px 0 0; }
-        .ql-container { border: none !important; font-size: 16px; font-family: 'Arial', sans-serif; }
+        .ql-toolbar { background: white; border: none !important; border-bottom: 1px solid #e0e0e0 !important; }
+        .ql-container { border: none !important; font-size: 16px; font-family: 'Inter', 'Arial', sans-serif; }
         .ql-editor { padding: 40px 60px; min-height: 800px; }
-        .app-menu-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.2s; color: #3c4043; font-weight: 500; }
-        .app-menu-item:hover { background-color: #f1f3f4; }
-        .sheet-cell { border-right: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0; padding: 0; position: relative; }
-        .sheet-input { width: 100%; height: 100%; border: none; padding: 8px; outline: none; font-size: 14px; }
-        .sheet-input:focus { box-shadow: inset 0 0 0 2px #1a73e8; z-index: 10; }
-        .sheet-header { background: #f8f9fa; border-right: 1px solid #c0c0c0; border-bottom: 1px solid #c0c0c0; text-align: center; padding: 5px 0; font-size: 12px; font-weight: 600; color: #5f6368; user-select: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-
-      {/* --- FULL SCREEN PRESENTATION MODE --- */}
-      {isPresenting && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'black', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <button onClick={() => setIsPresenting(false)} style={{ position: 'absolute', top: 20, right: 20, padding: '10px 20px', background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Exit Slideshow (Esc)</button>
-          <div style={{ width: '90vw', maxWidth: '1200px', aspectRatio: '16/9', backgroundColor: 'white', padding: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', borderRadius: '8px' }}>
-            <h1 style={{ fontSize: '4rem', marginBottom: '40px' }}>{slides[activeSlide]?.title}</h1>
-            <p style={{ fontSize: '2rem', color: '#555' }}>{slides[activeSlide]?.content}</p>
-          </div>
-          <div style={{ position: 'absolute', bottom: 30, display: 'flex', gap: '20px' }}>
-            <button onClick={() => setActiveSlide(Math.max(0, activeSlide - 1))} disabled={activeSlide === 0} style={{ padding: '15px', fontSize: '20px', cursor: 'pointer', borderRadius: '50%' }}>◀</button>
-            <button onClick={() => setActiveSlide(Math.min(slides.length - 1, activeSlide + 1))} disabled={activeSlide === slides.length - 1} style={{ padding: '15px', fontSize: '20px', cursor: 'pointer', borderRadius: '50%' }}>▶</button>
-          </div>
-        </div>
-      )}
 
       {/* --- LOGIN SCREEN --- */}
       <SignedOut>
@@ -725,19 +721,31 @@ export default function App() {
                       socket={socket}
                     />
                   </div>
+
+                  <div className={`w-full h-full ${activeApp === 'settings' ? 'block' : 'hidden'}`}>
+                    <Settings
+                      isDarkMode={isDarkMode}
+                      setIsDarkMode={setIsDarkMode}
+                      userName={getDisplayName()}
+                    />
+                  </div>
                 </div>
               </main>
 
-              {/* Right Tabbed Collaboration Panel */}
-              <CollaborationPanel
-                roomId={roomId}
-                messages={messages}
-                chatInput={chatInput}
-                setChatInput={setChatInput}
-                handleSendMessage={handleSendMessage}
-                activeUsers={activeUsers}
-                activities={activities}
-              />
+              {/* Right Tabbed Collaboration Panel - hide on settings */}
+              {activeApp !== 'settings' && (
+                <CollaborationPanel
+                  roomId={roomId}
+                  messages={messages}
+                  chatInput={chatInput}
+                  setChatInput={setChatInput}
+                  handleSendMessage={handleSendMessage}
+                  activeUsers={activeUsers}
+                  activities={activities}
+                  isCollapsed={isRightPanelCollapsed}
+                  setIsCollapsed={setIsRightPanelCollapsed}
+                />
+              )}
             </div>
 
             {/* Bottom Status Bar */}
