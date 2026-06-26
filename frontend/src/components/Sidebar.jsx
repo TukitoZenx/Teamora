@@ -5,7 +5,6 @@ import {
   Paintbrush, 
   TableProperties, 
   Presentation, 
-  FolderOpen, 
   Settings, 
   ChevronLeft, 
   ChevronRight,
@@ -26,11 +25,6 @@ export default function Sidebar({
     { id: 'whiteboard', label: 'Whiteboard', icon: Paintbrush, color: 'text-rose-500 bg-rose-500/10' },
     { id: 'sheets', label: 'Spreadsheet', icon: TableProperties, color: 'text-emerald-500 bg-emerald-500/10' },
     { id: 'slides', label: 'Slides', icon: Presentation, color: 'text-amber-500 bg-amber-500/10' },
-  ];
-
-  const secondaryItems = [
-    { id: 'files', label: 'Files', icon: FolderOpen },
-    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -90,26 +84,27 @@ export default function Sidebar({
         {/* Divider */}
         <div className="h-px bg-slate-200 dark:bg-slate-800/80 mx-2"></div>
 
-        {/* Secondary Navigation */}
+        {/* Settings Button */}
         <div className="space-y-1">
-          {secondaryItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {}}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/40 group relative cursor-pointer"
-            >
-              <div className="p-1.5 rounded-lg bg-transparent group-hover:bg-slate-200 dark:group-hover:bg-slate-800">
-                <item.icon className="w-4 h-4" />
-              </div>
-              {!isCollapsed && <span className="truncate">{item.label}</span>}
+          <button
+            onClick={() => setActiveApp('settings')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative cursor-pointer ${
+              activeApp === 'settings'
+                ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-700/50'
+                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/40'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg transition-colors ${activeApp === 'settings' ? 'text-slate-600 bg-slate-500/10' : 'bg-transparent group-hover:bg-slate-200 dark:group-hover:bg-slate-800'}`}>
+              <Settings className="w-4 h-4" />
+            </div>
+            {!isCollapsed && <span className="truncate">Settings</span>}
 
-              {isCollapsed && (
-                <div className="absolute left-16 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-md">
-                  {item.label}
-                </div>
-              )}
-            </button>
-          ))}
+            {isCollapsed && (
+              <div className="absolute left-16 bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-md">
+                Settings
+              </div>
+            )}
+          </button>
         </div>
       </div>
 

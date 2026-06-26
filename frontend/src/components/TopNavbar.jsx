@@ -2,13 +2,11 @@ import React from 'react';
 import { UserButton } from "@clerk/clerk-react";
 import { 
   Building2, 
-  Copy, 
   Check, 
   Wifi, 
   WifiOff, 
   Moon, 
   Sun, 
-  Bell, 
   Share2,
   CloudLightning
 } from 'lucide-react';
@@ -52,7 +50,7 @@ export default function TopNavbar({
         </div>
       </div>
 
-      {/* Center: Search & Room Actions */}
+      {/* Center: Room Actions */}
       <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-1.5 max-w-md w-96 hidden md:flex">
         <span className="text-xs text-slate-500 font-mono select-all truncate flex-1">
           Room: {roomId}
@@ -66,7 +64,7 @@ export default function TopNavbar({
         </button>
       </div>
 
-      {/* Right: Collaborative Avatars, Status, Actions, User */}
+      {/* Right: Status, Avatars, Actions, User */}
       <div className="flex items-center gap-4">
         {/* Connection Status */}
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-slate-50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800/50 text-slate-500 dark:text-slate-400">
@@ -116,15 +114,6 @@ export default function TopNavbar({
             title="Toggle Theme"
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-          
-          <button 
-            onClick={() => toast('No new notifications', { icon: '🔔' })}
-            className="p-2 text-slate-500 hover:text-indigo-500 dark:text-slate-400 dark:hover:text-indigo-400 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative"
-            title="Notifications"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full"></span>
           </button>
 
           <div className="flex items-center">
