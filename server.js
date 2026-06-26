@@ -6,7 +6,6 @@ const cors = require('cors');
 
 // --- DATABASE SETUP ---
 // REPLACE THIS STRING WITH YOUR MONGODB ATLAS CONNECTION STRING
-// Don't forget to replace <password> with your actual database password
 const MONGO_URI = 'mongodb+srv://collaborate:collaborate@cluster0.lsqk5i9.mongodb.net/?appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
@@ -58,7 +57,22 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('receive-changes', text);
   });
 
-  // 3. Auto-save: Listen for the auto-save event from the frontend
+  // 3. NEW: Sync Cursor Movements (Figma style)
+  // Added 'color' to support unique cursor colors
+  socket.on('cursor-move', ({ roomId, range, user, color }) => {
+    socket.to(roomId).emit('receive-cursor', { range, user, color });
+  });
+
+  // 4. NEW: Sync Chat Messages (Sidebar chat)
+  socket.on('send-message', ({ roomId, message, user }) => {
+    socket.to(roomId).emit('receive-message', {
+      message,
+      user,
+      timestamp: new Date().toLocaleTimeString()
+    });
+  });
+
+  // 5. Auto-save: Listen for the auto-save event from the frontend
   socket.on('save-document', async ({ roomId, data }) => {
     await Document.findByIdAndUpdate(roomId, { data });
   });

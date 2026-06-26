@@ -13,6 +13,7 @@
     "@clerk/clerk-react": "^5.61.8",
     "html2pdf.js": "^0.14.0",
     "quill": "^2.0.3",
+    "quill-cursors": "^4.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "socket.io-client": "^4.8.3"
