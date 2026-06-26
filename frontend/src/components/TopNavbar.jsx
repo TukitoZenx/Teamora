@@ -11,6 +11,7 @@ import {
   CloudLightning
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ScreenShareButton from './ScreenShareButton';
 
 export default function TopNavbar({
   workspaceName,
@@ -20,7 +21,11 @@ export default function TopNavbar({
   activeUsers,
   isConnected,
   latency,
-  isSaving
+  isSaving,
+  isSharing,
+  startSharing,
+  stopSharing,
+  presenter
 }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -108,6 +113,13 @@ export default function TopNavbar({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-800 pl-4">
+          <ScreenShareButton
+            isSharing={isSharing}
+            startSharing={startSharing}
+            stopSharing={stopSharing}
+            presenter={presenter}
+          />
+
           <button 
             onClick={() => setIsDarkMode(!isDarkMode)}
             className="p-2 text-slate-500 hover:text-indigo-500 dark:text-slate-400 dark:hover:text-indigo-400 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

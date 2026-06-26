@@ -30,7 +30,16 @@ const SHORTCUTS = [
   { keys: ['Enter'], action: 'Confirm cell (Spreadsheet)' },
 ];
 
-export default function Settings({ isDarkMode, setIsDarkMode, userName }) {
+export default function Settings({ 
+  isDarkMode, 
+  setIsDarkMode, 
+  userName,
+  roomId,
+  socket,
+  roomSettings = { screenShareAllowed: 'everyone' },
+  setRoomSettings,
+  isHost
+}) {
   const [activeSection, setActiveSection] = React.useState('profile');
 
   const renderContent = () => {
@@ -58,47 +67,107 @@ export default function Settings({ isDarkMode, setIsDarkMode, userName }) {
         return (
           <div className="space-y-6">
             <h2 className="text-lg font-bold text-slate-800 dark:text-white">Workspace Settings</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Configure options for the current collaboration room.</p>
-            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/50 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Room ID</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={window.location.search.replace('?room=', '') || 'N/A'}
-                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-100 select-all"
-                  />
-                  <button
-                    onClick={() => {
-                      const id = window.location.search.replace('?room=', '');
-                      navigator.clipboard.writeText(id);
-                      toast.success('Room ID copied!');
-                    }}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer"
-                  >
-                    Copy ID
-                  </button>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Configure options for the current collaboration room.</p>
+            
+            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-2xl p-6 border border-slate-200/50 dark:border-slate-700/50 space-y-6">
+              {/* Room ID & Share Info */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Room ID</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={roomId || 'N/A'}
+                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-100 select-all focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(roomId);
+                        toast.success('Room ID copied!');
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                    >
+                      Copy ID
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Workspace Share URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${window.location.origin}?room=${roomId}`}
+                      className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-100 select-all focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}?room=${roomId}`);
+                        toast.success('Share link copied!');
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="pt-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Workspace Share URL</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={window.location.href}
-                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-100 select-all"
-                  />
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href);
-                      toast.success('Share link copied!');
-                    }}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer"
-                  >
-                    Copy Link
-                  </button>
+
+              <div className="h-px bg-slate-200 dark:bg-slate-700"></div>
+
+              {/* Presentation permissions */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Presentation Permissions</label>
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-400">Configure who is allowed to present screen shares in this room.</p>
+                  
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button
+                      disabled={!isHost}
+                      onClick={() => {
+                        const newSettings = { ...roomSettings, screenShareAllowed: 'everyone' };
+                        setRoomSettings(newSettings);
+                        socket.emit('update-room-settings', { roomId, settings: newSettings });
+                        toast.success('Permission updated: Everyone can present.');
+                      }}
+                      className={`flex items-center justify-between p-3.5 rounded-xl border text-xs font-semibold transition-all ${
+                        !isHost ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                      } ${
+                        roomSettings?.screenShareAllowed !== 'host'
+                          ? 'border-indigo-500 bg-indigo-500/5 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <span>Everyone</span>
+                      {roomSettings?.screenShareAllowed !== 'host' && (
+                        <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                      )}
+                    </button>
+
+                    <button
+                      disabled={!isHost}
+                      onClick={() => {
+                        const newSettings = { ...roomSettings, screenShareAllowed: 'host' };
+                        setRoomSettings(newSettings);
+                        socket.emit('update-room-settings', { roomId, settings: newSettings });
+                        toast.success('Permission updated: Host-only presentation.');
+                      }}
+                      className={`flex items-center justify-between p-3.5 rounded-xl border text-xs font-semibold transition-all ${
+                        !isHost ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                      } ${
+                        roomSettings?.screenShareAllowed === 'host'
+                          ? 'border-indigo-500 bg-indigo-500/5 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <span>Host Only</span>
+                      {roomSettings?.screenShareAllowed === 'host' && (
+                        <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

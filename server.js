@@ -72,6 +72,7 @@ setInterval(async () => {
 
 // Active users tracking in memory
 const roomUsers = {};
+const roomPresenters = {}; // { roomId: { socketId, user, color } }
 
 // --- REAL-TIME & DATABASE LOGIC ---
 io.on('connection', (socket) => {
@@ -126,7 +127,8 @@ io.on('connection', (socket) => {
 
     // Send complete saved room state back to user who joined
     if (roomsCache[roomId]) {
-      socket.emit('load-room', roomsCache[roomId]);
+      const activePresenter = roomPresenters[roomId] || null;
+      socket.emit('load-room', { ...roomsCache[roomId], activePresenter });
     }
   });
 
@@ -236,9 +238,128 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 9. WebRTC Screen Sharing & Signaling
+  socket.on('start-screen-share', ({ roomId, user, color }) => {
+    const room = roomsCache[roomId];
+    const settings = room ? (room.settings || {}) : {};
+    const shareAllowed = settings.screenShareAllowed || 'everyone';
+    
+    const users = roomUsers[roomId] || [];
+    const isHost = users[0] && users[0].socketId === socket.id;
+    
+    if (shareAllowed === 'host' && !isHost) {
+      socket.emit('screen-share-error', 'Only the host is allowed to present screen.');
+      return;
+    }
+
+    if (roomPresenters[roomId]) {
+      const prevPresenter = roomPresenters[roomId];
+      io.to(roomId).emit('screen-share-ended', { presenterSocketId: prevPresenter.socketId });
+    }
+
+    roomPresenters[roomId] = { socketId: socket.id, user, color };
+    
+    if (roomUsers[roomId]) {
+      const u = roomUsers[roomId].find(usr => usr.socketId === socket.id);
+      if (u) u.activeApp = 'presenting';
+      io.to(roomId).emit('active-users', roomUsers[roomId]);
+    }
+
+    io.to(roomId).emit('screen-share-started', { 
+      presenterSocketId: socket.id, 
+      user, 
+      color 
+    });
+  });
+
+  socket.on('stop-screen-share', ({ roomId }) => {
+    if (roomPresenters[roomId] && roomPresenters[roomId].socketId === socket.id) {
+      delete roomPresenters[roomId];
+      
+      if (roomUsers[roomId]) {
+        const u = roomUsers[roomId].find(usr => usr.socketId === socket.id);
+        if (u) u.activeApp = 'docs';
+        io.to(roomId).emit('active-users', roomUsers[roomId]);
+      }
+
+      io.to(roomId).emit('screen-share-ended', { presenterSocketId: socket.id });
+    }
+  });
+
+  socket.on('host-stop-screen-share', ({ roomId, presenterSocketId }) => {
+    const users = roomUsers[roomId] || [];
+    const isHost = users[0] && users[0].socketId === socket.id;
+    
+    if (isHost && roomPresenters[roomId] && roomPresenters[roomId].socketId === presenterSocketId) {
+      delete roomPresenters[roomId];
+      
+      if (roomUsers[roomId]) {
+        const u = roomUsers[roomId].find(usr => usr.socketId === presenterSocketId);
+        if (u) u.activeApp = 'docs';
+        io.to(roomId).emit('active-users', roomUsers[roomId]);
+      }
+
+      io.to(roomId).emit('screen-share-ended', { presenterSocketId: presenterSocketId, forced: true });
+    }
+  });
+
+  socket.on('update-room-settings', ({ roomId, settings }) => {
+    if (roomsCache[roomId]) {
+      roomsCache[roomId].settings = {
+        ...roomsCache[roomId].settings,
+        ...settings
+      };
+      dirtyRooms.add(roomId);
+      io.to(roomId).emit('receive-room-settings', roomsCache[roomId].settings);
+    }
+  });
+
+  socket.on('watch-screen', ({ roomId, presenterSocketId }) => {
+    if (roomUsers[roomId]) {
+      const u = roomUsers[roomId].find(usr => usr.socketId === socket.id);
+      if (u && u.activeApp !== 'presenting') {
+        u.activeApp = 'watching';
+        io.to(roomId).emit('active-users', roomUsers[roomId]);
+      }
+    }
+    io.to(presenterSocketId).emit('user-joined-presenter', { 
+      viewerSocketId: socket.id, 
+      viewerName: socket.id 
+    });
+  });
+
+  socket.on('offer', ({ targetSocketId, sdp }) => {
+    io.to(targetSocketId).emit('offer', { 
+      senderSocketId: socket.id, 
+      sdp 
+    });
+  });
+
+  socket.on('answer', ({ targetSocketId, sdp }) => {
+    io.to(targetSocketId).emit('answer', { 
+      senderSocketId: socket.id, 
+      sdp 
+    });
+  });
+
+  socket.on('ice-candidate', ({ targetSocketId, candidate }) => {
+    io.to(targetSocketId).emit('ice-candidate', { 
+      senderSocketId: socket.id, 
+      candidate 
+    });
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     
+    // Clean up active presenter if they disconnect
+    for (const roomId in roomPresenters) {
+      if (roomPresenters[roomId].socketId === socket.id) {
+        delete roomPresenters[roomId];
+        io.to(roomId).emit('screen-share-ended', { presenterSocketId: socket.id });
+      }
+    }
+
     // Remove user from the presence list and update others
     for (const roomId in roomUsers) {
       const initialLength = roomUsers[roomId].length;

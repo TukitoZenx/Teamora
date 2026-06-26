@@ -13,7 +13,9 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Tv,
+  Eye
 } from 'lucide-react';
 
 const EMOJI_LIST = ['😀','😂','❤️','👍','🎉','🔥','💯','✨','🚀','💡','👏','🙌','😍','🤔','😎','💪','🎯','⭐','💜','🙏'];
@@ -62,11 +64,13 @@ export default function CollaborationPanel({
 
   const getAppLabel = (appId) => {
     switch(appId) {
-      case 'docs': return 'Documents';
-      case 'whiteboard': return 'Whiteboard';
-      case 'sheets': return 'Spreadsheet';
-      case 'slides': return 'Slides';
-      case 'settings': return 'Settings';
+      case 'docs': return '📄 Documents';
+      case 'whiteboard': return '🎨 Whiteboard';
+      case 'sheets': return '📊 Spreadsheet';
+      case 'slides': return '📽 Slides';
+      case 'settings': return '⚙️ Settings';
+      case 'presenting': return '📺 Presenting Screen';
+      case 'watching': return '👀 Watching';
       default: return 'Workspace';
     }
   };
@@ -262,7 +266,13 @@ export default function CollaborationPanel({
                           {i === 0 && <Crown className="w-3.5 h-3.5 text-amber-500" title="Host" />}
                         </span>
                         <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Monitor className="w-3 h-3 text-indigo-400" />
+                          {member.activeApp === 'presenting' ? (
+                            <Tv className="w-3 h-3 text-rose-500 animate-pulse" />
+                          ) : member.activeApp === 'watching' ? (
+                            <Eye className="w-3 h-3 text-emerald-500 animate-pulse" />
+                          ) : (
+                            <Monitor className="w-3 h-3 text-indigo-400" />
+                          )}
                           {getAppLabel(member.activeApp || 'docs')}
                         </span>
                       </div>
