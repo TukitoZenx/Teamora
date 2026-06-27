@@ -68,6 +68,11 @@ export default function CollaborationPanel({
       case 'whiteboard': return '🎨 Whiteboard';
       case 'sheets': return '📊 Spreadsheet';
       case 'slides': return '📽 Slides';
+      case 'files': return '📁 Files';
+      case 'calendar': return '📅 Calendar';
+      case 'tasks': return '✅ Tasks';
+      case 'meetings': return '📹 Meetings';
+      case 'chat': return '💬 Chat';
       case 'settings': return '⚙️ Settings';
       case 'presenting': return '📺 Presenting Screen';
       case 'watching': return '👀 Watching';

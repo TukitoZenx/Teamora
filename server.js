@@ -15,14 +15,20 @@ mongoose.connect(MONGO_URI)
 const RoomSchema = new mongoose.Schema({
   _id: String, // We use the Room ID as the database ID
   document: { type: Object, default: null }, // Quill Delta
-  whiteboard: { type: Array, default: [] }, // strokes [{ startX, startY, endX, endY, color, size }]
+  documentComments: { type: Array, default: [] }, // comments [{ id, user, text, timestamp, range }]
+  documentVersions: { type: Array, default: [] }, // history [{ versionId, timestamp, user, data }]
+  whiteboard: { type: Array, default: [] }, // strokes & elements [{ type, startX, startY, endX, endY, color, size, text, x, y, width, height }]
   spreadsheet: { type: Array, default: null }, // 2D array of grid cells [[String]]
+  spreadsheetConfig: { type: Object, default: {} }, // sorting, conditional formatting, pivot configs
   slides: { 
     type: Array, 
     default: [{ title: 'Click to add title', content: 'Click to add text', notes: '' }] 
   },
-  chat: { type: Array, default: [] }, // messages [{ message, user, timestamp }]
-  settings: { type: Object, default: {} }
+  chat: { type: Array, default: [] }, // messages [{ message, user, timestamp, attachmentId, replyTo, pinned }]
+  settings: { type: Object, default: {} },
+  files: { type: Array, default: [] }, // [{ id, name, type, size, content, folderId, uploadedBy, uploadedAt, version }]
+  calendar: { type: Array, default: [] }, // [{ id, title, start, end, description, category, recurring, attendees }]
+  tasks: { type: Array, default: [] } // [{ id, title, description, status, priority, assignee, dueDate, comments }]
 });
 const Room = mongoose.model('Room', RoomSchema);
 
@@ -56,11 +62,17 @@ setInterval(async () => {
     try {
       await Room.findByIdAndUpdate(roomId, {
         document: cachedRoom.document,
+        documentComments: cachedRoom.documentComments,
+        documentVersions: cachedRoom.documentVersions,
         whiteboard: cachedRoom.whiteboard,
         spreadsheet: cachedRoom.spreadsheet,
+        spreadsheetConfig: cachedRoom.spreadsheetConfig,
         slides: cachedRoom.slides,
         chat: cachedRoom.chat,
-        settings: cachedRoom.settings
+        settings: cachedRoom.settings,
+        files: cachedRoom.files,
+        calendar: cachedRoom.calendar,
+        tasks: cachedRoom.tasks
       }, { upsert: true });
       console.log(`💾 Auto-saved room ${roomId} to MongoDB.`);
     } catch (err) {
@@ -91,20 +103,32 @@ io.on('connection', (socket) => {
           dbRoom = await Room.create({
             _id: roomId,
             document: null,
+            documentComments: [],
+            documentVersions: [],
             whiteboard: [],
             spreadsheet: defaultGrid,
+            spreadsheetConfig: {},
             slides: [{ title: 'Click to add title', content: 'Click to add text', notes: '' }],
             chat: [],
-            settings: {}
+            settings: {},
+            files: [],
+            calendar: [],
+            tasks: []
           });
         }
         roomsCache[roomId] = {
           document: dbRoom.document,
+          documentComments: dbRoom.documentComments || [],
+          documentVersions: dbRoom.documentVersions || [],
           whiteboard: dbRoom.whiteboard || [],
           spreadsheet: dbRoom.spreadsheet || Array(15).fill().map(() => Array(8).fill('')),
+          spreadsheetConfig: dbRoom.spreadsheetConfig || {},
           slides: dbRoom.slides || [{ title: 'Click to add title', content: 'Click to add text', notes: '' }],
           chat: dbRoom.chat || [],
-          settings: dbRoom.settings || {}
+          settings: dbRoom.settings || {},
+          files: dbRoom.files || [],
+          calendar: dbRoom.calendar || [],
+          tasks: dbRoom.tasks || []
         };
       } catch (err) {
         console.error('Error loading room:', err);
@@ -346,6 +370,82 @@ io.on('connection', (socket) => {
     io.to(targetSocketId).emit('ice-candidate', { 
       senderSocketId: socket.id, 
       candidate 
+    });
+  });
+
+  // 10. Workspace Files persistence
+  socket.on('update-files', ({ roomId, files }) => {
+    if (roomsCache[roomId]) {
+      roomsCache[roomId].files = files;
+      dirtyRooms.add(roomId);
+    }
+    socket.to(roomId).emit('receive-files', files);
+  });
+
+  // 11. Workspace Calendar persistence
+  socket.on('update-calendar', ({ roomId, calendar }) => {
+    if (roomsCache[roomId]) {
+      roomsCache[roomId].calendar = calendar;
+      dirtyRooms.add(roomId);
+    }
+    socket.to(roomId).emit('receive-calendar', calendar);
+  });
+
+  // 12. Workspace Tasks (Kanban cards) persistence
+  socket.on('update-tasks', ({ roomId, tasks }) => {
+    if (roomsCache[roomId]) {
+      roomsCache[roomId].tasks = tasks;
+      dirtyRooms.add(roomId);
+    }
+    socket.to(roomId).emit('receive-tasks', tasks);
+  });
+
+  // 13. Spreadsheet Config updates
+  socket.on('update-spreadsheet-config', ({ roomId, config }) => {
+    if (roomsCache[roomId]) {
+      roomsCache[roomId].spreadsheetConfig = config;
+      dirtyRooms.add(roomId);
+    }
+    socket.to(roomId).emit('receive-spreadsheet-config', config);
+  });
+
+  // 14. Document Comments & History updates
+  socket.on('update-document-comments', ({ roomId, comments }) => {
+    if (roomsCache[roomId]) {
+      roomsCache[roomId].documentComments = comments;
+      dirtyRooms.add(roomId);
+    }
+    socket.to(roomId).emit('receive-document-comments', comments);
+  });
+
+  socket.on('update-document-versions', ({ roomId, versions }) => {
+    if (roomsCache[roomId]) {
+      roomsCache[roomId].documentVersions = versions;
+      dirtyRooms.add(roomId);
+    }
+    socket.to(roomId).emit('receive-document-versions', versions);
+  });
+
+  // 15. Real-Time Video Meeting signaling (WebRTC Mesh)
+  socket.on('meeting-join', ({ roomId, participant }) => {
+    socket.to(roomId).emit('receive-meeting-join', participant);
+  });
+
+  socket.on('meeting-leave', ({ roomId, socketId }) => {
+    socket.to(roomId).emit('receive-meeting-leave', socketId);
+  });
+
+  socket.on('meeting-signal', ({ roomId, targetSocketId, signal }) => {
+    io.to(targetSocketId).emit('receive-meeting-signal', {
+      senderSocketId: socket.id,
+      signal
+    });
+  });
+
+  socket.on('meeting-state-change', ({ roomId, state }) => {
+    socket.to(roomId).emit('receive-meeting-state-change', {
+      socketId: socket.id,
+      state
     });
   });
 

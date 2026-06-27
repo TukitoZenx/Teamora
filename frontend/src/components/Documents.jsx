@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Download, FileText, 
   Image, Table2, Shapes, Link, 
   BarChart3, File, Type, List,
-  Printer,
-  Bookmark, Languages, SpellCheck2 as SpellCheck, ZoomIn, ZoomOut, Maximize2, Eye,
-  Ruler, Columns, PanelLeft, Replace
+  Printer, MessageSquare, History, Send, Trash2, ArrowLeft,
+  Ruler, Columns, PanelLeft, Replace, Check, X
 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import toast from 'react-hot-toast';
@@ -13,52 +12,41 @@ import toast from 'react-hot-toast';
 const MENU_ITEMS = {
   File: [
     { label: 'New Document', icon: FileText },
-    { label: 'Save', icon: Download },
+    { label: 'Save Draft', icon: Download, action: 'saveDraft' },
     { label: 'Export as PDF', icon: Download, action: 'exportPdf' },
     { label: 'Print', icon: Printer },
   ],
   Insert: [
-    { label: 'Image', icon: Image },
-    { label: 'Table', icon: Table2 },
-    { label: 'Shape', icon: Shapes },
-    { label: 'Link', icon: Link },
-    { label: 'Chart', icon: BarChart3 },
-    { label: 'File', icon: File },
+    { label: 'Image', icon: Image, action: 'insertImage' },
+    { label: 'Table', icon: Table2, action: 'insertTable' },
+    { label: 'Link', icon: Link, action: 'insertLink' },
   ],
   Layout: [
     { label: 'Margins', icon: Ruler },
     { label: 'Columns', icon: Columns },
     { label: 'Page Setup', icon: PanelLeft },
   ],
-  References: [
-    { label: 'Table of Contents', icon: List },
-    { label: 'Bookmark', icon: Bookmark },
-    { label: 'Footnote', icon: Type },
-  ],
   Review: [
-    { label: 'Spell Check', icon: SpellCheck },
-    { label: 'Language', icon: Languages },
-    { label: 'Find & Replace', icon: Replace },
-  ],
-  View: [
-    { label: 'Zoom In', icon: ZoomIn },
-    { label: 'Zoom Out', icon: ZoomOut },
-    { label: 'Full Width', icon: Maximize2 },
-    { label: 'Reading Mode', icon: Eye },
-  ],
-  Help: [
-    { label: 'Keyboard Shortcuts', icon: Type },
-    { label: 'About', icon: FileText },
-  ],
+    { label: 'Spell Check', icon: Type },
+    { label: 'Word Count', icon: List }
+  ]
 };
 
 export default function Documents({
   wrapperRef,
   isSaving,
-  activeUsersCount
+  activeUsersCount,
+  comments = [],
+  socket,
+  roomId,
+  userName,
+  versions = [],
+  onRevertVersion
 }) {
-  const [docTitle, setDocTitle] = React.useState('Untitled Document');
-  const [openMenu, setOpenMenu] = React.useState(null);
+  const [docTitle, setDocTitle] = useState('Untitled Document');
+  const [openMenu, setOpenMenu] = useState(null);
+  const [activeSidePanel, setActiveSidePanel] = useState(null); // null | 'comments' | 'versions'
+  const [commentInput, setCommentInput] = useState('');
 
   const exportToPDF = () => {
     const element = wrapperRef.current?.querySelector('.ql-editor');
@@ -86,12 +74,79 @@ export default function Documents({
   };
 
   const handleMenuAction = (item) => {
+    setOpenMenu(null);
     if (item.action === 'exportPdf') {
       exportToPDF();
+    } else if (item.action === 'saveDraft') {
+      // Manual trigger to append a version
+      const editor = wrapperRef.current?.querySelector('.ql-editor');
+      if (editor) {
+        const text = editor.innerHTML;
+        const newVersion = {
+          versionId: 'ver-' + Math.random().toString(36).substring(7),
+          timestamp: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString(),
+          user: userName,
+          data: text
+        };
+        const updated = [newVersion, ...versions];
+        socket.emit('update-document-versions', { roomId, versions: updated });
+        toast.success('Document draft saved in version history!');
+      }
+    } else if (item.action === 'insertImage') {
+      const url = prompt('Enter Image URL:');
+      if (url) {
+        const editor = wrapperRef.current?.querySelector('.ql-editor');
+        if (editor) editor.innerHTML += `<img src="${url}" class="max-w-md my-4 rounded-lg shadow-sm" />`;
+        toast.success('Image inserted!');
+      }
+    } else if (item.action === 'insertTable') {
+      const rows = prompt('Rows count:', '3');
+      const cols = prompt('Columns count:', '3');
+      if (rows && cols) {
+        let tableHTML = '<table class="border-collapse border border-slate-300 my-4 w-full">';
+        for (let r = 0; r < parseInt(rows); r++) {
+          tableHTML += '<tr>';
+          for (let c = 0; c < parseInt(cols); c++) {
+            tableHTML += '<td class="border border-slate-300 p-2 text-xs">Cell</td>';
+          }
+          tableHTML += '</tr>';
+        }
+        tableHTML += '</table>';
+        const editor = wrapperRef.current?.querySelector('.ql-editor');
+        if (editor) editor.innerHTML += tableHTML;
+        toast.success('Table inserted!');
+      }
+    } else if (item.action === 'insertLink') {
+      const text = prompt('Link Text:');
+      const url = prompt('Link URL (https://...):');
+      if (text && url) {
+        const editor = wrapperRef.current?.querySelector('.ql-editor');
+        if (editor) editor.innerHTML += ` <a href="${url}" class="text-indigo-600 underline" target="_blank">${text}</a> `;
+        toast.success('Link inserted!');
+      }
     } else {
       toast(`${item.label} (coming soon)`, { icon: '📝' });
     }
-    setOpenMenu(null);
+  };
+
+  const handleAddComment = () => {
+    if (!commentInput.trim()) return;
+    const commentObj = {
+      id: 'comment-' + Math.random().toString(36).substring(7),
+      user: userName,
+      text: commentInput,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    const updated = [...comments, commentObj];
+    socket.emit('update-document-comments', { roomId, comments: updated });
+    setCommentInput('');
+    toast.success('Comment thread added!');
+  };
+
+  const handleDeleteComment = (commentId) => {
+    const updated = comments.filter((c) => c.id !== commentId);
+    socket.emit('update-document-comments', { roomId, comments: updated });
+    toast.success('Comment resolved.');
   };
 
   return (
@@ -116,19 +171,35 @@ export default function Documents({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Side Panel Toggle Toggles */}
+        <div className="flex items-center gap-2">
           <button 
-            onClick={exportToPDF}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-sm cursor-pointer transition-colors"
+            onClick={() => setActiveSidePanel(activeSidePanel === 'comments' ? null : 'comments')}
+            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+              activeSidePanel === 'comments'
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-white hover:bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+            }`}
+            title="Comments Sidebar"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export PDF</span>
+            <MessageSquare className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setActiveSidePanel(activeSidePanel === 'versions' ? null : 'versions')}
+            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+              activeSidePanel === 'versions'
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-white hover:bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+            }`}
+            title="Version History"
+          >
+            <History className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* Word-like Ribbon Menu Bar */}
-      <div className="h-9 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 px-3 flex items-center gap-0.5 shrink-0 relative z-30">
+      <div className="h-9 border-b border-slate-200 dark:border-slate-800 bg-slate-50/85 dark:bg-slate-900/85 px-3 flex items-center gap-0.5 shrink-0 relative z-30">
         {Object.keys(MENU_ITEMS).map((menuName) => (
           <div key={menuName} className="relative">
             <button
@@ -165,17 +236,105 @@ export default function Documents({
         ))}
       </div>
 
-      {/* Editor Content Area - Full Width, No Side Panel */}
-      <div className="flex-1 overflow-hidden">
-        <div className="w-full h-full overflow-y-auto flex justify-center no-scrollbar">
+      {/* Editor Content Area + Collapsible Side Panel */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main Editor */}
+        <div className="flex-1 overflow-y-auto flex justify-center no-scrollbar bg-slate-50 dark:bg-slate-900">
           <div className="w-full max-w-none bg-white dark:bg-slate-950 border-x border-slate-200/60 dark:border-slate-800 min-h-full transition-colors relative flex flex-col">
-            {/* Top gradient accent */}
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
-            
-            {/* Quill editor mounts here */}
             <div ref={wrapperRef} className="flex-1 quill-editor-wrapper"></div>
           </div>
         </div>
+
+        {/* Collapsible sidebar panels */}
+        {activeSidePanel === 'comments' && (
+          <div className="w-72 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col shrink-0 text-xs">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between font-bold text-[10px] text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/10 shrink-0">
+              <span>Comments Threads</span>
+              <button onClick={() => setActiveSidePanel(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            
+            {/* Thread list */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+              {comments.length === 0 ? (
+                <p className="italic text-slate-400 text-center py-6">No comment threads in this document.</p>
+              ) : (
+                comments.map((c) => (
+                  <div key={c.id} className="bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-xl p-3 relative">
+                    <button
+                      onClick={() => handleDeleteComment(c.id)}
+                      className="absolute top-2.5 right-2.5 p-1 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-300 hover:text-rose-500 rounded-md cursor-pointer"
+                      title="Resolve Thread"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="flex items-center justify-between text-[8px] font-bold text-slate-400 mb-1">
+                      <span>{c.user}</span>
+                      <span>{c.timestamp}</span>
+                    </div>
+                    <p className="text-slate-700 dark:text-slate-200 leading-normal">{c.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Input field */}
+            <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+              <input
+                type="text"
+                placeholder="Write a comment..."
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-[11px] text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+              />
+              <button 
+                onClick={handleAddComment}
+                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold cursor-pointer"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeSidePanel === 'versions' && (
+          <div className="w-72 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col shrink-0 text-xs">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between font-bold text-[10px] text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/10 shrink-0">
+              <span>Version History</span>
+              <button onClick={() => setActiveSidePanel(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+              {versions.length === 0 ? (
+                <p className="italic text-slate-400 text-center py-6">No saved history drafts.</p>
+              ) : (
+                versions.map((ver, i) => (
+                  <div 
+                    key={ver.versionId} 
+                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-xl p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between text-[8px] font-bold text-slate-400">
+                      <span>Draft #{versions.length - i}</span>
+                      <span>{ver.timestamp}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Saved by {ver.user}</p>
+                    <button
+                      onClick={() => onRevertVersion(ver)}
+                      className="w-full py-1.5 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-indigo-100/50 dark:border-indigo-900/20"
+                    >
+                      Restore Draft
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
