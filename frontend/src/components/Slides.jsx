@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Presentation, 
   Play, 
@@ -9,8 +9,12 @@ import {
   ChevronRight,
   X,
   Palette,
-  StickyNote
+  StickyNote,
+  Tv,
+  ArrowRight,
+  Download
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 const SLIDE_THEMES = [
@@ -34,14 +38,15 @@ export default function Slides({
   activeUsers = [],
   setSlides
 }) {
-  const [showNotes, setShowNotes] = React.useState(false);
-  const [selectedTheme, setSelectedTheme] = React.useState('default');
-  const [showThemePicker, setShowThemePicker] = React.useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState('default');
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [presenterMode, setPresenterMode] = useState(false); // presenter split screen
 
   const theme = SLIDE_THEMES.find(t => t.id === selectedTheme) || SLIDE_THEMES[0];
 
   // Keyboard navigation for presentation
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if (isPresenting) {
         if (e.key === 'Escape') {
@@ -93,6 +98,26 @@ export default function Slides({
     toast.success('Slide deleted');
   };
 
+  // PPTX Exporter (download text outline)
+  const handleExportDeckOutline = () => {
+    try {
+      let outlineText = `PRESENTATION OUTLINE: ${roomId.toUpperCase()}\n`;
+      slides.forEach((slide, idx) => {
+        outlineText += `\n--- SLIDE ${idx + 1} ---\nTitle: ${slide.title || 'Untitled'}\nBody: ${slide.content || ''}\nNotes: ${slide.notes || ''}\n`;
+      });
+      const element = document.createElement('a');
+      const file = new Blob([outlineText], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = 'presentation-deck-outline.txt';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      toast.success('Presentation outline exported!');
+    } catch {
+      toast.error('Outline export failed.');
+    }
+  };
+
   // Find users currently looking at slide index `slideIdx`
   const getUsersOnSlide = (slideIdx) => {
     return activeUsers.filter(u => u.activeApp === 'slides' && u.activeSlide === slideIdx);
@@ -102,34 +127,83 @@ export default function Slides({
     <div className="flex-1 flex flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden h-full relative">
       {/* Fullscreen Presentation Mode */}
       {isPresenting && (
-        <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center">
+        <div className="fixed inset-0 bg-slate-950 z-[9999] flex flex-col items-center justify-center">
           <button 
-            onClick={() => setIsPresenting(false)} 
-            className="absolute top-4 right-4 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all cursor-pointer"
+            onClick={() => {
+              setIsPresenting(false);
+              setPresenterMode(false);
+            }} 
+            className="absolute top-4 right-4 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all cursor-pointer z-50"
             title="Exit Slideshow (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
-          
-          <div className={`w-[85vw] max-w-5xl aspect-[16/9] bg-gradient-to-br ${theme.gradient} rounded-2xl p-12 md:p-20 shadow-2xl flex flex-col justify-center items-center text-center relative border border-white/5 transition-colors`}>
-            <div className={`absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r ${theme.accent} rounded-t-2xl`} />
-            <h1 className="text-4xl md:text-6xl font-bold text-slate-900 dark:text-white mb-6 leading-tight select-none">
-              {slides[activeSlide]?.title || 'Untitled Slide'}
-            </h1>
-            <p className="text-lg md:text-2xl text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed select-none">
-              {slides[activeSlide]?.content || 'Slide body content goes here...'}
-            </p>
-          </div>
 
-          {/* Presenter Notes Bar */}
-          {slides[activeSlide]?.notes && (
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 max-w-lg w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-5 py-3">
-              <p className="text-xs text-white/60 leading-relaxed">{slides[activeSlide]?.notes}</p>
+          {/* Dual Screen: Presenter Mode controls */}
+          {presenterMode ? (
+            <div className="w-[90vw] h-[85vh] flex gap-6">
+              {/* Left: Current Slide preview */}
+              <div className="flex-1 bg-black/40 rounded-2xl p-6 border border-white/5 flex flex-col justify-between">
+                <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Live Slide View</span>
+                <div className={`aspect-[16/9] w-full bg-gradient-to-br ${theme.gradient} rounded-xl p-8 flex flex-col justify-center text-center relative border border-white/5`}>
+                  <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-4">
+                    {slides[activeSlide]?.title || 'Untitled Slide'}
+                  </h1>
+                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                    {slides[activeSlide]?.content || ''}
+                  </p>
+                </div>
+                <div className="text-xs text-white/50">Slide {activeSlide + 1} of {slides.length}</div>
+              </div>
+
+              {/* Right: Notes & Next Slide preview */}
+              <div className="w-96 bg-black/40 rounded-2xl p-6 border border-white/5 flex flex-col justify-between space-y-4">
+                <div>
+                  <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase block mb-3">Speaker Notes</span>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 min-h-[150px] text-xs text-slate-200 leading-relaxed overflow-y-auto">
+                    {slides[activeSlide]?.notes || 'No notes added to this slide.'}
+                  </div>
+                </div>
+
+                <div className="flex-1 border-t border-white/10 pt-4 flex flex-col justify-between">
+                  <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Up Next</span>
+                  {slides[activeSlide + 1] ? (
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-left">
+                      <p className="font-bold text-xs text-white">{slides[activeSlide+1].title}</p>
+                      <p className="text-[10px] text-slate-400 truncate mt-1">{slides[activeSlide+1].content}</p>
+                    </div>
+                  ) : (
+                    <p className="italic text-[10px] text-slate-500 text-center py-4">End of Slide Presentation</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Standard Fullscreen Deck view with Framer Motion slide-in transitions */
+            <div className="relative w-[85vw] max-w-5xl aspect-[16/9] overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeSlide}
+                  initial={{ opacity: 0, x: 80 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -80 }}
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  className={`w-full h-full bg-gradient-to-br ${theme.gradient} rounded-2xl p-12 md:p-20 shadow-2xl flex flex-col justify-center items-center text-center relative border border-white/5`}
+                >
+                  <div className={`absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r ${theme.accent} rounded-t-2xl`} />
+                  <h1 className="text-4xl md:text-6xl font-bold text-slate-900 dark:text-white mb-6 leading-tight select-none">
+                    {slides[activeSlide]?.title || 'Untitled Slide'}
+                  </h1>
+                  <p className="text-lg md:text-2xl text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed select-none">
+                    {slides[activeSlide]?.content || 'Slide body content goes here...'}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
             </div>
           )}
 
-          {/* Slide Navigation */}
-          <div className="absolute bottom-8 flex items-center gap-4 bg-white/10 dark:bg-slate-900/40 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10">
+          {/* Toggle Dual/Single Monitor screen view */}
+          <div className="absolute bottom-8 flex items-center gap-4 bg-slate-900/60 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 z-50">
             <button 
               onClick={() => {
                 const prevIndex = Math.max(0, activeSlide - 1);
@@ -155,6 +229,18 @@ export default function Slides({
             >
               <ChevronRight className="w-5 h-5" />
             </button>
+
+            <div className="w-px h-5 bg-white/10"></div>
+
+            <button 
+              onClick={() => setPresenterMode(!presenterMode)}
+              className={`flex items-center gap-1 text-[10px] uppercase font-bold text-white px-2.5 py-1 rounded-md border ${
+                presenterMode ? 'bg-indigo-600 border-indigo-500' : 'bg-transparent border-white/10 hover:bg-white/5'
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>Presenter Mode</span>
+            </button>
           </div>
         </div>
       )}
@@ -175,7 +261,7 @@ export default function Slides({
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-slate-700 dark:text-slate-200 hover:text-white dark:hover:text-white text-xs font-semibold rounded-xl transition-all cursor-pointer border border-slate-200/50 dark:border-slate-700/50"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>New</span>
+            <span>New Slide</span>
           </button>
           <button 
             onClick={handleDuplicateSlide}
@@ -201,7 +287,7 @@ export default function Slides({
               className={`p-2 rounded-lg transition-all cursor-pointer ${
                 showThemePicker ? 'bg-indigo-500/10 text-indigo-500' : 'text-slate-500 hover:text-indigo-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
-              title="Theme"
+              title="Theme Color"
             >
               <Palette className="w-4 h-4" />
             </button>
@@ -241,6 +327,14 @@ export default function Slides({
             title="Speaker Notes"
           >
             <StickyNote className="w-4 h-4" />
+          </button>
+
+          <button 
+            onClick={handleExportDeckOutline}
+            className="p-2 text-slate-500 hover:text-indigo-500 dark:text-slate-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+            title="Export Slide Outline"
+          >
+            <Download className="w-4 h-4" />
           </button>
 
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5"></div>
@@ -316,7 +410,7 @@ export default function Slides({
                 type="text"
                 value={slides[activeSlide]?.title || ''}
                 onChange={(e) => handleSlideUpdate('title', e.target.value)}
-                className="text-3xl md:text-4xl font-bold text-slate-950 dark:text-white border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800/80 focus:border-indigo-500 focus:outline-none py-2 text-center transition-all bg-transparent"
+                className="text-3xl md:text-4xl font-bold text-slate-950 dark:text-white border-b border-transparent hover:border-slate-200 dark:hover:border-slate-800/80 focus:border-indigo-500 focus:outline-none py-2 text-center transition-all bg-transparent font-sans"
                 placeholder="Click to add title"
               />
               

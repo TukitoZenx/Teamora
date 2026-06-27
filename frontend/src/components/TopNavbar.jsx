@@ -8,7 +8,8 @@ import {
   Moon, 
   Sun, 
   Share2,
-  CloudLightning
+  CloudLightning,
+  Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ScreenShareButton from './ScreenShareButton';
@@ -25,7 +26,8 @@ export default function TopNavbar({
   isSharing,
   startSharing,
   stopSharing,
-  presenter
+  presenter,
+  onSearchClick
 }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -45,7 +47,7 @@ export default function TopNavbar({
           <div className="w-8 h-8 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
             <Building2 className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-lg text-slate-800 dark:text-slate-100 hidden sm:inline-block">CollabSpace</span>
+          <span className="font-bold text-lg text-slate-800 dark:text-slate-100 hidden sm:inline-block">Teamora</span>
         </div>
         <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
         <div className="flex items-center gap-2">
@@ -55,18 +57,29 @@ export default function TopNavbar({
         </div>
       </div>
 
-      {/* Center: Room Actions */}
-      <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-1.5 max-w-md w-96 hidden md:flex">
-        <span className="text-xs text-slate-500 font-mono select-all truncate flex-1">
-          Room: {roomId}
-        </span>
+      {/* Center: Search Trigger + Room Actions */}
+      <div className="flex items-center gap-3">
         <button
-          onClick={copyInviteLink}
-          className="text-slate-400 hover:text-indigo-500 transition-colors p-1 rounded-full hover:bg-white dark:hover:bg-slate-800"
-          title="Copy Invite Link"
+          onClick={onSearchClick}
+          className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl text-xs font-semibold cursor-pointer transition-all"
         >
-          {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
+          <Search className="w-3.5 h-3.5" />
+          <span>Global Search</span>
+          <kbd className="px-1 py-0.5 bg-white dark:bg-slate-900 text-[9px] text-slate-400 border border-slate-200 dark:border-slate-700 font-mono rounded">Ctrl+K</kbd>
         </button>
+
+        <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-1.5 max-w-xs w-64 hidden md:flex">
+          <span className="text-[10px] text-slate-500 font-mono select-all truncate flex-1">
+            Room: {roomId}
+          </span>
+          <button
+            onClick={copyInviteLink}
+            className="text-slate-400 hover:text-indigo-500 transition-colors p-1 rounded-full hover:bg-white dark:hover:bg-slate-800"
+            title="Copy Invite Link"
+          >
+            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Right: Status, Avatars, Actions, User */}

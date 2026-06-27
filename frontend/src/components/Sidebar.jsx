@@ -9,7 +9,12 @@ import {
   ChevronLeft, 
   ChevronRight,
   History,
-  Sparkles
+  Sparkles,
+  Folder,
+  Calendar as CalendarIcon,
+  CheckSquare,
+  Video,
+  MessageSquare
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -25,6 +30,11 @@ export default function Sidebar({
     { id: 'whiteboard', label: 'Whiteboard', icon: Paintbrush, color: 'text-rose-500 bg-rose-500/10' },
     { id: 'sheets', label: 'Spreadsheet', icon: TableProperties, color: 'text-emerald-500 bg-emerald-500/10' },
     { id: 'slides', label: 'Slides', icon: Presentation, color: 'text-amber-500 bg-amber-500/10' },
+    { id: 'files', label: 'Files', icon: Folder, color: 'text-indigo-500 bg-indigo-500/10' },
+    { id: 'calendar', label: 'Calendar', icon: CalendarIcon, color: 'text-purple-500 bg-purple-500/10' },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, color: 'text-cyan-500 bg-cyan-500/10' },
+    { id: 'meetings', label: 'Meetings', icon: Video, color: 'text-red-500 bg-red-500/10' },
+    { id: 'chat', label: 'Chat', icon: MessageSquare, color: 'text-teal-500 bg-teal-500/10' },
   ];
 
   return (

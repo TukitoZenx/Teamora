@@ -30,6 +30,11 @@ import Slides from './components/Slides'
 import Settings from './components/Settings'
 import useScreenShare from './hooks/useScreenShare'
 import ScreenViewer from './components/ScreenViewer'
+import GlobalSearch from './components/GlobalSearch'
+import Files from './components/Files'
+import Calendar from './components/Calendar'
+import Tasks from './components/Tasks'
+import Meetings from './components/Meetings'
 
 // Fallback to localhost if running locally
 const SOCKET_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -98,6 +103,15 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [isConnected, setIsConnected] = useState(true)
   const [latency, setLatency] = useState(15)
+
+  // Teamora new workspaces states
+  const [filesList, setFilesList] = useState([])
+  const [calendarList, setCalendarList] = useState([])
+  const [tasksList, setTasksList] = useState([])
+  const [documentComments, setDocumentComments] = useState([])
+  const [documentVersions, setDocumentVersions] = useState([])
+  const [userRoles, setUserRoles] = useState({})
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const addActivity = (username, action, type = 'edit') => {
     setActivities(prev => [
@@ -223,6 +237,41 @@ export default function App() {
       handleJoinRoom(roomParam);
     }
   }, [user]);
+
+  // Global Ctrl+K Search Shortcut
+  useEffect(() => {
+    const handleGlobalSearchKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalSearchKey);
+    return () => window.removeEventListener('keydown', handleGlobalSearchKey);
+  }, []);
+
+  const handleUpdateUserRole = (username, newRole) => {
+    const nextRoles = { ...userRoles, [username]: newRole };
+    setUserRoles(nextRoles);
+    const nextSettings = { ...roomSettings, userRoles: nextRoles };
+    setRoomSettings(nextSettings);
+    socket.emit('update-room-settings', { roomId, settings: nextSettings });
+    toast.success(`Role for ${username} updated to ${newRole}`);
+  };
+
+  const handleRevertVersion = (version) => {
+    if (quillRef.current) {
+      quillRef.current.clipboard.dangerouslyPasteHTML(version.data);
+      toast.success(`Document reverted to version saved by ${version.user}`);
+      socket.emit('send-changes', { roomId, text: quillRef.current.getContents() });
+    }
+  };
+
+  // Plain document text extractor helper for search
+  const getDocumentTextContent = () => {
+    if (!quillRef.current) return '';
+    return quillRef.current.getText();
+  };
 
   function getDisplayName() {
     if (!user) return 'Guest';
@@ -358,9 +407,21 @@ export default function App() {
       if (roomState.slides) setSlides(roomState.slides);
       if (roomState.chat) setMessages(roomState.chat);
       if (roomState.settings) setRoomSettings(roomState.settings);
+      if (roomState.files) setFilesList(roomState.files);
+      if (roomState.calendar) setCalendarList(roomState.calendar);
+      if (roomState.tasks) setTasksList(roomState.tasks);
+      if (roomState.documentComments) setDocumentComments(roomState.documentComments);
+      if (roomState.documentVersions) setDocumentVersions(roomState.documentVersions);
+      if (roomState.settings && roomState.settings.userRoles) setUserRoles(roomState.settings.userRoles);
       quill.enable();
     };
     socket.once('load-room', loadRoomHandler);
+
+    socket.on('receive-files', (files) => setFilesList(files));
+    socket.on('receive-calendar', (calendar) => setCalendarList(calendar));
+    socket.on('receive-tasks', (tasks) => setTasksList(tasks));
+    socket.on('receive-document-comments', (comments) => setDocumentComments(comments));
+    socket.on('receive-document-versions', (versions) => setDocumentVersions(versions));
 
     socket.on('receive-room-settings', (settings) => {
       setRoomSettings(settings);
@@ -496,6 +557,11 @@ export default function App() {
       socket.off('receive-whiteboard-cursor');
       socket.off('receive-spreadsheet-cell');
       socket.off('receive-room-settings');
+      socket.off('receive-files');
+      socket.off('receive-calendar');
+      socket.off('receive-tasks');
+      socket.off('receive-document-comments');
+      socket.off('receive-document-versions');
       quill.off('text-change', textChangeHandler);
       quill.off('selection-change', selectionChangeHandler);
       clearInterval(saveInterval);
@@ -863,7 +929,7 @@ export default function App() {
           // WORKSPACE VIEW
           <div className="w-screen h-screen overflow-hidden flex flex-col bg-white dark:bg-slate-950 transition-colors duration-300">
             {/* Top Header */}
-            <TopNavbar
+             <TopNavbar
               workspaceName={workspaceName}
               roomId={roomId}
               isDarkMode={isDarkMode}
@@ -876,6 +942,7 @@ export default function App() {
               startSharing={startSharing}
               stopSharing={stopSharing}
               presenter={presenter}
+              onSearchClick={() => setSearchOpen(true)}
             />
 
             {/* Layout Shell: Sidebar + Main Area + Right Panel */}
@@ -915,23 +982,28 @@ export default function App() {
                         wrapperRef={wrapperRef}
                         isSaving={isSaving}
                         activeUsersCount={activeUsers.length}
+                        comments={documentComments}
+                        socket={socket}
+                        roomId={roomId}
+                        userName={getDisplayName()}
+                        versions={documentVersions}
+                        onRevertVersion={handleRevertVersion}
                       />
                     </div>
 
                     <div className={`w-full h-full ${activeApp === 'whiteboard' ? 'block' : 'hidden'}`}>
                       <Whiteboard
                         canvasRef={canvasRef}
-                        startDrawing={startDrawing}
-                        draw={draw}
-                        stopDrawing={() => setIsDrawing(false)}
                         myColor={myColor}
                         setMyColor={setMyColor}
-                        handleClearBoard={handleClearBoard}
                         whiteboardTool={whiteboardTool}
                         setWhiteboardTool={setWhiteboardTool}
                         whiteboardSize={whiteboardSize}
                         setWhiteboardSize={setWhiteboardSize}
                         whiteboardCursors={whiteboardCursors}
+                        socket={socket}
+                        roomId={roomId}
+                        userName={getDisplayName()}
                       />
                     </div>
 
@@ -942,6 +1014,8 @@ export default function App() {
                         setActiveCell={setActiveCell}
                         handleCellChange={handleCellChange}
                         spreadsheetCells={spreadsheetCells}
+                        socket={socket}
+                        roomId={roomId}
                       />
                     </div>
 
@@ -961,6 +1035,66 @@ export default function App() {
                       />
                     </div>
 
+                    <div className={`w-full h-full ${activeApp === 'files' ? 'block' : 'hidden'}`}>
+                      <Files
+                        filesList={filesList}
+                        socket={socket}
+                        roomId={roomId}
+                        userName={getDisplayName()}
+                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                      />
+                    </div>
+
+                    <div className={`w-full h-full ${activeApp === 'calendar' ? 'block' : 'hidden'}`}>
+                      <Calendar
+                        calendarList={calendarList}
+                        socket={socket}
+                        roomId={roomId}
+                        userName={getDisplayName()}
+                        activeUsers={activeUsers}
+                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                      />
+                    </div>
+
+                    <div className={`w-full h-full ${activeApp === 'tasks' ? 'block' : 'hidden'}`}>
+                      <Tasks
+                        tasksList={tasksList}
+                        socket={socket}
+                        roomId={roomId}
+                        userName={getDisplayName()}
+                        activeUsers={activeUsers}
+                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                      />
+                    </div>
+
+                    <div className={`w-full h-full ${activeApp === 'meetings' ? 'block' : 'hidden'}`}>
+                      <Meetings
+                        socket={socket}
+                        roomId={roomId}
+                        userName={getDisplayName()}
+                        activeUsers={activeUsers}
+                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                      />
+                    </div>
+
+                    <div className={`w-full h-full ${activeApp === 'chat' ? 'block' : 'hidden'}`}>
+                      <div className="w-full h-full flex justify-center bg-slate-50 dark:bg-slate-900">
+                        <div className="w-full max-w-4xl bg-white dark:bg-slate-950 border-x border-slate-200/60 dark:border-slate-800 min-h-full transition-colors relative flex flex-col">
+                          <CollaborationPanel
+                            roomId={roomId}
+                            messages={messages}
+                            chatInput={chatInput}
+                            setChatInput={setChatInput}
+                            handleSendMessage={handleSendMessage}
+                            activeUsers={activeUsers}
+                            activities={activities}
+                            isCollapsed={false}
+                            setIsCollapsed={() => {}}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className={`w-full h-full ${activeApp === 'settings' ? 'block' : 'hidden'}`}>
                       <Settings
                         isDarkMode={isDarkMode}
@@ -971,11 +1105,29 @@ export default function App() {
                         roomSettings={roomSettings}
                         setRoomSettings={setRoomSettings}
                         isHost={isHost}
+                        activeUsers={activeUsers}
+                        userRoles={userRoles}
+                        onUpdateUserRole={handleUpdateUserRole}
                       />
                     </div>
                   </div>
                 </div>
               </main>
+
+              {/* Global search palette */}
+              <GlobalSearch
+                isOpen={searchOpen}
+                onClose={() => setSearchOpen(false)}
+                activeApp={activeApp}
+                setActiveApp={setActiveApp}
+                roomId={roomId}
+                documentText={getDocumentTextContent()}
+                spreadsheetGrid={grid}
+                slidesList={slides}
+                chatHistory={messages}
+                filesList={filesList}
+                tasksList={tasksList}
+              />
 
               {/* Right Tabbed Collaboration Panel - hide on settings */}
               {activeApp !== 'settings' && (
