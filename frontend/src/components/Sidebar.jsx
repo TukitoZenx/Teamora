@@ -42,7 +42,8 @@ export default function Sidebar({
     <motion.aside
       animate={{ width: isCollapsed ? '64px' : '288px' }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="h-full shrink-0 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex flex-col justify-between relative z-30 select-none transition-colors duration-300"
+      style={{ backgroundColor: 'var(--sidebar-bg)' }}
+      className="h-full shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between relative z-30 select-none transition-colors duration-300"
     >
       {/* Toggle Button */}
       <button
