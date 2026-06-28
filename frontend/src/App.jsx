@@ -35,6 +35,8 @@ import Files from './components/Files'
 import Calendar from './components/Calendar'
 import Tasks from './components/Tasks'
 import Meetings from './components/Meetings'
+import Dashboard from './components/Dashboard'
+import FloatingScreenShare from './components/FloatingScreenShare'
 
 // Fallback to localhost if running locally
 const SOCKET_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -121,6 +123,7 @@ export default function App() {
   };
 
   const [roomSettings, setRoomSettings] = useState({ screenShareAllowed: 'everyone' });
+  const autoWatchPresenterRef = useRef(null);
 
   const {
     isSharing,
@@ -128,9 +131,12 @@ export default function App() {
     localStream,
     remoteStream,
     isLoading,
+    isWatching,
     startSharing,
     stopSharing,
-    forceStopShare
+    forceStopShare,
+    watchPresentation,
+    stopWatching
   } = useScreenShare(socket, roomId, getDisplayName(), myColor);
 
   const isHost = activeUsers[0] && activeUsers[0].socketId === socket.id;
@@ -178,10 +184,36 @@ export default function App() {
     if (activeApp === 'whiteboard' && joined) {
       setTimeout(redrawWhiteboard, 50);
     }
+  }, [activeApp, joined]);
+
+  useEffect(() => {
     if (joined) {
-      socket.emit('update-active-app', { roomId, activeApp });
+      let status = 'idle';
+      if (isSharing) {
+        status = 'presenting';
+      } else if (isWatching) {
+        status = 'watching';
+      } else {
+        switch (activeApp) {
+          case 'docs':
+            status = 'docs';
+            break;
+          case 'sheets':
+            status = 'sheets';
+            break;
+          case 'whiteboard':
+            status = 'whiteboard';
+            break;
+          case 'meetings':
+            status = 'meetings';
+            break;
+          default:
+            status = 'idle';
+        }
+      }
+      socket.emit('update-active-app', { roomId, activeApp: status });
     }
-  }, [activeApp, joined, roomId]);
+  }, [activeApp, isSharing, isWatching, joined, roomId]);
 
   useEffect(() => {
     if (joined && activeApp === 'slides') {
@@ -233,8 +265,12 @@ export default function App() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
+    const presentationParam = urlParams.get('presentation');
     if (roomParam && user && !joined) {
       handleJoinRoom(roomParam);
+      if (presentationParam) {
+        autoWatchPresenterRef.current = presentationParam;
+      }
     }
   }, [user]);
 
@@ -413,6 +449,12 @@ export default function App() {
       if (roomState.documentComments) setDocumentComments(roomState.documentComments);
       if (roomState.documentVersions) setDocumentVersions(roomState.documentVersions);
       if (roomState.settings && roomState.settings.userRoles) setUserRoles(roomState.settings.userRoles);
+      
+      // Auto-watch if presentation parameters are active
+      if (autoWatchPresenterRef.current && roomState.activePresenter && roomState.activePresenter.socketId === autoWatchPresenterRef.current) {
+        watchPresentation(autoWatchPresenterRef.current);
+        autoWatchPresenterRef.current = null;
+      }
       quill.enable();
     };
     socket.once('load-room', loadRoomHandler);
@@ -572,9 +614,14 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleJoinRoom = (targetRoomId) => {
+  const handleJoinRoom = (targetRoomId, targetWorkspaceName) => {
     const roomToJoin = targetRoomId || roomId;
     if (roomToJoin.trim() !== '') {
+      if (targetWorkspaceName) {
+        setWorkspaceName(targetWorkspaceName);
+      } else {
+        setWorkspaceName(roomToJoin);
+      }
       socket.emit('join-room', { 
         roomId: roomToJoin, 
         user: getDisplayName(), 
@@ -739,192 +786,11 @@ export default function App() {
       {/* --- MAIN APP --- */}
       <SignedIn>
         {!joined ? (
-          // DASHBOARD
-          <div className={`min-h-screen w-full flex flex-col md:flex-row font-sans ${isDarkMode ? 'dark' : ''}`}>
-            {/* Left Section */}
-            <div className="w-full md:w-[45%] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-8 md:p-12 flex-col justify-between text-white hidden md:flex">
-              <div>
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-3 mb-16"
-                >
-                  <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center">
-                    <Building2 className="w-6 h-6 text-white" />
-                  </div>
-                  <span className="text-xl font-bold tracking-wide">CollabSpace</span>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
-                    Collaborate.<br />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Create.</span><br />
-                    Connect.
-                  </h1>
-                  <p className="text-slate-300 text-lg max-w-md leading-relaxed mb-12">
-                    Create documents, whiteboards, spreadsheets, presentations and collaborate with your team in real time.
-                  </p>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="grid grid-cols-2 gap-4 mb-12"
-                >
-                  {[
-                    { icon: FileText, label: 'Documents', color: 'bg-blue-500/20 text-blue-400' },
-                    { icon: Paintbrush, label: 'Whiteboard', color: 'bg-rose-500/20 text-rose-400' },
-                    { icon: TableProperties, label: 'Spreadsheet', color: 'bg-emerald-500/20 text-emerald-400' },
-                    { icon: Presentation, label: 'Slides', color: 'bg-amber-500/20 text-amber-400' },
-                    { icon: MessageSquare, label: 'Chat', color: 'bg-purple-500/20 text-purple-400' },
-                  ].map((feat, i) => (
-                    <motion.div
-                      key={i}
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      className="flex items-center gap-3 bg-white/5 backdrop-blur-sm p-4 rounded-xl border border-white/10"
-                    >
-                      <div className={`p-2 rounded-lg ${feat.color}`}>
-                        <feat.icon className="w-5 h-5" />
-                      </div>
-                      <span className="font-medium text-sm">{feat.label}</span>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              </div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="flex items-center gap-6 text-sm font-medium text-slate-400"
-              >
-                <div className="flex items-center gap-2"><span className="text-indigo-400">⚡</span> Real-time Collaboration</div>
-                <div className="flex items-center gap-2"><Lock className="w-4 h-4 text-emerald-400" /> Secure</div>
-                <div className="flex items-center gap-2"><span className="text-cyan-400">☁️</span> Access Anywhere</div>
-              </motion.div>
-            </div>
-
-            {/* Right Section */}
-            <div className="w-full md:w-[55%] bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center relative p-6 md:p-12 transition-colors duration-300 min-h-screen md:min-h-0">
-              <div className="absolute top-6 right-6 flex items-center gap-4">
-                <button
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300"
-                >
-                  {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </button>
-                <UserButton />
-              </div>
-
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-full max-w-[480px] bg-white dark:bg-slate-800 rounded-[24px] shadow-xl shadow-slate-200/50 dark:shadow-none p-8 md:p-10 border border-slate-100 dark:border-slate-700 my-auto"
-              >
-                <div className="mb-10 text-center">
-                  <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Welcome Back 👋</h2>
-                  <p className="text-slate-500 dark:text-slate-400">Join your workspace to continue collaborating</p>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Workspace Name Input */}
-                  <div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Building2 className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="Team Alpha"
-                        value={workspaceName}
-                        onChange={(e) => setWorkspaceName(e.target.value)}
-                        className="w-full pl-11 pr-4 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 px-1">Enter your workspace or organization name.</p>
-                  </div>
-
-                  {/* Room ID Input */}
-                  <div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Hash className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <input
-                        type="text"
-                        placeholder="A7F4-K9L2"
-                        value={roomId}
-                        onChange={(e) => setRoomId(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
-                        className="w-full pl-11 pr-12 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono"
-                      />
-                      <button
-                        onClick={() => navigator.clipboard.writeText(roomId)}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-indigo-500 transition-colors"
-                      >
-                        <Copy className="h-5 w-5" />
-                      </button>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 px-1">Enter the room ID shared with your team.</p>
-                  </div>
-
-                  {/* Display Name Input */}
-                  <div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <UserIcon className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <input
-                        type="text"
-                        readOnly
-                        value={getDisplayName()}
-                        className="w-full pl-11 pr-4 py-4 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-500 dark:text-slate-400 cursor-not-allowed transition-all"
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 px-1">This is how other collaborators will see you.</p>
-                  </div>
-
-                  <div className="pt-4 space-y-4">
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleJoinRoom()}
-                      className="w-full h-14 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 transition-all"
-                    >
-                      <span>Join Workspace</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </motion.button>
-
-                    <div className="flex items-center gap-4 py-2">
-                      <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700"></div>
-                      <span className="text-sm font-medium text-slate-400 uppercase tracking-wider">OR</span>
-                      <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700"></div>
-                    </div>
-
-                    <motion.button
-                      whileHover={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleJoinRoom('new-workspace-' + Math.random().toString(36).substring(7))}
-                      className="w-full h-14 bg-transparent border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all hover:border-slate-300 dark:hover:border-slate-600"
-                    >
-                      <Plus className="w-5 h-5" />
-                      <span>Create New Workspace</span>
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-
-              <div className="absolute bottom-6 flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm font-medium">
-                <Lock className="w-4 h-4" />
-                <span>Secure end-to-end collaboration</span>
-              </div>
-            </div>
-          </div>
+          <Dashboard
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+            onJoinRoom={handleJoinRoom}
+          />
         ) : (
           // WORKSPACE VIEW
           <div className="w-screen h-screen overflow-hidden flex flex-col bg-white dark:bg-slate-950 transition-colors duration-300">
@@ -939,7 +805,7 @@ export default function App() {
               latency={latency}
               isSaving={isSaving}
               isSharing={isSharing}
-              startSharing={startSharing}
+              startSharing={() => startSharing(isHost)}
               stopSharing={stopSharing}
               presenter={presenter}
               onSearchClick={() => setSearchOpen(true)}
@@ -953,26 +819,14 @@ export default function App() {
                 setActiveApp={setActiveApp}
                 recentRooms={recentRooms}
                 handleJoinRoom={handleJoinRoom}
+                handleLeaveRoom={handleLeaveRoom}
               />
 
               {/* Main Content Workspace */}
               <main className="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-slate-50 dark:bg-slate-900 transition-colors">
                 <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
                   
-                  {/* Screen Share Viewport */}
-                  {presenter && activeApp !== 'settings' && (
-                    <div className="w-full lg:w-1/2 h-[45vh] lg:h-full p-4 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 shrink-0">
-                      <ScreenViewer
-                        stream={isSharing ? localStream : remoteStream}
-                        presenter={presenter}
-                        isLocal={isSharing}
-                        isLoading={isLoading}
-                        onStopSharing={forceStopShare}
-                        isHost={isHost}
-                        currentUserSocketId={socket.id}
-                      />
-                    </div>
-                  )}
+
 
                   {/* Normal workspaces container */}
                   <div className="flex-1 h-full overflow-hidden relative">
@@ -1077,24 +931,6 @@ export default function App() {
                       />
                     </div>
 
-                    <div className={`w-full h-full ${activeApp === 'chat' ? 'block' : 'hidden'}`}>
-                      <div className="w-full h-full flex justify-center bg-slate-50 dark:bg-slate-900">
-                        <div className="w-full max-w-4xl bg-white dark:bg-slate-950 border-x border-slate-200/60 dark:border-slate-800 min-h-full transition-colors relative flex flex-col">
-                          <CollaborationPanel
-                            roomId={roomId}
-                            messages={messages}
-                            chatInput={chatInput}
-                            setChatInput={setChatInput}
-                            handleSendMessage={handleSendMessage}
-                            activeUsers={activeUsers}
-                            activities={activities}
-                            isCollapsed={false}
-                            setIsCollapsed={() => {}}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
                     <div className={`w-full h-full ${activeApp === 'settings' ? 'block' : 'hidden'}`}>
                       <Settings
                         isDarkMode={isDarkMode}
@@ -1141,6 +977,8 @@ export default function App() {
                   activities={activities}
                   isCollapsed={isRightPanelCollapsed}
                   setIsCollapsed={setIsRightPanelCollapsed}
+                  presenter={presenter}
+                  onJoinPresentation={watchPresentation}
                 />
               )}
             </div>
@@ -1153,6 +991,28 @@ export default function App() {
               activeApp={activeApp}
               activeUsersCount={activeUsers.length}
             />
+            {/* Floating Screen Share Window */}
+            {presenter && (isSharing || isWatching) && (
+              <FloatingScreenShare
+                stream={isSharing ? localStream : remoteStream}
+                presenter={presenter}
+                isLocal={isSharing}
+                isLoading={isLoading}
+                onStopSharing={forceStopShare}
+                isHost={isHost}
+                currentUserSocketId={socket.id}
+                socket={socket}
+                roomId={roomId}
+                roomSettings={roomSettings}
+                onClose={() => {
+                  if (isSharing) {
+                    stopSharing();
+                  } else {
+                    stopWatching();
+                  }
+                }}
+              />
+            )}
           </div>
         )}
       </SignedIn>

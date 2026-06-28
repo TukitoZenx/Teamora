@@ -29,7 +29,9 @@ export default function CollaborationPanel({
   activeUsers,
   activities = [],
   isCollapsed,
-  setIsCollapsed
+  setIsCollapsed,
+  presenter,
+  onJoinPresentation
 }) {
   const [activeTab, setActiveTab] = React.useState('chat');
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
@@ -64,18 +66,18 @@ export default function CollaborationPanel({
 
   const getAppLabel = (appId) => {
     switch(appId) {
-      case 'docs': return '📄 Documents';
-      case 'whiteboard': return '🎨 Whiteboard';
-      case 'sheets': return '📊 Spreadsheet';
-      case 'slides': return '📽 Slides';
-      case 'files': return '📁 Files';
-      case 'calendar': return '📅 Calendar';
-      case 'tasks': return '✅ Tasks';
-      case 'meetings': return '📹 Meetings';
-      case 'chat': return '💬 Chat';
-      case 'settings': return '⚙️ Settings';
-      case 'presenting': return '📺 Presenting Screen';
-      case 'watching': return '👀 Watching';
+      case 'docs': return 'Editing Document';
+      case 'whiteboard': return 'Drawing';
+      case 'sheets': return 'Editing Spreadsheet';
+      case 'slides': return 'Presentation';
+      case 'calendar': return 'Calendar';
+      case 'tasks': return 'Tasks';
+      case 'meetings': return 'Meeting';
+      case 'chat': return 'Chat';
+      case 'settings': return 'Settings';
+      case 'presenting': return 'Presenting';
+      case 'watching': return 'Watching Presentation';
+      case 'idle': return 'Idle';
       default: return 'Workspace';
     }
   };
@@ -158,22 +160,53 @@ export default function CollaborationPanel({
                     <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">Start the conversation with your team!</span>
                   </div>
                 ) : (
-                  messages.map((m, i) => (
-                    <div key={i} className="flex gap-3 items-start group">
-                      <div className="w-8 h-8 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
-                        {m.user?.substring(0, 2).toUpperCase() || 'U'}
-                      </div>
-                      <div className="space-y-1 max-w-[80%]">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{m.user}</span>
-                          <span className="text-[9px] text-slate-400">{m.timestamp || 'Just now'}</span>
+                  messages.map((m, i) => {
+                    const isSystemScreenShare = m.user === 'System' && m.message.startsWith('SYSTEM_SCREEN_SHARE_START|');
+                    if (isSystemScreenShare) {
+                      const [, presenterName, startTime, presenterSocketId] = m.message.split('|');
+                      const isActive = presenter && presenter.socketId === presenterSocketId;
+                      return (
+                        <div key={i} className="flex gap-3 items-start w-full">
+                          <div className="w-8 h-8 rounded-full bg-indigo-600 border border-indigo-500 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                            📢
+                          </div>
+                          <div className="bg-gradient-to-br from-indigo-900 to-indigo-950 border border-indigo-500/20 rounded-2xl p-4 text-white shadow-md flex flex-col gap-3 my-1 w-full max-w-[80%]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base shrink-0">📺</span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs font-bold text-slate-100 truncate">{presenterName} started Screen Sharing</span>
+                                <span className="text-[9px] text-slate-400">Started at {startTime}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => isActive && onJoinPresentation(presenterSocketId)}
+                              disabled={!isActive}
+                              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed rounded-xl text-xs font-semibold text-white transition-all shadow-md shadow-indigo-500/10 cursor-pointer"
+                            >
+                              {isActive ? 'Join Presentation' : 'Presentation Ended'}
+                            </button>
+                          </div>
                         </div>
-                        <div className="bg-slate-100 dark:bg-slate-800/80 rounded-2xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 leading-relaxed border border-slate-200/20">
-                          {m.message}
+                      );
+                    }
+
+                    return (
+                      <div key={i} className="flex gap-3 items-start group">
+                        <div className="w-8 h-8 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0">
+                          {m.user?.substring(0, 2).toUpperCase() || 'U'}
+                        </div>
+                        <div className="space-y-1 max-w-[80%]">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{m.user}</span>
+                            <span className="text-[9px] text-slate-400">{m.timestamp || 'Just now'}</span>
+                          </div>
+                          <div className="bg-slate-100 dark:bg-slate-800/80 rounded-2xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 leading-relaxed border border-slate-200/20">
+                            {m.message}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 <div ref={chatEndRef} />
               </div>
