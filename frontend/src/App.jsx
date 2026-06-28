@@ -27,7 +27,7 @@ import Documents from './components/Documents'
 import Whiteboard from './components/Whiteboard'
 import Spreadsheet from './components/Spreadsheet'
 import Slides from './components/Slides'
-import Settings from './components/Settings'
+import Settings, { applyCustomizations } from './components/Settings'
 import useScreenShare from './hooks/useScreenShare'
 import ScreenViewer from './components/ScreenViewer'
 import GlobalSearch from './components/GlobalSearch'
@@ -142,8 +142,19 @@ export default function App() {
   const isHost = activeUsers[0] && activeUsers[0].socketId === socket.id;
 
 
-  // Sheets States (15 rows, 8 columns)
-  const [grid, setGrid] = useState(Array(15).fill().map(() => Array(8).fill('')))
+  // Sheets States (100 rows, 26 columns)
+  const ensureGridDimensions = (loadedGrid) => {
+    if (!Array.isArray(loadedGrid)) return Array(100).fill().map(() => Array(26).fill(''));
+    const rows = 100;
+    const cols = 26;
+    const padded = Array(rows).fill().map((_, r) => {
+      const existingRow = loadedGrid[r] || [];
+      return Array(cols).fill().map((_, c) => existingRow[c] !== undefined ? String(existingRow[c]) : '');
+    });
+    return padded;
+  };
+
+  const [grid, setGrid] = useState(Array(100).fill().map(() => Array(26).fill('')))
   const [activeCell, setActiveCell] = useState(null)
 
   // Slides States
@@ -262,6 +273,16 @@ export default function App() {
   useEffect(() => {
     const savedRooms = JSON.parse(localStorage.getItem('recentRooms')) || [];
     setRecentRooms(savedRooms);
+
+    // Apply custom settings on load
+    const savedCustoms = localStorage.getItem('teamora-customization');
+    if (savedCustoms) {
+      try {
+        applyCustomizations(JSON.parse(savedCustoms));
+      } catch (err) {
+        console.error('Failed to parse customs settings:', err);
+      }
+    }
 
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
@@ -439,7 +460,7 @@ export default function App() {
         whiteboardStrokesRef.current = roomState.whiteboard;
         redrawWhiteboard();
       }
-      if (roomState.spreadsheet) setGrid(roomState.spreadsheet);
+      if (roomState.spreadsheet) setGrid(ensureGridDimensions(roomState.spreadsheet));
       if (roomState.slides) setSlides(roomState.slides);
       if (roomState.chat) setMessages(roomState.chat);
       if (roomState.settings) setRoomSettings(roomState.settings);
@@ -539,8 +560,15 @@ export default function App() {
 
     socket.on('receive-spreadsheet', ({ row, col, value }) => {
       setGrid((prevGrid) => {
-        const newGrid = [...prevGrid];
-        newGrid[row] = [...newGrid[row]];
+        const newGrid = prevGrid.map(r => [...r]);
+        while (newGrid.length <= row) {
+          newGrid.push(Array(26).fill(''));
+        }
+        for (let r = 0; r < newGrid.length; r++) {
+          while (newGrid[r].length <= col) {
+            newGrid[r].push('');
+          }
+        }
         newGrid[row][col] = value;
         return newGrid;
       });
@@ -658,8 +686,15 @@ export default function App() {
   // Sheets
   const handleCellChange = (row, col, value) => {
     setGrid((prevGrid) => {
-      const newGrid = [...prevGrid];
-      newGrid[row] = [...newGrid[row]];
+      const newGrid = prevGrid.map(r => [...r]);
+      while (newGrid.length <= row) {
+        newGrid.push(Array(26).fill(''));
+      }
+      for (let r = 0; r < newGrid.length; r++) {
+        while (newGrid[r].length <= col) {
+          newGrid[r].push('');
+        }
+      }
       newGrid[row][col] = value;
       return newGrid;
     });
@@ -870,6 +905,8 @@ export default function App() {
                         spreadsheetCells={spreadsheetCells}
                         socket={socket}
                         roomId={roomId}
+                        roomSettings={roomSettings}
+                        setRoomSettings={setRoomSettings}
                       />
                     </div>
 
