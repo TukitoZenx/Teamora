@@ -8,6 +8,7 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isWatching, setIsWatching] = useState(false);
 
   const localStreamRef = useRef(null);
   const isSharingRef = useRef(false);
@@ -26,10 +27,15 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
     toast.success('Connection restored: Screen stream loaded!', { id: 'screen-stream-toast' });
   });
 
-  const startSharing = async () => {
+  const startSharing = async (isHost) => {
     if (presenter) {
-      toast.error(`Only one presenter allowed. ${presenter.user} is currently sharing.`);
-      return;
+      if (isHost) {
+        const replace = window.confirm(`${presenter.user} is already presenting. Replace presentation?`);
+        if (!replace) return;
+      } else {
+        toast.error(`${presenter.user} is already presenting. Only the host can replace the presentation.`);
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -61,6 +67,21 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
 
       // Notify the room
       socket.emit('start-screen-share', { roomId, user: userName, color: myColor });
+
+      // Copy presentation URL and notify chat
+      const presentationId = socket.id || Math.random().toString(36).substring(7);
+      const inviteUrl = `${window.location.origin}/?room=${roomId}&presentation=${presentationId}`;
+      navigator.clipboard.writeText(inviteUrl).then(() => {
+        toast.success('Presentation invite link copied to clipboard!');
+      }).catch(err => console.error('Clipboard copy failed:', err));
+      
+      const startTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      socket.emit('send-message', {
+        roomId,
+        user: 'System',
+        message: `SYSTEM_SCREEN_SHARE_START|${userName}|${startTime}|${socket.id}`
+      });
+
       toast.success('You are presenting your screen!');
     } catch (err) {
       console.error('Error getting display media:', err);
@@ -95,10 +116,6 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
       if (roomState && roomState.activePresenter) {
         const pres = roomState.activePresenter;
         setPresenter(pres);
-        if (pres.socketId !== socket.id) {
-          setIsLoading(true);
-          socket.emit('watch-screen', { roomId, presenterSocketId: pres.socketId });
-        }
       }
     };
     socket.on('load-room', handleLoadRoom);
@@ -107,9 +124,7 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
     socket.on('screen-share-started', ({ presenterSocketId, user, color }) => {
       setPresenter({ socketId: presenterSocketId, user, color });
       if (presenterSocketId !== socket.id) {
-        setIsLoading(true);
-        toast.success(`${user} started presenting screen!`, { icon: '📺' });
-        socket.emit('watch-screen', { roomId, presenterSocketId });
+        toast.success(`${user} started presenting`, { icon: '📺' });
       }
     });
 
@@ -119,6 +134,7 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
       setRemoteStream(null);
       cleanupViewerConnection();
       setIsLoading(false);
+      setIsWatching(false);
       
       if (presenterSocketId === socket.id) {
         // If we were the presenter, make sure local stream stops
@@ -129,19 +145,20 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
         }
         setIsSharing(false);
         isSharingRef.current = false;
-      }
-      
-      if (forced) {
-        toast.error('Presentation ended by the host.', { id: 'screen-end-toast' });
+        toast('Presenter stopped sharing', { icon: '🛑', id: 'screen-end-toast' });
       } else {
-        toast('Presentation ended', { icon: '🛑', id: 'screen-end-toast' });
+        if (forced) {
+          toast.error('Presentation ended by the host.', { id: 'screen-end-toast' });
+        } else {
+          toast('Presenter stopped sharing', { icon: '🛑', id: 'screen-end-toast' });
+        }
       }
     });
 
     // WebRTC signaling
     socket.on('user-joined-presenter', async ({ viewerSocketId, viewerName }) => {
       if (isSharingRef.current && localStreamRef.current) {
-        toast(`${viewerName || 'A collaborator'} joined presentation`, { icon: '👀' });
+        toast(`${viewerName || 'Bob'} joined presentation`, { icon: '👀' });
         await createPresenterPeerConnection(viewerSocketId, localStreamRef.current);
       }
     });
@@ -179,14 +196,32 @@ export default function useScreenShare(socket, roomId, userName, myColor) {
     };
   }, [socket, roomId, userName, myColor]);
 
+  const watchPresentation = (presenterSocketId) => {
+    if (presenterSocketId && presenterSocketId !== socket.id) {
+      setIsWatching(true);
+      setIsLoading(true);
+      socket.emit('watch-screen', { roomId, presenterSocketId });
+    }
+  };
+
+  const stopWatching = () => {
+    setIsWatching(false);
+    cleanupViewerConnection();
+    setRemoteStream(null);
+    setIsLoading(false);
+  };
+
   return {
     isSharing,
     presenter,
     localStream,
     remoteStream,
     isLoading,
+    isWatching,
     startSharing,
     stopSharing,
-    forceStopShare
+    forceStopShare,
+    watchPresentation,
+    stopWatching
   };
 }
