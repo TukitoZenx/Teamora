@@ -21,6 +21,16 @@ export default function Meetings({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [waitingRoomActive, setWaitingRoomActive] = useState(false);
+  const [waitingUsers, setWaitingUsers] = useState([]); // [ { socketId, user } ]
+  const [admitted, setAdmitted] = useState(false); // Used to block users in waiting room
+
+  // Screen share stream
+  const [screenSharingActive, setScreenSharingActive] = useState(false);
+  const screenStreamRef = useRef(null);
+
+  // WebRTC mesh states
+  const [remoteStreams, setRemoteStreams] = useState({}); // { socketId: { stream } }
+  const peersRef = useRef({}); // { socketId: RTCPeerConnection }
 
   // Panels
   const [activeSidePanel, setActiveSidePanel] = useState(null); // null | 'chat' | 'participants'
@@ -85,26 +95,149 @@ export default function Meetings({
     return stream;
   };
 
+  const initiatePeerConnection = async (targetSocketId, isInitiator) => {
+    if (peersRef.current[targetSocketId]) {
+      peersRef.current[targetSocketId].close();
+      delete peersRef.current[targetSocketId];
+    }
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socket.emit('meeting-signal', {
+          roomId,
+          targetSocketId,
+          signal: { type: 'candidate', candidate: e.candidate }
+        });
+      }
+    };
+
+    pc.ontrack = (e) => {
+      setRemoteStreams(prev => ({
+        ...prev,
+        [targetSocketId]: {
+          stream: e.streams[0]
+        }
+      }));
+    };
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamRef.current);
+      });
+    }
+
+    peersRef.current[targetSocketId] = pc;
+
+    if (isInitiator) {
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('meeting-signal', {
+          roomId,
+          targetSocketId,
+          signal: { type: 'offer', sdp: pc.localDescription }
+        });
+      } catch (err) {
+        console.error('Failed to create WebRTC offer:', err);
+      }
+    }
+
+    return pc;
+  };
+
+  const toggleScreenShare = async () => {
+    if (!screenSharingActive) {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = stream;
+        setScreenSharingActive(true);
+        
+        // Replace video track in all WebRTC peers
+        const videoTrack = stream.getVideoTracks()[0];
+        Object.values(peersRef.current).forEach(pc => {
+          const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(videoTrack);
+          }
+        });
+        
+        videoTrack.onended = () => {
+          stopScreenShare();
+        };
+        
+        toast.success('Screen sharing started!');
+      } catch (err) {
+        console.error('Screen share error:', err);
+        toast.error('Failed to share screen.');
+      }
+    } else {
+      stopScreenShare();
+    }
+  };
+
+  const stopScreenShare = () => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+    setScreenSharingActive(false);
+    
+    // Restore camera video track in all WebRTC peers
+    if (localStreamRef.current) {
+      const cameraTrack = localStreamRef.current.getVideoTracks()[0];
+      if (cameraTrack) {
+        Object.values(peersRef.current).forEach(pc => {
+          const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(cameraTrack);
+          }
+        });
+      }
+    }
+    toast('Screen sharing stopped.');
+  };
+
   const handleJoinMeeting = async () => {
     try {
-      setInMeeting(true);
-      toast.success('Joined call lobby!', { icon: '📹' });
-
       let stream = null;
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          localStreamRef.current = stream;
-        } catch {
-          stream = startMockVideoStream();
-        }
-      } else {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStreamRef.current = stream;
+      } catch (err) {
+        console.error('Real media devices fail, using fallback:', err);
         stream = startMockVideoStream();
       }
 
       if (localVideoRef.current && stream) {
         localVideoRef.current.srcObject = stream;
       }
+
+      // Check if we are host or if waiting room is active
+      const hostUserObj = activeUsers[0];
+      const hostIsMe = hostUserObj && hostUserObj.user === userName;
+
+      if (waitingRoomActive && !hostIsMe && !admitted) {
+        // Send join request to host via signaling!
+        socket.emit('meeting-signal', {
+          roomId,
+          targetSocketId: hostUserObj.socketId || '', // Relay to host
+          signal: { type: 'waiting-room-request', user: userName, socketId: socket.id }
+        });
+        toast('Waiting for host to admit you...', { icon: '⏳' });
+        setInMeeting(true); // Shows video screen but waiting overlays
+        return;
+      }
+
+      setInMeeting(true);
+      setAdmitted(true);
+      toast.success('Joined meeting grid!', { icon: '📹' });
 
       socket.emit('meeting-join', {
         roomId,
@@ -123,12 +256,13 @@ export default function Meetings({
       }));
     } catch (err) {
       console.error('Error joining meeting:', err);
-      toast.error('Lobby initialization failed.');
+      toast.error('Initialization failed.');
     }
   };
 
   const handleLeaveMeeting = () => {
     setInMeeting(false);
+    setAdmitted(false);
     
     // Stop local stream
     if (localStreamRef.current) {
@@ -145,6 +279,11 @@ export default function Meetings({
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
+
+    // Close all WebRTC peer connections
+    Object.values(peersRef.current).forEach(pc => pc.close());
+    peersRef.current = {};
+    setRemoteStreams({});
 
     // Stop recording timer
     if (isRecording) {
@@ -235,26 +374,78 @@ export default function Meetings({
   };
 
   // Host Privilege Controls
-  const hostMuteParticipant = (socketId) => {
+  const hostMuteParticipant = (targetSocketId) => {
     if (!isHost) return;
-    toast.success('Muted participant!');
+    socket.emit('meeting-signal', {
+      roomId,
+      targetSocketId,
+      signal: { type: 'host-action', action: 'mute' }
+    });
+    toast.success('Signaled user to mute mic.');
   };
 
-  const hostLowerHand = (socketId) => {
+  const hostLowerHand = (targetSocketId) => {
     if (!isHost) return;
-    toast.success('Lowered participant hand.');
+    socket.emit('meeting-signal', {
+      roomId,
+      targetSocketId,
+      signal: { type: 'host-action', action: 'lower-hand' }
+    });
+    toast.success('Lowered user hand.');
   };
 
-  const hostKickParticipant = (socketId) => {
+  const hostKickParticipant = (targetSocketId) => {
     if (!isHost) return;
-    toast.error('Kicked participant from video meeting.');
+    socket.emit('meeting-signal', {
+      roomId,
+      targetSocketId,
+      signal: { type: 'host-action', action: 'kick' }
+    });
+    toast.error('Kicked user.');
   };
 
-  // Socket listener registration (Separated from Stream lifecycle cleanup!)
+  const hostAdmitParticipant = (targetSocketId, name) => {
+    if (!isHost) return;
+    socket.emit('meeting-signal', {
+      roomId,
+      targetSocketId,
+      signal: { type: 'host-action', action: 'admit' }
+    });
+    setWaitingUsers(prev => prev.filter(u => u.socketId !== targetSocketId));
+    toast.success(`Admitted ${name}!`);
+  };
+
+  const hostDenyParticipant = (targetSocketId, name) => {
+    if (!isHost) return;
+    socket.emit('meeting-signal', {
+      roomId,
+      targetSocketId,
+      signal: { type: 'host-action', action: 'kick' }
+    });
+    setWaitingUsers(prev => prev.filter(u => u.socketId !== targetSocketId));
+    toast.error(`Denied ${name}.`);
+  };
+
+  // Socket listener registration
   useEffect(() => {
     const onJoin = (p) => {
+      // If waiting room is active and we are host, add user to waiting list
+      if (waitingRoomActive && isHost) {
+        setWaitingUsers(prev => {
+          if (prev.some(u => u.socketId === p.socketId)) return prev;
+          return [...prev, { socketId: p.socketId, user: p.user }];
+        });
+        toast(`${p.user} is waiting in the lobby.`, { icon: '⏳' });
+        return;
+      }
+
       setMeetingParticipants(prev => ({ ...prev, [p.socketId]: p }));
       toast(`${p.user} joined the call.`, { icon: '📹' });
+
+      // Existing peers initiate WebRTC connection with new joiners
+      if (inMeeting && p.socketId !== socket.id) {
+        initiatePeerConnection(p.socketId, true);
+      }
     };
 
     const onLeave = (socketId) => {
@@ -263,6 +454,16 @@ export default function Meetings({
         delete next[socketId];
         return next;
       });
+      setWaitingUsers(prev => prev.filter(u => u.socketId !== socketId));
+      setRemoteStreams(prev => {
+        const next = { ...prev };
+        delete next[socketId];
+        return next;
+      });
+      if (peersRef.current[socketId]) {
+        peersRef.current[socketId].close();
+        delete peersRef.current[socketId];
+      }
     };
 
     const onStateChange = ({ socketId, state }) => {
@@ -272,22 +473,109 @@ export default function Meetings({
       }));
     };
 
+    const onSignal = async ({ senderSocketId, signal }) => {
+      if (signal.type === 'waiting-room-request' && isHost) {
+        setWaitingUsers(prev => {
+          if (prev.some(u => u.socketId === senderSocketId)) return prev;
+          return [...prev, { socketId: senderSocketId, user: signal.user }];
+        });
+        toast(`${signal.user} is waiting to join the call.`, { icon: '⏳' });
+      } else if (signal.type === 'offer') {
+        const pc = await initiatePeerConnection(senderSocketId, false);
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          socket.emit('meeting-signal', {
+            roomId,
+            targetSocketId: senderSocketId,
+            signal: { type: 'answer', sdp: pc.localDescription }
+          });
+        } catch (err) {
+          console.error('Error handling WebRTC offer signal:', err);
+        }
+      } else if (signal.type === 'answer') {
+        const pc = peersRef.current[senderSocketId];
+        if (pc) {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          } catch (err) {
+            console.error('Error setting remote description answer:', err);
+          }
+        }
+      } else if (signal.type === 'candidate') {
+        const pc = peersRef.current[senderSocketId];
+        if (pc) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } catch (err) {
+            console.error('Error adding ICE candidate:', err);
+          }
+        }
+      } else if (signal.type === 'host-action') {
+        if (signal.action === 'mute') {
+          setMicActive(false);
+          if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
+          }
+          socket.emit('meeting-state-change', {
+            roomId,
+            state: { micActive: false, camActive, handRaised }
+          });
+          toast.error('The host muted your microphone.');
+        } else if (signal.action === 'lower-hand') {
+          setHandRaised(false);
+          socket.emit('meeting-state-change', {
+            roomId,
+            state: { micActive, camActive, handRaised: false }
+          });
+          toast('The host lowered your hand.');
+        } else if (signal.action === 'kick') {
+          handleLeaveMeeting();
+          toast.error('You were disconnected by the host.');
+        } else if (signal.action === 'admit') {
+          setAdmitted(true);
+          toast.success('Admitted into the call!');
+          // Now join active participants grid
+          socket.emit('meeting-join', {
+            roomId,
+            participant: {
+              socketId: socket.id,
+              user: userName,
+              micActive: true,
+              camActive: true,
+              handRaised: false
+            }
+          });
+          setMeetingParticipants(prev => ({
+            ...prev,
+            [socket.id]: { user: userName, micActive: true, camActive: true, handRaised: false }
+          }));
+        }
+      }
+    };
+
     socket.on('receive-meeting-join', onJoin);
     socket.on('receive-meeting-leave', onLeave);
     socket.on('receive-meeting-state-change', onStateChange);
+    socket.on('receive-meeting-signal', onSignal);
 
     return () => {
       socket.off('receive-meeting-join', onJoin);
       socket.off('receive-meeting-leave', onLeave);
       socket.off('receive-meeting-state-change', onStateChange);
+      socket.off('receive-meeting-signal', onSignal);
     };
-  }, [socket]);
+  }, [socket, inMeeting, waitingRoomActive, isHost, admitted, micActive, camActive, handRaised]);
 
   // Global cleanups on unmount
   useEffect(() => {
     return () => {
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((track) => track.stop());
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -328,7 +616,21 @@ export default function Meetings({
           </div>
         )}
 
-        {!inMeeting ? (
+        {inMeeting && !admitted ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
+            <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-400 mb-6 border border-amber-500/20 animate-pulse">
+              <Shield className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-100 mb-2">Teamora Call Lobby</h2>
+            <p className="text-sm text-slate-400 mb-8 font-medium">Please wait. The host has enabled the waiting room for this call.</p>
+            <button
+              onClick={handleLeaveMeeting}
+              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-2xl cursor-pointer border border-white/10"
+            >
+              Leave Lobby
+            </button>
+          </div>
+        ) : !inMeeting ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
             <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6 border border-indigo-500/20">
               <Video className="w-8 h-8" />
@@ -362,8 +664,23 @@ export default function Meetings({
                       style={{ filter: blurActive ? 'blur(10px)' : 'none' }}
                       className="w-full h-full object-cover transition-all"
                     />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-tr from-indigo-950 to-slate-900 flex items-center justify-center relative">
+                  ) : remoteStreams[socketId]?.stream ? (
+                    <video
+                      ref={(el) => {
+                        if (el && remoteStreams[socketId]?.stream) {
+                          el.srcObject = remoteStreams[socketId].stream;
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-cover"
+                      style={{ display: part.camActive ? 'block' : 'none' }}
+                    />
+                  ) : null}
+
+                  {/* Fallback avatar if not me and camera is disabled or stream not connected yet */}
+                  {!isMe && (!part.camActive || !remoteStreams[socketId]?.stream) && (
+                    <div className="w-full h-full bg-gradient-to-tr from-indigo-950 to-slate-900 flex items-center justify-center absolute inset-0">
                       <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-lg font-bold text-indigo-400 shadow-md">
                         {(part.user || 'U').substring(0, 2).toUpperCase()}
                       </div>
@@ -394,7 +711,7 @@ export default function Meetings({
         )}
 
         {/* Toolbar panel */}
-        {inMeeting && (
+        {inMeeting && admitted && (
           <div className="h-16 bg-slate-950/90 border border-white/10 px-6 py-2.5 rounded-full flex items-center justify-between shrink-0 max-w-2xl mx-auto w-full shadow-2xl mt-4 select-none">
             <div className="flex items-center gap-2">
               <button 
@@ -411,6 +728,14 @@ export default function Meetings({
                 title={camActive ? 'Disable Camera' : 'Enable Camera'}
               >
                 {camActive ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+              </button>
+
+              <button 
+                onClick={toggleScreenShare}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${screenSharingActive ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-350 border-white/10'}`}
+                title={screenSharingActive ? 'Stop Sharing Screen' : 'Share Screen'}
+              >
+                <Tv className="w-4 h-4" />
               </button>
             </div>
 
@@ -541,7 +866,33 @@ export default function Meetings({
             </>
           ) : (
             /* Participant list & Host Controls */
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar text-xs">
+              {/* Waiting Room Queue for Host */}
+              {isHost && waitingUsers.length > 0 && (
+                <div className="space-y-2 border-b border-white/10 pb-4 mb-4">
+                  <span className="font-bold text-[10px] uppercase text-amber-400 tracking-wider block">Waiting List ({waitingUsers.length})</span>
+                  {waitingUsers.map(user => (
+                    <div key={user.socketId} className="flex items-center justify-between bg-slate-900 border border-amber-500/20 rounded-xl p-2.5">
+                      <span className="font-semibold text-slate-200 truncate flex-1">{user.user}</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => hostAdmitParticipant(user.socketId, user.user)}
+                          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                        >
+                          Admit
+                        </button>
+                        <button
+                          onClick={() => hostDenyParticipant(user.socketId, user.user)}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-500 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                        >
+                          Deny
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {Object.entries(meetingParticipants).map(([socketId, part]) => {
                 const isUserHost = part.user === activeUsers[0]?.user;
                 return (

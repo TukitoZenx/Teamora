@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ensureArray } from '../utils/arrayUtils';
 import { 
   Presentation, Play, Plus, Copy, Trash2, ChevronLeft, ChevronRight,
   X, Palette, StickyNote, Tv, Download, Image as ImageIcon, Video,
@@ -26,7 +27,9 @@ export default function Slides({
   roomId,
   socket,
   activeUsers = [],
-  setSlides
+  setSlides,
+  activeFileId,
+  filesList = []
 }) {
   const [showNotes, setShowNotes] = useState(true);
   const [selectedTheme, setSelectedTheme] = useState('default');
@@ -39,10 +42,34 @@ export default function Slides({
 
   const theme = SLIDE_THEMES.find(t => t.id === selectedTheme) || SLIDE_THEMES[0];
 
+  // Dynamic slides load from active file content
+  useEffect(() => {
+    if (activeFileId && filesList && filesList.length > 0) {
+      const file = filesList.find(f => f.id === activeFileId);
+      if (file && file.content) {
+        if (Array.isArray(file.content)) {
+          setSlides(file.content);
+        } else {
+          console.warn('Warning: loaded slide content is not an array:', file.content);
+          setSlides([{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }]);
+        }
+      } else {
+        setSlides([{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }]);
+      }
+    }
+  }, [activeFileId, filesList, setSlides]);
+
   // Sync event listener for custom slide lists
   useEffect(() => {
     socket.on('receive-slides-list', (syncedSlides) => {
-      if (syncedSlides) setSlides(syncedSlides);
+      if (syncedSlides) {
+        if (Array.isArray(syncedSlides)) {
+          setSlides(syncedSlides);
+        } else {
+          console.warn('Warning: received slides list is not an array:', syncedSlides);
+          setSlides([]);
+        }
+      }
     });
     return () => {
       socket.off('receive-slides-list');
@@ -88,7 +115,12 @@ export default function Slides({
     });
     setSlides(newSlides);
     setActiveSlide(activeSlide + 1);
-    socket.emit('update-slides-list', { roomId, slides: newSlides });
+    
+    if (activeFileId) {
+      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides });
+    } else {
+      socket.emit('update-slides-list', { roomId, slides: newSlides });
+    }
     socket.emit('change-slide', { roomId, slideIndex: activeSlide + 1 });
     toast.success('Slide duplicated');
   };
@@ -102,7 +134,12 @@ export default function Slides({
     const newActive = Math.max(0, activeSlide - 1);
     setSlides(newSlides);
     setActiveSlide(newActive);
-    socket.emit('update-slides-list', { roomId, slides: newSlides });
+    
+    if (activeFileId) {
+      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides });
+    } else {
+      socket.emit('update-slides-list', { roomId, slides: newSlides });
+    }
     socket.emit('change-slide', { roomId, slideIndex: newActive });
     toast.success('Slide deleted');
   };
@@ -116,7 +153,12 @@ export default function Slides({
     newSlides.splice(targetIndex, 0, movedSlide);
     setSlides(newSlides);
     setActiveSlide(targetIndex);
-    socket.emit('update-slides-list', { roomId, slides: newSlides });
+    
+    if (activeFileId) {
+      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides });
+    } else {
+      socket.emit('update-slides-list', { roomId, slides: newSlides });
+    }
     socket.emit('change-slide', { roomId, slideIndex: targetIndex });
   };
 
@@ -183,7 +225,7 @@ export default function Slides({
   const handleExportDeckOutline = () => {
     try {
       let outlineText = `PRESENTATION: ${roomId.toUpperCase()}\n`;
-      slides.forEach((slide, idx) => {
+      ensureArray(slides).forEach((slide, idx) => {
         outlineText += `\n--- SLIDE ${idx + 1} ---\nTitle: ${slide.title || 'Untitled'}\nBody: ${slide.content || ''}\nNotes: ${slide.notes || ''}\n`;
       });
       const blob = new Blob([outlineText], { type: 'text/plain' });
@@ -292,7 +334,7 @@ export default function Slides({
                   </p>
 
                   {/* Render absolute slide elements in presentation */}
-                  {slideElements.map((el) => (
+                  {ensureArray(slideElements).map((el) => (
                     <div 
                       key={el.id}
                       style={{ position: 'absolute', left: `${(el.x / 800) * 100}%`, top: `${(el.y / 500) * 100}%`, width: el.width, height: el.height }}
@@ -451,7 +493,7 @@ export default function Slides({
         {/* Thumbnails Sidebar */}
         <div className="w-52 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
           <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
-            {slides.map((s, i) => {
+            {ensureArray(slides).map((s, i) => {
               const isActive = activeSlide === i;
               const usersHere = getUsersOnSlide(i);
               return (
@@ -476,7 +518,7 @@ export default function Slides({
                     
                     {usersHere.length > 0 && (
                       <div className="absolute bottom-1 right-1 flex -space-x-1.5 overflow-hidden z-10 p-0.5">
-                        {usersHere.map((u, uIdx) => (
+                        {ensureArray(usersHere).map((u, uIdx) => (
                           <img
                             key={uIdx}
                             className="inline-block h-4 w-4 rounded-full border bg-white object-cover"
@@ -607,7 +649,7 @@ export default function Slides({
               )}
 
               {/* Absolute elements rendering */}
-              {slideElements.map((el) => {
+              {ensureArray(slideElements).map((el) => {
                 const isSelected = selectedElemId === el.id;
                 return (
                   <div

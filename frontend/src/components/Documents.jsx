@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ensureArray } from '../utils/arrayUtils';
 import { 
   Download, FileText, FolderOpen, Save, Copy, History,
   Image, Table2, Shapes, Link, Printer, MessageSquare, 
@@ -24,12 +25,17 @@ export default function Documents({
   roomId,
   userName,
   versions = [],
-  onRevertVersion
+  onRevertVersion,
+  onMount
 }) {
   const [docTitle, setDocTitle] = useState('Untitled Document');
   const [openMenu, setOpenMenu] = useState(null);
   const [activeSidePanel, setActiveSidePanel] = useState(null); // null | 'comments' | 'versions'
   const [commentInput, setCommentInput] = useState('');
+  
+  useEffect(() => {
+    if (onMount) onMount();
+  }, [onMount]);
   
   // Format states
   const [fontFamily, setFontFamily] = useState('Sans-Serif');
@@ -43,9 +49,12 @@ export default function Documents({
   const [orientation, setOrientation] = useState('portrait');
   const [pageColor, setPageColor] = useState('#ffffff');
   const [pageBorder, setPageBorder] = useState('none');
+  const [zoom, setZoom] = useState(100);
 
   // Stats
   const [stats, setStats] = useState({ words: 0, characters: 0, readTime: 1, pages: 1 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const scrollContainerRef = useRef(null);
 
   const getQuillInstance = () => {
     const container = wrapperRef.current?.querySelector('.ql-container');
@@ -54,6 +63,22 @@ export default function Documents({
     }
     return null;
   };
+
+  // Scroll handler to monitor visible page
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollContainerRef.current) {
+        const scrollTop = scrollContainerRef.current.scrollTop;
+        const pageIdx = Math.max(1, Math.ceil((scrollTop + 300) / 1076));
+        setCurrentPage(pageIdx);
+      }
+    };
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.addEventListener('scroll', handleScroll);
+    }
+    return () => el?.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Monitor statistics
   useEffect(() => {
@@ -64,8 +89,8 @@ export default function Documents({
         const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
         const chars = text.length;
         const readTime = Math.max(1, Math.ceil(words / 200));
-        // Approximate pages based on scroll height of editor
-        const pages = Math.max(1, Math.ceil(quill.root.scrollHeight / 1056));
+        // A4 page splits height math (1056px page height + 20px margins)
+        const pages = Math.max(1, Math.ceil(quill.root.scrollHeight / 1076));
         setStats({ words, characters: chars, readTime, pages });
       }
     }, 800);
@@ -80,7 +105,6 @@ export default function Documents({
       editor.style.fontSize = fontSize;
       editor.style.lineHeight = lineSpacing;
       editor.style.color = textColor;
-      editor.style.backgroundColor = pageColor;
       editor.style.columnCount = columnsCount;
       editor.style.columnGap = '24px';
       
@@ -88,6 +112,21 @@ export default function Documents({
       editor.style.padding = marginVal;
       
       editor.style.border = pageBorder === 'none' ? 'none' : `2px ${pageBorder} #cbd5e1`;
+
+      const isDark = document.documentElement.classList.contains('dark');
+      const sheetBg = pageColor || (isDark ? '#020617' : '#ffffff');
+      const gapBg = isDark ? '#0f172a' : '#e2e8f0';
+
+      editor.style.background = `
+        repeating-linear-gradient(
+          to bottom,
+          ${sheetBg},
+          ${sheetBg} 1056px,
+          ${gapBg} 1056px,
+          ${gapBg} 1076px
+        )
+      `;
+      editor.style.backgroundSize = '100% 1076px';
 
       if (orientation === 'landscape') {
         editor.style.aspectRatio = '1.414';
@@ -481,11 +520,29 @@ export default function Documents({
 
       {/* Editor Formatting Ribbon */}
       <div className="h-10 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 flex items-center gap-1.5 shrink-0 z-20 overflow-x-auto no-scrollbar">
+        {/* Zoom Select */}
+        <select 
+          value={zoom} 
+          onChange={(e) => setZoom(parseInt(e.target.value))}
+          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 cursor-pointer"
+          title="Zoom"
+        >
+          <option value="50">50%</option>
+          <option value="75">75%</option>
+          <option value="90">90%</option>
+          <option value="100">100%</option>
+          <option value="115">115%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+        </select>
+
+        <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+
         {/* Font Select */}
         <select 
           value={fontFamily} 
           onChange={(e) => setFontFamily(e.target.value)}
-          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 cursor-pointer"
+          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-350 cursor-pointer"
         >
           {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
         </select>
@@ -494,12 +551,12 @@ export default function Documents({
         <select 
           value={fontSize} 
           onChange={(e) => setFontSize(e.target.value)}
-          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 cursor-pointer"
+          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-350 cursor-pointer"
         >
           {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
 
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+        <div className="w-px h-4 bg-slate-200 dark:bg-slate-850" />
 
         {/* Formatting actions */}
         <button onClick={() => applyFormat('bold', true)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 font-bold cursor-pointer">B</button>
@@ -562,10 +619,14 @@ export default function Documents({
       {/* Editor Content Area + Collapsible Side Panel */}
       <div className="flex-1 flex overflow-hidden">
         {/* Main Editor Page Layout */}
-        <div className="flex-1 overflow-y-auto flex justify-center bg-slate-100 dark:bg-slate-900 p-4 shadow-inner">
+        <div className="flex-1 overflow-y-auto flex justify-center bg-slate-100 dark:bg-slate-900 p-4 shadow-inner" ref={scrollContainerRef}>
           <div 
-            className="w-full bg-white dark:bg-slate-950 shadow-lg transition-all relative flex flex-col my-4 min-h-[1056px] h-max border border-slate-200 dark:border-slate-800"
-            style={{ maxWidth: orientation === 'landscape' ? '1056px' : '816px' }}
+            className="w-full bg-white dark:bg-slate-950 shadow-lg transition-all relative flex flex-col my-4 min-h-[1056px] h-max border border-slate-200 dark:border-slate-800 origin-top"
+            style={{ 
+              maxWidth: orientation === 'landscape' ? '1056px' : '816px',
+              transform: `scale(${zoom / 100})`,
+              marginBottom: `${((zoom / 100) * 1056) - 1056 + 16}px`
+            }}
           >
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
             <div ref={wrapperRef} className="flex-1 quill-editor-wrapper text-slate-800 dark:text-slate-100 p-8"></div>
@@ -583,10 +644,10 @@ export default function Documents({
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-              {comments.length === 0 ? (
+              {ensureArray(comments).length === 0 ? (
                 <p className="italic text-slate-400 text-center py-6">No comment threads in this document.</p>
               ) : (
-                comments.map((c) => (
+                ensureArray(comments).map((c) => (
                   <div key={c.id} className="bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-xl p-3 relative">
                     <button
                       onClick={() => handleDeleteComment(c.id)}
@@ -634,16 +695,16 @@ export default function Documents({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-              {versions.length === 0 ? (
+              {ensureArray(versions).length === 0 ? (
                 <p className="italic text-slate-400 text-center py-6">No saved history drafts.</p>
               ) : (
-                versions.map((ver, i) => (
+                ensureArray(versions).map((ver, i) => (
                   <div 
                     key={ver.versionId} 
                     className="bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-xl p-3 space-y-2"
                   >
                     <div className="flex items-center justify-between text-[8px] font-bold text-slate-400">
-                      <span>Draft #{versions.length - i}</span>
+                      <span>Draft #{ensureArray(versions).length - i}</span>
                       <span>{ver.timestamp}</span>
                     </div>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Saved by {ver.user}</p>
@@ -664,7 +725,7 @@ export default function Documents({
       {/* Document Metrics Status Bar */}
       <div className="h-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 flex items-center justify-between text-[9px] font-bold text-slate-400 select-none shrink-0">
         <div className="flex items-center gap-3">
-          <span>PAGES: {stats.pages}</span>
+          <span>PAGE: {currentPage} of {stats.pages}</span>
           <span>WORDS: {stats.words}</span>
           <span>CHARACTERS: {stats.characters}</span>
         </div>

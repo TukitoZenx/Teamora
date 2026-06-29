@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ensureArray } from '../utils/arrayUtils';
 import { FolderPlus, Upload, Trash2, Edit3, ArrowLeft, Folder, File, FileText, ImageIcon, Download, Eye, Search, MoreVertical, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,8 +26,9 @@ export default function Files({
   const breadcrumbs = useMemo(() => {
     const list = [];
     let currentId = currentFolderId;
+    const safeFiles = ensureArray(filesList);
     while (currentId) {
-      const folder = filesList.find((f) => f.id === currentId && f.type === 'folder');
+      const folder = safeFiles.find((f) => f && f.id === currentId && f.type === 'folder');
       if (folder) {
         list.unshift(folder);
         currentId = folder.folderId;
@@ -39,10 +41,11 @@ export default function Files({
 
   // Current folder items
   const currentItems = useMemo(() => {
-    let items = filesList.filter((f) => f.folderId === currentFolderId);
+    const safeFiles = ensureArray(filesList);
+    let items = safeFiles.filter((f) => f && f.folderId === currentFolderId);
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      items = filesList.filter((f) => f.name.toLowerCase().includes(query) && f.type !== 'folder');
+      items = safeFiles.filter((f) => f && f.name && typeof f.name === 'string' && f.name.toLowerCase().includes(query) && f.type !== 'folder');
     }
     return items;
   }, [currentFolderId, filesList, searchQuery]);
@@ -58,7 +61,7 @@ export default function Files({
       uploadedBy: userName,
       uploadedAt: new Date().toLocaleString()
     };
-    const updated = [...filesList, folderObj];
+    const updated = [...ensureArray(filesList), folderObj];
     socket.emit('update-files', { roomId, files: updated });
     setNewFolderName('');
     setShowFolderModal(false);
@@ -86,7 +89,7 @@ export default function Files({
             { version: 1, name: file.name, size: file.size, uploadedAt: new Date().toLocaleString() }
           ]
         };
-        const updated = [...filesList, fileObj];
+        const updated = [...ensureArray(filesList), fileObj];
         socket.emit('update-files', { roomId, files: updated });
         toast.success(`Uploaded "${file.name}"!`);
       };
@@ -100,21 +103,21 @@ export default function Files({
   };
 
   const handleDeleteItem = (itemId) => {
-    const updated = filesList.filter((f) => f.id !== itemId && f.folderId !== itemId); // delete children if folder
+    const updated = ensureArray(filesList).filter((f) => f && f.id !== itemId && f.folderId !== itemId); // delete children if folder
     socket.emit('update-files', { roomId, files: updated });
     toast.success('Item deleted successfully.');
   };
 
   const handleRename = () => {
     if (!newFileName.trim() || !editingFile) return;
-    const updated = filesList.map((f) => {
-      if (f.id === editingFile.id) {
+    const updated = ensureArray(filesList).map((f) => {
+      if (f && f.id === editingFile.id) {
         return {
           ...f,
           name: newFileName,
           version: f.type !== 'folder' ? (f.version || 1) + 1 : f.version,
           versionHistory: f.type !== 'folder' 
-            ? [...(f.versionHistory || []), { version: (f.version || 1) + 1, name: newFileName, size: f.size, uploadedAt: new Date().toLocaleString() }]
+            ? [...ensureArray(f.versionHistory), { version: (f.version || 1) + 1, name: newFileName, size: f.size, uploadedAt: new Date().toLocaleString() }]
             : undefined
         };
       }

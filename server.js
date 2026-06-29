@@ -35,6 +35,24 @@ const Room = mongoose.model('Room', RoomSchema);
 // --- SERVER SETUP ---
 const app = express();
 app.use(cors());
+app.use(express.json());
+
+app.get('/api/workspaces/:id', async (req, res) => {
+  try {
+    const roomId = req.params.id;
+    let roomExists = !!roomsCache[roomId];
+    if (!roomExists) {
+      const dbRoom = await Room.findById(roomId);
+      if (dbRoom) {
+        roomExists = true;
+      }
+    }
+    res.json({ exists: roomExists });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -90,50 +108,42 @@ const roomPresenters = {}; // { roomId: { socketId, user, color } }
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
-  // 1. Join Room: Loads complete state from cache/database
-  socket.on('join-room', async ({ roomId, user, imageUrl, color, activeApp }) => {
-    socket.join(roomId);
-    
+  // 1. Join Room: Loads complete state from cache/database (Verifies room exists)
+  socket.on('join-room', async ({ roomId, user, imageUrl, color, activeApp, activeFileId, activeFileTitle }) => {
     // Load from database if not in server cache
-    if (!roomsCache[roomId]) {
+    let roomExists = !!roomsCache[roomId];
+    if (!roomExists) {
       try {
-        let dbRoom = await Room.findById(roomId);
-        if (!dbRoom) {
-          const defaultGrid = Array(15).fill().map(() => Array(8).fill(''));
-          dbRoom = await Room.create({
-            _id: roomId,
-            document: null,
-            documentComments: [],
-            documentVersions: [],
-            whiteboard: [],
-            spreadsheet: defaultGrid,
-            spreadsheetConfig: {},
-            slides: [{ title: 'Click to add title', content: 'Click to add text', notes: '' }],
-            chat: [],
-            settings: {},
-            files: [],
-            calendar: [],
-            tasks: []
-          });
+        const dbRoom = await Room.findById(roomId);
+        if (dbRoom) {
+          roomExists = true;
+          roomsCache[roomId] = {
+            document: dbRoom.document,
+            documentComments: dbRoom.documentComments || [],
+            documentVersions: dbRoom.documentVersions || [],
+            whiteboard: dbRoom.whiteboard || [],
+            spreadsheet: dbRoom.spreadsheet || Array(100).fill().map(() => Array(26).fill('')),
+            spreadsheetConfig: dbRoom.spreadsheetConfig || {},
+            slides: dbRoom.slides || [{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }],
+            chat: dbRoom.chat || [],
+            settings: dbRoom.settings || {},
+            files: dbRoom.files || [],
+            calendar: dbRoom.calendar || [],
+            tasks: dbRoom.tasks || []
+          };
         }
-        roomsCache[roomId] = {
-          document: dbRoom.document,
-          documentComments: dbRoom.documentComments || [],
-          documentVersions: dbRoom.documentVersions || [],
-          whiteboard: dbRoom.whiteboard || [],
-          spreadsheet: dbRoom.spreadsheet || Array(15).fill().map(() => Array(8).fill('')),
-          spreadsheetConfig: dbRoom.spreadsheetConfig || {},
-          slides: dbRoom.slides || [{ title: 'Click to add title', content: 'Click to add text', notes: '' }],
-          chat: dbRoom.chat || [],
-          settings: dbRoom.settings || {},
-          files: dbRoom.files || [],
-          calendar: dbRoom.calendar || [],
-          tasks: dbRoom.tasks || []
-        };
       } catch (err) {
-        console.error('Error loading room:', err);
+        console.error('Error querying room:', err);
       }
     }
+
+    if (!roomExists) {
+      // Validate that room exists. If not found, emit room-not-found and abort!
+      socket.emit('room-not-found', { roomId });
+      return;
+    }
+
+    socket.join(roomId);
     
     // Track user for active-users
     if (!roomUsers[roomId]) roomUsers[roomId] = [];
@@ -143,7 +153,9 @@ io.on('connection', (socket) => {
       user, 
       imageUrl, 
       color, 
-      activeApp: activeApp || 'docs' 
+      activeApp: activeApp || 'docs',
+      activeFileId: activeFileId || null,
+      activeFileTitle: activeFileTitle || null
     });
     
     // Broadcast active users
@@ -156,7 +168,83 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 2. Document (Quill Delta) edits
+  // 2. Create Room: Explicit room creation event
+  socket.on('create-room', async ({ roomId, name }) => {
+    try {
+      let dbRoom = await Room.findById(roomId);
+      if (!dbRoom) {
+        const defaultGrid = Array(100).fill().map(() => Array(26).fill(''));
+        dbRoom = await Room.create({
+          _id: roomId,
+          document: null,
+          documentComments: [],
+          documentVersions: [],
+          whiteboard: [],
+          spreadsheet: defaultGrid,
+          spreadsheetConfig: {},
+          slides: [{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }],
+          chat: [],
+          settings: { name: name || 'New Workspace' },
+          files: [
+            { id: 'file-doc-default', name: 'Getting Started.docx', type: 'document', folderId: null, content: null, comments: [], versions: [], lastModified: new Date().toISOString() },
+            { id: 'file-sheet-default', name: 'Project Budget.xlsx', type: 'spreadsheet', folderId: null, content: Array(100).fill().map(() => Array(26).fill('')), config: {}, lastModified: new Date().toISOString() },
+            { id: 'file-slide-default', name: 'Pitch Slide.pptx', type: 'presentation', folderId: null, content: [{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }], lastModified: new Date().toISOString() }
+          ],
+          calendar: [],
+          tasks: []
+        });
+      }
+      roomsCache[roomId] = {
+        document: dbRoom.document,
+        documentComments: dbRoom.documentComments || [],
+        documentVersions: dbRoom.documentVersions || [],
+        whiteboard: dbRoom.whiteboard || [],
+        spreadsheet: dbRoom.spreadsheet || Array(100).fill().map(() => Array(26).fill('')),
+        spreadsheetConfig: dbRoom.spreadsheetConfig || {},
+        slides: dbRoom.slides || [{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }],
+        chat: dbRoom.chat || [],
+        settings: dbRoom.settings || { name: name || 'New Workspace' },
+        files: dbRoom.files || [
+          { id: 'file-doc-default', name: 'Getting Started.docx', type: 'document', folderId: null, content: null, comments: [], versions: [], lastModified: new Date().toISOString() },
+          { id: 'file-sheet-default', name: 'Project Budget.xlsx', type: 'spreadsheet', folderId: null, content: Array(100).fill().map(() => Array(26).fill('')), config: {}, lastModified: new Date().toISOString() },
+          { id: 'file-slide-default', name: 'Pitch Slide.pptx', type: 'presentation', folderId: null, content: [{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }], lastModified: new Date().toISOString() }
+        ],
+        calendar: dbRoom.calendar || [],
+        tasks: dbRoom.tasks || []
+      };
+      socket.emit('room-created', { roomId });
+    } catch (err) {
+      console.error('Room creation error:', err);
+      socket.emit('room-create-error', { error: err.message });
+    }
+  });
+
+  // 3. Document (Quill Delta) edits (scoped to workspace file)
+  socket.on('file-content-update', ({ roomId, fileId, content }) => {
+    if (roomsCache[roomId] && roomsCache[roomId].files) {
+      const file = roomsCache[roomId].files.find(f => f.id === fileId);
+      if (file) {
+        file.content = content;
+        file.lastModified = new Date().toISOString();
+        dirtyRooms.add(roomId);
+      }
+    }
+    socket.to(roomId).emit('receive-file-content-update', { fileId, content });
+  });
+
+  socket.on('file-metadata-update', ({ roomId, fileId, key, value }) => {
+    if (roomsCache[roomId] && roomsCache[roomId].files) {
+      const file = roomsCache[roomId].files.find(f => f.id === fileId);
+      if (file) {
+        file[key] = value;
+        file.lastModified = new Date().toISOString();
+        dirtyRooms.add(roomId);
+      }
+    }
+    socket.to(roomId).emit('receive-file-metadata-update', { fileId, key, value });
+  });
+
+  // Keep legacy drawing/sheet events as fallbacks
   socket.on('send-changes', ({ roomId, text }) => {
     socket.to(roomId).emit('receive-changes', text);
   });
@@ -168,7 +256,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 3. Whiteboard drawing & clear
+  // Whiteboard drawing & clear
   socket.on('draw-line', ({ roomId, startX, startY, endX, endY, color, size }) => {
     if (roomsCache[roomId]) {
       roomsCache[roomId].whiteboard.push({ startX, startY, endX, endY, color, size });
@@ -185,7 +273,7 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('receive-clear-board');
   });
 
-  // 4. Spreadsheet cell updates
+  // Spreadsheet cell updates
   socket.on('update-spreadsheet', ({ roomId, row, col, value }) => {
     if (roomsCache[roomId]) {
       if (!roomsCache[roomId].spreadsheet) {
@@ -197,7 +285,7 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('receive-spreadsheet', { row, col, value });
   });
 
-  // 5. Slides updates & additions
+  // Slides updates & additions
   socket.on('update-slide', ({ roomId, slideIndex, field, value }) => {
     if (roomsCache[roomId]) {
       if (!roomsCache[roomId].slides) roomsCache[roomId].slides = [];
@@ -252,11 +340,13 @@ io.on('connection', (socket) => {
   });
 
   // 8. Presence activeApp switch
-  socket.on('update-active-app', ({ roomId, activeApp }) => {
+  socket.on('update-active-app', ({ roomId, activeApp, activeFileId, activeFileTitle }) => {
     if (roomUsers[roomId]) {
       const u = roomUsers[roomId].find(usr => usr.socketId === socket.id);
       if (u) {
         u.activeApp = activeApp;
+        u.activeFileId = activeFileId || null;
+        u.activeFileTitle = activeFileTitle || null;
         io.to(roomId).emit('active-users', roomUsers[roomId]);
       }
     }
