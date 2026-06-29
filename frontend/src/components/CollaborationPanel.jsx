@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   Image as ImageIcon,
   Tv,
-  Eye
+  Eye,
+  Info
 } from 'lucide-react';
 
 const EMOJI_LIST = ['😀','😂','❤️','👍','🎉','🔥','💯','✨','🚀','💡','👏','🙌','😍','🤔','😎','💪','🎯','⭐','💜','🙏'];
@@ -32,7 +33,9 @@ export default function CollaborationPanel({
   isCollapsed,
   setIsCollapsed,
   presenter,
-  onJoinPresentation
+  onJoinPresentation,
+  activeFileId,
+  filesList = []
 }) {
   const [activeTab, setActiveTab] = React.useState('chat');
   const [showEmojiPicker, setShowEmojiPicker] = React.useState(false);
@@ -65,28 +68,30 @@ export default function CollaborationPanel({
     setShowEmojiPicker(false);
   };
 
-  const getAppLabel = (appId) => {
-    switch(appId) {
-      case 'docs': return 'Editing Document';
-      case 'whiteboard': return 'Drawing';
-      case 'sheets': return 'Editing Spreadsheet';
-      case 'slides': return 'Presentation';
-      case 'calendar': return 'Calendar';
-      case 'tasks': return 'Tasks';
-      case 'meetings': return 'Meeting';
-      case 'chat': return 'Chat';
-      case 'settings': return 'Settings';
-      case 'presenting': return 'Presenting';
-      case 'watching': return 'Watching Presentation';
-      case 'idle': return 'Idle';
-      default: return 'Workspace';
-    }
+  const getAppLabel = (member) => {
+    const appId = member.activeApp;
+    const title = member.activeFileTitle;
+    
+    if (appId === 'presenting') return `Presenting ${title || 'Investor Pitch'}`;
+    if (appId === 'watching') return `Watching Presentation`;
+    if (appId === 'docs') return `Editing ${title || 'Document'}`;
+    if (appId === 'sheets') return `Editing ${title || 'Spreadsheet'}`;
+    if (appId === 'slides') return `Presenting ${title || 'Slides'}`;
+    if (appId === 'whiteboard') return `Drawing ${title || 'UI Flow'}`;
+    if (appId === 'calendar') return 'Viewing Calendar';
+    if (appId === 'tasks') return 'Managing Tasks';
+    if (appId === 'meetings') return 'In Meeting';
+    if (appId === 'files') return 'Managing Files';
+    if (appId === 'settings') return 'In Settings';
+    if (appId === 'home') return 'At Home';
+    return 'Idle';
   };
 
   const tabs = [
     { id: 'chat', label: 'Chat', icon: MessageSquare, badge: ensureArray(messages).length > 0 ? ensureArray(messages).length : null },
     { id: 'members', label: 'Members', icon: Users, badge: ensureArray(activeUsers).length },
     { id: 'activity', label: 'Activity', icon: Activity, badge: ensureArray(activities).length > 0 ? ensureArray(activities).length : null },
+    { id: 'properties', label: 'Properties', icon: Info, badge: null }
   ];
 
   // Collapsed state: Show a thin bar with a toggle button
@@ -312,7 +317,7 @@ export default function CollaborationPanel({
                           ) : (
                             <Monitor className="w-3 h-3 text-indigo-400" />
                           )}
-                          {getAppLabel(member.activeApp || 'docs')}
+                          {getAppLabel(member)}
                         </span>
                       </div>
                     </div>
@@ -357,7 +362,7 @@ export default function CollaborationPanel({
                         {act.type === 'join' ? '➕' : act.type === 'leave' ? '🏃' : act.type === 'edit' ? '✏️' : '🔔'}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs text-slate-700 dark:text-slate-300 leading-tight">
+                        <span className="text-xs text-slate-700 dark:text-slate-350 leading-tight">
                           <span className="font-semibold text-slate-900 dark:text-white">{act.user}</span> {act.action}
                         </span>
                         <span className="text-[9px] text-slate-400 mt-1">{act.time}</span>
@@ -366,6 +371,69 @@ export default function CollaborationPanel({
                   ))
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'properties' && (
+            <motion.div
+              key="properties-tab"
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              className="flex-1 p-4 overflow-y-auto space-y-4 no-scrollbar"
+            >
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">File Properties</h3>
+              {activeFileId ? (() => {
+                const file = ensureArray(filesList).find(f => f.id === activeFileId);
+                if (!file) return <div className="text-xs text-slate-400 dark:text-slate-500">File not found.</div>;
+                const fileCollaborators = ensureArray(activeUsers).filter(u => u.activeFileId === activeFileId || u.activeApp === file.type);
+                return (
+                  <div className="space-y-4 text-xs">
+                    <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-200/30 dark:border-slate-800/50 rounded-xl p-4 space-y-3">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">File Name</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{file.name}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Type</span>
+                        <span className="capitalize font-semibold text-slate-800 dark:text-slate-200">{file.type}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Owner</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{file.uploadedBy || 'System'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Created At</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{file.uploadedAt || 'Workspace creation'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Last Modified</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {file.lastModified ? new Date(file.lastModified).toLocaleString() : 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Version</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">v{file.version || 1}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Active Collaborators</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                          {fileCollaborators.length || 1} online
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Permissions</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">Shared (Collaborative)</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div className="py-12 text-center text-slate-400 dark:text-slate-500 text-xs">
+                  No file is currently open. Select a file to view its properties.
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

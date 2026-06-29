@@ -16,7 +16,9 @@ import {
   TableProperties,
   Presentation,
   MessageSquare,
-  ArrowRight
+  ArrowRight,
+  X,
+  Home as HomeIcon
 } from 'lucide-react'
 import toast, { Toaster } from 'react-hot-toast'
 import TopNavbar from './components/TopNavbar'
@@ -38,6 +40,7 @@ import Calendar from './components/Calendar'
 import Tasks from './components/Tasks'
 import Meetings from './components/Meetings'
 import Dashboard from './components/Dashboard'
+import WorkspaceHome from './components/WorkspaceHome'
 import FloatingScreenShare from './components/FloatingScreenShare'
 import ErrorBoundary from './components/ErrorBoundary'
 import LandingPage from './components/LandingPage'
@@ -74,7 +77,7 @@ export default function App() {
   const [activeUsers, setActiveUsers] = useState([])
 
   // App Navigation
-  const [activeApp, setActiveApp] = useState('docs') // 'docs', 'whiteboard', 'sheets', 'slides', 'settings'
+  const [activeApp, setActiveApp] = useState('home') // 'home', 'docs', 'whiteboard', 'sheets', 'slides', 'settings'
 
   // Right panel collapse state
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false)
@@ -142,6 +145,30 @@ export default function App() {
   const [documentVersions, setDocumentVersions] = useState([])
   const [userRoles, setUserRoles] = useState({})
   const [searchOpen, setSearchOpen] = useState(false)
+  const [openTabs, setOpenTabs] = useState([])
+  const [wordCount, setWordCount] = useState(0)
+  const [charCount, setCharCount] = useState(0)
+
+  useEffect(() => {
+    if (!quillInstance) {
+      setWordCount(0);
+      setCharCount(0);
+      return;
+    }
+    const updateStats = () => {
+      const text = quillInstance.getText() || '';
+      const cleanText = text.endsWith('\n') ? text.slice(0, -1) : text;
+      const chars = cleanText.length;
+      const words = cleanText.trim() ? cleanText.trim().split(/\s+/).length : 0;
+      setCharCount(chars);
+      setWordCount(words);
+    };
+    quillInstance.on('text-change', updateStats);
+    updateStats();
+    return () => {
+      quillInstance.off('text-change', updateStats);
+    };
+  }, [quillInstance, activeFileId]);
 
   const addActivity = (username, action, type = 'edit') => {
     setActivities(prev => [
@@ -243,16 +270,39 @@ export default function App() {
           case 'whiteboard':
             status = 'whiteboard';
             break;
+          case 'slides':
+            status = 'slides';
+            break;
           case 'meetings':
             status = 'meetings';
+            break;
+          case 'calendar':
+            status = 'calendar';
+            break;
+          case 'tasks':
+            status = 'tasks';
+            break;
+          case 'files':
+            status = 'files';
+            break;
+          case 'settings':
+            status = 'settings';
+            break;
+          case 'home':
+            status = 'home';
             break;
           default:
             status = 'idle';
         }
       }
-      socket.emit('update-active-app', { roomId, activeApp: status });
+      socket.emit('update-active-app', { 
+        roomId, 
+        activeApp: status, 
+        activeFileId: activeFileId || null, 
+        activeFileTitle: activeFileTitle || null 
+      });
     }
-  }, [activeApp, isSharing, isWatching, joined, roomId]);
+  }, [activeApp, isSharing, isWatching, joined, roomId, activeFileId, activeFileTitle]);
 
   useEffect(() => {
     if (joined && activeApp === 'slides') {
@@ -512,11 +562,9 @@ export default function App() {
       if (roomState.settings) setRoomSettings(roomState.settings);
       if (roomState.files) {
         setFilesList(roomState.files);
-        const defaultDoc = roomState.files.find(f => f.type === 'document');
-        if (defaultDoc) {
-          setActiveFileId(defaultDoc.id);
-          setActiveFileTitle(defaultDoc.name);
-        }
+        // Do not open any file automatically
+        setActiveFileId(null);
+        setActiveFileTitle(null);
       }
       if (roomState.calendar) setCalendarList(roomState.calendar);
       if (roomState.tasks) setTasksList(roomState.tasks);
@@ -808,17 +856,87 @@ export default function App() {
 
   const handleOpenFile = (item) => {
     if (!item) return;
-    setActiveFileId(item.id);
-    setActiveFileTitle(item.name);
     
-    // Switch dynamic app
-    if (item.type === 'document') setActiveApp('docs');
-    else if (item.type === 'spreadsheet') setActiveApp('sheets');
-    else if (item.type === 'presentation') setActiveApp('slides');
-    else if (item.type === 'whiteboard') setActiveApp('whiteboard');
-    else {
+    if (['document', 'spreadsheet', 'presentation', 'whiteboard'].includes(item.type)) {
+      setOpenTabs((prev) => {
+        if (!prev.includes(item.id)) {
+          return [...prev, item.id];
+        }
+        return prev;
+      });
+      setActiveFileId(item.id);
+      setActiveFileTitle(item.name);
+      if (item.type === 'document') setActiveApp('docs');
+      else if (item.type === 'spreadsheet') setActiveApp('sheets');
+      else if (item.type === 'presentation') setActiveApp('slides');
+      else if (item.type === 'whiteboard') setActiveApp('whiteboard');
+    } else {
       setPreviewFile(item);
     }
+  };
+
+  const handleCloseTab = (fileId) => {
+    setOpenTabs((prev) => {
+      const nextTabs = prev.filter(id => id !== fileId);
+      
+      // If we closed the active tab, we need to activate another tab or clear it
+      if (activeFileId === fileId) {
+        if (nextTabs.length > 0) {
+          const nextActiveId = nextTabs[nextTabs.length - 1];
+          const file = filesList.find(f => f.id === nextActiveId);
+          if (file) {
+            setActiveFileId(file.id);
+            setActiveFileTitle(file.name);
+            if (file.type === 'document') setActiveApp('docs');
+            else if (file.type === 'spreadsheet') setActiveApp('sheets');
+            else if (file.type === 'presentation') setActiveApp('slides');
+            else if (file.type === 'whiteboard') setActiveApp('whiteboard');
+          }
+        } else {
+          setActiveFileId(null);
+          setActiveFileTitle(null);
+          setActiveApp('home');
+        }
+      }
+      return nextTabs;
+    });
+  };
+
+  const handleCreateFile = (name, type) => {
+    const defaultContents = {
+      document: null,
+      spreadsheet: Array(100).fill().map(() => Array(26).fill('')),
+      presentation: [{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }],
+      whiteboard: []
+    };
+
+    const ext = {
+      document: '.docx',
+      spreadsheet: '.xlsx',
+      presentation: '.pptx',
+      whiteboard: '.board'
+    };
+
+    const cleanName = name.endsWith(ext[type] || '') ? name : `${name}${ext[type] || ''}`;
+
+    const newFile = {
+      id: `file-${type}-${Math.random().toString(36).substring(2, 9)}`,
+      name: cleanName,
+      type: type,
+      folderId: null,
+      content: defaultContents[type] !== undefined ? defaultContents[type] : null,
+      comments: [],
+      versions: [],
+      lastModified: new Date().toISOString(),
+      uploadedBy: getDisplayName(),
+      uploadedAt: new Date().toLocaleString()
+    };
+
+    const updated = [...filesList, newFile];
+    setFilesList(updated);
+    socket.emit('update-files', { roomId, files: updated });
+    toast.success(`Created file "${cleanName}"`);
+    handleOpenFile(newFile);
   };
 
   const handleCreateRoom = (targetRoomId, targetWorkspaceName) => {
@@ -1145,131 +1263,273 @@ export default function App() {
 
 
                   {/* Normal workspaces container */}
-                  <div className="flex-1 h-full overflow-hidden relative">
-                    {/* Keep all editors mounted to preserve state/Quill instances */}
-                    <div className={`w-full h-full ${activeApp === 'docs' ? 'block' : 'hidden'}`}>
-                      <Documents
-                        wrapperRef={wrapperRef}
-                        onMount={() => setEditorMounted(true)}
-                        isSaving={isSaving}
-                        activeUsersCount={activeUsers.length}
-                        comments={documentComments}
-                        socket={socket}
-                        roomId={roomId}
-                        userName={getDisplayName()}
-                        versions={documentVersions}
-                        onRevertVersion={handleRevertVersion}
-                      />
-                    </div>
+                  <div className="flex-1 h-full overflow-hidden flex flex-col relative">
+                    
+                    {/* Tabs Bar */}
+                    {openTabs.length > 0 && (
+                      <div className="flex items-center gap-px bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar shrink-0 select-none">
+                        {openTabs.map((tabId) => {
+                          const file = filesList.find(f => f.id === tabId);
+                          if (!file) return null;
+                          const isActive = activeFileId === tabId;
+                          const FileIcon = (() => {
+                            if (file.type === 'document') return FileText;
+                            if (file.type === 'spreadsheet') return TableProperties;
+                            if (file.type === 'presentation') return Presentation;
+                            return Paintbrush;
+                          })();
+                          const iconColor = (() => {
+                            if (file.type === 'document') return 'text-blue-500';
+                            if (file.type === 'spreadsheet') return 'text-emerald-500';
+                            if (file.type === 'presentation') return 'text-orange-500';
+                            return 'text-purple-500';
+                          })();
 
-                    <div className={`w-full h-full ${activeApp === 'whiteboard' ? 'block' : 'hidden'}`}>
-                      <Whiteboard
-                        canvasRef={canvasRef}
-                        myColor={myColor}
-                        setMyColor={setMyColor}
-                        whiteboardTool={whiteboardTool}
-                        setWhiteboardTool={setWhiteboardTool}
-                        whiteboardSize={whiteboardSize}
-                        setWhiteboardSize={setWhiteboardSize}
-                        whiteboardCursors={whiteboardCursors}
-                        socket={socket}
-                        roomId={roomId}
-                        userName={getDisplayName()}
-                        activeFileId={activeFileId}
-                        filesList={filesList}
-                      />
-                    </div>
+                          return (
+                            <div
+                              key={tabId}
+                              onClick={() => handleOpenFile(file)}
+                              className={`flex items-center gap-2 px-4 py-2 border-r border-slate-200 dark:border-slate-800 text-xs font-semibold cursor-pointer transition-colors relative group ${
+                                isActive 
+                                  ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-white border-t-2 border-t-black dark:border-t-white' 
+                                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-slate-50 dark:bg-slate-950'
+                              }`}
+                            >
+                              <FileIcon className={`w-3.5 h-3.5 ${iconColor}`} />
+                              <span>{file.name}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCloseTab(tabId);
+                                }}
+                                className="p-0.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-850 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                    <div className={`w-full h-full ${activeApp === 'sheets' ? 'block' : 'hidden'}`}>
-                      <Spreadsheet
-                        grid={grid}
-                        activeCell={activeCell}
-                        setActiveCell={setActiveCell}
-                        handleCellChange={handleCellChange}
-                        spreadsheetCells={spreadsheetCells}
-                        socket={socket}
-                        roomId={roomId}
-                        roomSettings={roomSettings}
-                        setRoomSettings={setRoomSettings}
-                      />
-                    </div>
+                    {/* Breadcrumbs Bar */}
+                    {activeFileId && (
+                      <div className="px-6 py-2 border-b border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/30 flex items-center gap-1.5 text-[10px] text-slate-400 font-medium shrink-0">
+                        <span className="hover:text-slate-600 dark:hover:text-slate-350 cursor-pointer" onClick={() => { setActiveFileId(null); setActiveFileTitle(null); setActiveApp('home'); }}>Workspace</span>
+                        <span>&gt;</span>
+                        <span className="hover:text-slate-600 dark:hover:text-slate-350 cursor-pointer capitalize" onClick={() => {
+                          const file = filesList.find(f => f.id === activeFileId);
+                          if (file) {
+                            if (file.type === 'document') setActiveApp('docs-list');
+                            if (file.type === 'spreadsheet') setActiveApp('sheets-list');
+                            if (file.type === 'presentation') setActiveApp('slides-list');
+                            if (file.type === 'whiteboard') setActiveApp('whiteboard-list');
+                          }
+                        }}>
+                          {(() => {
+                            const file = filesList.find(f => f.id === activeFileId);
+                            if (file) {
+                              if (file.type === 'document') return 'Documents';
+                              if (file.type === 'spreadsheet') return 'Spreadsheets';
+                              if (file.type === 'presentation') return 'Presentations';
+                              if (file.type === 'whiteboard') return 'Whiteboards';
+                              return file.type;
+                            }
+                            return 'Files';
+                          })()}
+                        </span>
+                        <span>&gt;</span>
+                        <span className="font-bold text-slate-605 dark:text-slate-250">
+                          {activeFileTitle || 'Untitled'}
+                        </span>
+                      </div>
+                    )}
 
-                    <div className={`w-full h-full ${activeApp === 'slides' ? 'block' : 'hidden'}`}>
-                      <Slides
-                        slides={slides}
-                        activeSlide={activeSlide}
-                        setActiveSlide={setActiveSlide}
-                        isPresenting={isPresenting}
-                        setIsPresenting={setIsPresenting}
-                        addSlide={addSlide}
-                        handleSlideUpdate={handleSlideUpdate}
-                        roomId={roomId}
-                        socket={socket}
-                        activeUsers={activeUsers}
-                        setSlides={setSlides}
-                        activeFileId={activeFileId}
-                        filesList={filesList}
-                      />
-                    </div>
+                    {/* Editor Content Area */}
+                    <div className="flex-1 overflow-hidden relative">
+                      {/* Workspace Home */}
+                      <div className={`w-full h-full ${activeApp === 'home' ? 'block' : 'hidden'}`}>
+                        <WorkspaceHome
+                          workspaceName={workspaceName}
+                          roomId={roomId}
+                          filesList={filesList}
+                          onOpenFile={handleOpenFile}
+                          onCreateFile={handleCreateFile}
+                          activeUsers={activeUsers}
+                          calendarList={calendarList}
+                          tasksList={tasksList}
+                          activities={activities}
+                          setActiveApp={setActiveApp}
+                          onSearchClick={() => setSearchOpen(true)}
+                        />
+                      </div>
 
-                    <div className={`w-full h-full ${activeApp === 'files' ? 'block' : 'hidden'}`}>
-                      <FileExplorer
-                        filesList={filesList}
-                        socket={socket}
-                        roomId={roomId}
-                        userName={getDisplayName()}
-                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
-                        onOpenFile={handleOpenFile}
-                        activeFileId={activeFileId}
-                      />
-                    </div>
+                      {/* Lists views */}
+                      <div className={`w-full h-full ${activeApp === 'docs-list' ? 'block' : 'hidden'}`}>
+                        <ModuleListView
+                          title="Documents"
+                          type="document"
+                          filesList={filesList}
+                          onCreateFile={handleCreateFile}
+                          onOpenFile={handleOpenFile}
+                        />
+                      </div>
 
-                    <div className={`w-full h-full ${activeApp === 'calendar' ? 'block' : 'hidden'}`}>
-                      <Calendar
-                        calendarList={calendarList}
-                        socket={socket}
-                        roomId={roomId}
-                        userName={getDisplayName()}
-                        activeUsers={activeUsers}
-                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
-                      />
-                    </div>
+                      <div className={`w-full h-full ${activeApp === 'sheets-list' ? 'block' : 'hidden'}`}>
+                        <ModuleListView
+                          title="Spreadsheets"
+                          type="spreadsheet"
+                          filesList={filesList}
+                          onCreateFile={handleCreateFile}
+                          onOpenFile={handleOpenFile}
+                        />
+                      </div>
 
-                    <div className={`w-full h-full ${activeApp === 'tasks' ? 'block' : 'hidden'}`}>
-                      <Tasks
-                        tasksList={tasksList}
-                        socket={socket}
-                        roomId={roomId}
-                        userName={getDisplayName()}
-                        activeUsers={activeUsers}
-                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
-                      />
-                    </div>
+                      <div className={`w-full h-full ${activeApp === 'slides-list' ? 'block' : 'hidden'}`}>
+                        <ModuleListView
+                          title="Presentations"
+                          type="presentation"
+                          filesList={filesList}
+                          onCreateFile={handleCreateFile}
+                          onOpenFile={handleOpenFile}
+                        />
+                      </div>
 
-                    <div className={`w-full h-full ${activeApp === 'meetings' ? 'block' : 'hidden'}`}>
-                      <Meetings
-                        socket={socket}
-                        roomId={roomId}
-                        userName={getDisplayName()}
-                        activeUsers={activeUsers}
-                        currentUserRole={userRoles[getDisplayName()] || 'editor'}
-                      />
-                    </div>
+                      <div className={`w-full h-full ${activeApp === 'whiteboard-list' ? 'block' : 'hidden'}`}>
+                        <ModuleListView
+                          title="Whiteboards"
+                          type="whiteboard"
+                          filesList={filesList}
+                          onCreateFile={handleCreateFile}
+                          onOpenFile={handleOpenFile}
+                        />
+                      </div>
 
-                    <div className={`w-full h-full ${activeApp === 'settings' ? 'block' : 'hidden'}`}>
-                      <Settings
-                        isDarkMode={isDarkMode}
-                        setIsDarkMode={setIsDarkMode}
-                        userName={getDisplayName()}
-                        roomId={roomId}
-                        socket={socket}
-                        roomSettings={roomSettings}
-                        setRoomSettings={setRoomSettings}
-                        isHost={isHost}
-                        activeUsers={activeUsers}
-                        userRoles={userRoles}
-                        onUpdateUserRole={handleUpdateUserRole}
-                      />
+                      {/* Keep all editors mounted to preserve state/Quill instances */}
+                      <div className={`w-full h-full ${activeApp === 'docs' ? 'block' : 'hidden'}`}>
+                        <Documents
+                          wrapperRef={wrapperRef}
+                          onMount={() => setEditorMounted(true)}
+                          isSaving={isSaving}
+                          activeUsersCount={activeUsers.length}
+                          comments={documentComments}
+                          socket={socket}
+                          roomId={roomId}
+                          userName={getDisplayName()}
+                          versions={documentVersions}
+                          onRevertVersion={handleRevertVersion}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'whiteboard' ? 'block' : 'hidden'}`}>
+                        <Whiteboard
+                          canvasRef={canvasRef}
+                          myColor={myColor}
+                          setMyColor={setMyColor}
+                          whiteboardTool={whiteboardTool}
+                          setWhiteboardTool={setWhiteboardTool}
+                          whiteboardSize={whiteboardSize}
+                          setWhiteboardSize={setWhiteboardSize}
+                          whiteboardCursors={whiteboardCursors}
+                          socket={socket}
+                          roomId={roomId}
+                          userName={getDisplayName()}
+                          activeFileId={activeFileId}
+                          filesList={filesList}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'sheets' ? 'block' : 'hidden'}`}>
+                        <Spreadsheet
+                          grid={grid}
+                          activeCell={activeCell}
+                          setActiveCell={setActiveCell}
+                          handleCellChange={handleCellChange}
+                          spreadsheetCells={spreadsheetCells}
+                          socket={socket}
+                          roomId={roomId}
+                          roomSettings={roomSettings}
+                          setRoomSettings={setRoomSettings}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'slides' ? 'block' : 'hidden'}`}>
+                        <Slides
+                          slides={slides}
+                          activeSlide={activeSlide}
+                          setActiveSlide={setActiveSlide}
+                          isPresenting={isPresenting}
+                          setIsPresenting={setIsPresenting}
+                          addSlide={addSlide}
+                          handleSlideUpdate={handleSlideUpdate}
+                          roomId={roomId}
+                          socket={socket}
+                          activeUsers={activeUsers}
+                          setSlides={setSlides}
+                          activeFileId={activeFileId}
+                          filesList={filesList}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'files' ? 'block' : 'hidden'}`}>
+                        <FileExplorer
+                          filesList={filesList}
+                          socket={socket}
+                          roomId={roomId}
+                          userName={getDisplayName()}
+                          currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                          onOpenFile={handleOpenFile}
+                          activeFileId={activeFileId}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'calendar' ? 'block' : 'hidden'}`}>
+                        <Calendar
+                          calendarList={calendarList}
+                          socket={socket}
+                          roomId={roomId}
+                          userName={getDisplayName()}
+                          activeUsers={activeUsers}
+                          currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'tasks' ? 'block' : 'hidden'}`}>
+                        <Tasks
+                          tasksList={tasksList}
+                          socket={socket}
+                          roomId={roomId}
+                          userName={getDisplayName()}
+                          activeUsers={activeUsers}
+                          currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'meetings' ? 'block' : 'hidden'}`}>
+                        <Meetings
+                          socket={socket}
+                          roomId={roomId}
+                          userName={getDisplayName()}
+                          activeUsers={activeUsers}
+                          currentUserRole={userRoles[getDisplayName()] || 'editor'}
+                        />
+                      </div>
+
+                      <div className={`w-full h-full ${activeApp === 'settings' ? 'block' : 'hidden'}`}>
+                        <Settings
+                          isDarkMode={isDarkMode}
+                          setIsDarkMode={setIsDarkMode}
+                          userName={getDisplayName()}
+                          roomId={roomId}
+                          socket={socket}
+                          roomSettings={roomSettings}
+                          setRoomSettings={setRoomSettings}
+                          isHost={isHost}
+                          activeUsers={activeUsers}
+                          userRoles={userRoles}
+                          onUpdateUserRole={handleUpdateUserRole}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1304,6 +1564,8 @@ export default function App() {
                   setIsCollapsed={setIsRightPanelCollapsed}
                   presenter={presenter}
                   onJoinPresentation={watchPresentation}
+                  activeFileId={activeFileId}
+                  filesList={filesList}
                 />
               )}
             </div>
@@ -1315,6 +1577,17 @@ export default function App() {
               isSaving={isSaving}
               activeApp={activeApp}
               activeUsersCount={activeUsers.length}
+              wordCount={wordCount}
+              charCount={charCount}
+              currentPage={
+                activeApp === 'slides' 
+                  ? `Slide ${activeSlide + 1} of ${slides.length || 1}` 
+                  : activeApp === 'docs' 
+                    ? 'Page 1 of 1' 
+                    : 'Page 1 of 1'
+              }
+              zoom={100}
+              language="English (US)"
             />
             {/* Floating Screen Share Window */}
             {presenter && (isSharing || isWatching) && (
@@ -1404,4 +1677,91 @@ export default function App() {
       </SignedIn>
     </>
   )
+}
+
+function ModuleListView({ title, type, filesList, onCreateFile, onOpenFile }) {
+  const filtered = filesList.filter(f => f.type === type);
+  const getIcon = () => {
+    if (type === 'document') return FileText;
+    if (type === 'spreadsheet') return TableProperties;
+    if (type === 'presentation') return Presentation;
+    return Paintbrush;
+  };
+  const Icon = getIcon();
+
+  const iconColor = (() => {
+    if (type === 'document') return 'text-blue-500';
+    if (type === 'spreadsheet') return 'text-emerald-500';
+    if (type === 'presentation') return 'text-orange-500';
+    return 'text-purple-500';
+  })();
+
+  return (
+    <div className="w-full h-full p-8 overflow-y-auto bg-slate-50 dark:bg-slate-900/40 text-neutral-800 dark:text-neutral-200">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-neutral-900 dark:text-white capitalize">{title}</h1>
+            <p className="text-xs text-neutral-500 dark:text-slate-400 mt-1">Manage and create collaborative {title.toLowerCase()} files.</p>
+          </div>
+          <button
+            onClick={() => {
+              const name = prompt(`Enter new ${type} name:`);
+              if (name && name.trim()) {
+                onCreateFile(name.trim(), type);
+              }
+            }}
+            className="px-4 py-2 text-xs font-bold text-white bg-black hover:bg-[#222] dark:bg-neutral-800 dark:hover:bg-neutral-750 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs border border-transparent dark:border-neutral-700"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New {title.slice(0, -1)}</span>
+          </button>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-16 text-center bg-white dark:bg-slate-950">
+            <Icon className="w-10 h-10 text-slate-350 dark:text-slate-600 mx-auto mb-4" />
+            <h3 className="text-sm font-bold text-slate-850 dark:text-slate-250">No {title} yet</h3>
+            <p className="text-xs text-slate-450 dark:text-slate-500 mt-1 mb-4">Create your first {type} to start collaborating.</p>
+            <button
+              onClick={() => {
+                const name = prompt(`Enter new ${type} name:`);
+                if (name && name.trim()) {
+                  onCreateFile(name.trim(), type);
+                }
+              }}
+              className="px-4 py-2 text-xs font-bold text-white bg-black hover:bg-[#222] dark:bg-neutral-800 dark:hover:bg-neutral-750 rounded-xl transition-colors cursor-pointer"
+            >
+              Create {title.slice(0, -1)}
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {filtered.map(file => (
+              <div
+                key={file.id}
+                onDoubleClick={() => onOpenFile(file)}
+                onClick={() => onOpenFile(file)}
+                className="bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-850 hover:border-black dark:hover:border-slate-700 hover:shadow-xs rounded-xl p-4 cursor-pointer transition-all duration-150 group animate-fadeIn"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 flex items-center justify-center shrink-0">
+                    <Icon className={`w-4.5 h-4.5 ${iconColor}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-black dark:group-hover:text-white truncate">
+                      {file.name}
+                    </h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                      Edited {new Date(file.lastModified || file.uploadedAt || Date.now()).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
