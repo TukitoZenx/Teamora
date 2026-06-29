@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ensureArray } from '../utils/arrayUtils';
 import { 
   Paintbrush, Eraser, Trash2, Undo2, Redo2, ZoomIn, ZoomOut, 
   Square, Circle, Minus, ArrowUpRight, Type, Hand, PenTool, 
@@ -18,7 +19,9 @@ export default function Whiteboard({
   whiteboardCursors = {},
   socket,
   roomId,
-  userName
+  userName,
+  activeFileId,
+  filesList = []
 }) {
   const [showGrid, setShowGrid] = useState(true);
   const [zoom, setZoom] = useState(100);
@@ -41,8 +44,35 @@ export default function Whiteboard({
   const containerRef = useRef(null);
   const elementsRef = useRef(elements);
 
+  // Load elements from active file content
   useEffect(() => {
-    elementsRef.current = elements;
+    if (activeFileId && filesList && filesList.length > 0) {
+      const file = filesList.find(f => f.id === activeFileId);
+      if (file && file.content) {
+        if (Array.isArray(file.content)) {
+          setElements(file.content);
+        } else {
+          console.warn('Warning: loaded whiteboard content is not an array:', file.content);
+          setElements([]);
+        }
+      } else {
+        setElements([]);
+      }
+    }
+  }, [activeFileId, filesList]);
+
+  // Sync elements changes to the active file content
+  useEffect(() => {
+    if (activeFileId && Array.isArray(elements) && elements.length > 0) {
+      const timeout = setTimeout(() => {
+        socket.emit('file-content-update', { roomId, fileId: activeFileId, content: elements });
+      }, 500); // Throttled updates to reduce socket traffic
+      return () => clearTimeout(timeout);
+    }
+  }, [elements, activeFileId, roomId, socket]);
+
+  useEffect(() => {
+    elementsRef.current = Array.isArray(elements) ? elements : [];
   }, [elements]);
 
   const colors = [
@@ -66,7 +96,12 @@ export default function Whiteboard({
     });
 
     socket.on('receive-whiteboard-elements', (elementsList) => {
-      setElements(elementsList || []);
+      if (Array.isArray(elementsList)) {
+        setElements(elementsList);
+      } else {
+        console.warn('Warning: received whiteboard elements is not an array:', elementsList);
+        setElements([]);
+      }
     });
 
     return () => {
@@ -137,7 +172,7 @@ export default function Whiteboard({
         text: 'New Sticky Note',
         locked: false
       };
-      saveElementsState([...elements, newSticky]);
+      saveElementsState([...(Array.isArray(elements) ? elements : []), newSticky]);
       setWhiteboardTool('select');
       setSelectedElementId(newSticky.id);
       return;
@@ -165,7 +200,7 @@ export default function Whiteboard({
         src: imgVal,
         locked: false
       };
-      saveElementsState([...elements, newElem]);
+      saveElementsState([...(Array.isArray(elements) ? elements : []), newElem]);
       setWhiteboardTool('select');
       setSelectedElementId(newElem.id);
       return;
@@ -222,10 +257,12 @@ export default function Whiteboard({
   };
 
   const saveElementsState = (newElements) => {
-    setUndoStack(prev => [...prev, elements]);
+    const verifiedNew = Array.isArray(newElements) ? newElements : [];
+    const currentElements = Array.isArray(elements) ? elements : [];
+    setUndoStack(prev => [...prev, currentElements]);
     setRedoStack([]);
-    setElements(newElements);
-    socket.emit('update-whiteboard-elements', { roomId, elements: newElements });
+    setElements(verifiedNew);
+    socket.emit('update-whiteboard-elements', { roomId, elements: verifiedNew });
   };
 
   const handleClear = () => {
@@ -242,30 +279,36 @@ export default function Whiteboard({
   const handleUndo = () => {
     if (undoStack.length === 0) return;
     const previous = undoStack[undoStack.length - 1];
-    setRedoStack(prev => [...prev, elements]);
-    setElements(previous);
+    const verifiedPrev = Array.isArray(previous) ? previous : [];
+    const currentElements = Array.isArray(elements) ? elements : [];
+    setRedoStack(prev => [...prev, currentElements]);
+    setElements(verifiedPrev);
     setUndoStack(prev => prev.slice(0, -1));
-    socket.emit('update-whiteboard-elements', { roomId, elements: previous });
+    socket.emit('update-whiteboard-elements', { roomId, elements: verifiedPrev });
   };
 
   const handleRedo = () => {
     if (redoStack.length === 0) return;
     const next = redoStack[redoStack.length - 1];
-    setUndoStack(prev => [...prev, elements]);
-    setElements(next);
+    const verifiedNext = Array.isArray(next) ? next : [];
+    const currentElements = Array.isArray(elements) ? elements : [];
+    setUndoStack(prev => [...prev, currentElements]);
+    setElements(verifiedNext);
     setRedoStack(prev => prev.slice(0, -1));
-    socket.emit('update-whiteboard-elements', { roomId, elements: next });
+    socket.emit('update-whiteboard-elements', { roomId, elements: verifiedNext });
   };
 
   const handleElementTextChange = (elemId, newText) => {
-    const updated = elements.map((el) => el.id === elemId ? { ...el, text: newText } : el);
+    const safeElements = Array.isArray(elements) ? elements : [];
+    const updated = safeElements.map((el) => el.id === elemId ? { ...el, text: newText } : el);
     setElements(updated);
     socket.emit('update-whiteboard-elements', { roomId, elements: updated });
   };
 
   // Element actions: lock, duplicate, layers
   const toggleLockElement = (elemId) => {
-    const updated = elements.map(el => el.id === elemId ? { ...el, locked: !el.locked } : el);
+    const safeElements = Array.isArray(elements) ? elements : [];
+    const updated = safeElements.map(el => el.id === elemId ? { ...el, locked: !el.locked } : el);
     saveElementsState(updated);
   };
 
@@ -277,20 +320,23 @@ export default function Whiteboard({
       y: elem.y + 20,
       locked: false
     };
-    saveElementsState([...elements, newElem]);
+    const safeElements = Array.isArray(elements) ? elements : [];
+    saveElementsState([...safeElements, newElem]);
     setSelectedElementId(newElem.id);
   };
 
   const deleteElement = (elemId) => {
-    const updated = elements.filter(el => el.id !== elemId);
+    const safeElements = Array.isArray(elements) ? elements : [];
+    const updated = safeElements.filter(el => el.id !== elemId);
     saveElementsState(updated);
     setSelectedElementId(null);
   };
 
   const moveLayer = (elemId, direction) => {
-    const index = elements.findIndex(el => el.id === elemId);
+    const safeElements = Array.isArray(elements) ? elements : [];
+    const index = safeElements.findIndex(el => el.id === elemId);
     if (index === -1) return;
-    const updated = [...elements];
+    const updated = [...safeElements];
     const [item] = updated.splice(index, 1);
     
     if (direction === 'front') {
@@ -369,7 +415,8 @@ export default function Whiteboard({
         { id: 'bs-3', type: 'sticky', x: 700, y: 350, width: 160, height: 160, color: '#fdf2f8', borderColor: '#ec4899', text: 'Idea B' }
       ];
     }
-    const updated = [...elements, ...templateElements];
+    const safeElements = Array.isArray(elements) ? elements : [];
+    const updated = [...safeElements, ...templateElements];
     saveElementsState(updated);
     toast.success(`Template applied!`);
   };
@@ -567,7 +614,7 @@ export default function Whiteboard({
           />
 
           {/* Interactive Elements Layer */}
-          {elements.map((elem) => {
+          {ensureArray(elements).map((elem) => {
             const isSelected = selectedElementId === elem.id;
             const isSticky = elem.type === 'sticky';
             const isText = elem.type === 'text';

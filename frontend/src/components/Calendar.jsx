@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ensureArray } from '../utils/arrayUtils';
 import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Clock, MapPin, AlignLeft, Users, Tag, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -92,7 +93,7 @@ export default function Calendar({
       }
     }
 
-    const updated = [...calendarList, ...newEvents];
+    const updated = [...ensureArray(calendarList), ...newEvents];
     socket.emit('update-calendar', { roomId, calendar: updated });
     
     // Reset Form
@@ -109,7 +110,7 @@ export default function Calendar({
 
   const handleDeleteEvent = (eventId, e) => {
     e.stopPropagation();
-    const updated = calendarList.filter((ev) => ev.id !== eventId);
+    const updated = ensureArray(calendarList).filter((ev) => ev.id !== eventId);
     socket.emit('update-calendar', { roomId, calendar: updated });
     toast.success('Event cancelled.');
   };
@@ -127,7 +128,7 @@ export default function Calendar({
     const dayStr = String(dayNum).padStart(2, '0');
     const datePattern = `${year}-${month}-${dayStr}`;
 
-    return calendarList.filter((e) => e.start.startsWith(datePattern));
+    return ensureArray(calendarList).filter((e) => e && e.start && typeof e.start === 'string' && e.start.startsWith(datePattern));
   };
 
   const getCategoryColor = (category) => {
@@ -234,9 +235,9 @@ export default function Calendar({
                 </div>
 
                 {/* Render events inside cell directly */}
-                {cell.day && hasEvents && (
+                {cell.day && ensureArray(cell.events).length > 0 && (
                   <div className="flex-1 overflow-y-auto space-y-1 mt-1 no-scrollbar max-h-[8vh]">
-                    {cell.events.map((e) => (
+                    {ensureArray(cell.events).map((e) => (
                       <div 
                         key={e.id}
                         onClick={(ev) => {
@@ -348,7 +349,7 @@ export default function Calendar({
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Attendees</label>
                 <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 max-h-28 overflow-y-auto space-y-2">
-                  {activeUsers.map((member, i) => (
+                  {ensureArray(activeUsers).map((member, i) => (
                     <label key={i} className="flex items-center gap-2 cursor-pointer text-slate-700">
                       <input
                         type="checkbox"

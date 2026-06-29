@@ -1,4 +1,5 @@
 import React from 'react';
+import { ensureArray } from '../utils/arrayUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageSquare, 
@@ -83,9 +84,9 @@ export default function CollaborationPanel({
   };
 
   const tabs = [
-    { id: 'chat', label: 'Chat', icon: MessageSquare, badge: messages.length > 0 ? messages.length : null },
-    { id: 'members', label: 'Members', icon: Users, badge: activeUsers.length },
-    { id: 'activity', label: 'Activity', icon: Activity, badge: activities.length > 0 ? activities.length : null },
+    { id: 'chat', label: 'Chat', icon: MessageSquare, badge: ensureArray(messages).length > 0 ? ensureArray(messages).length : null },
+    { id: 'members', label: 'Members', icon: Users, badge: ensureArray(activeUsers).length },
+    { id: 'activity', label: 'Activity', icon: Activity, badge: ensureArray(activities).length > 0 ? ensureArray(activities).length : null },
   ];
 
   // Collapsed state: Show a thin bar with a toggle button
@@ -151,7 +152,7 @@ export default function CollaborationPanel({
             >
               {/* Messages Area */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-                {messages.length === 0 ? (
+                {ensureArray(messages).length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-6">
                     <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center text-indigo-500 mb-3">
                       <MessageSquare className="w-6 h-6" />
@@ -160,7 +161,7 @@ export default function CollaborationPanel({
                     <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">Start the conversation with your team!</span>
                   </div>
                 ) : (
-                  messages.map((m, i) => {
+                  ensureArray(messages).map((m, i) => {
                     const isSystemScreenShare = m.user === 'System' && m.message.startsWith('SYSTEM_SCREEN_SHARE_START|');
                     if (isSystemScreenShare) {
                       const [, presenterName, startTime, presenterSocketId] = m.message.split('|');
@@ -286,7 +287,7 @@ export default function CollaborationPanel({
             >
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Collaborators in Room</h3>
               <div className="space-y-3">
-                {activeUsers.map((member, i) => (
+                {ensureArray(activeUsers).map((member, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200/30 dark:border-slate-800/50">
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -341,13 +342,13 @@ export default function CollaborationPanel({
             >
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">Live Activity Log</h3>
               <div className="space-y-4">
-                {activities.length === 0 ? (
+                {ensureArray(activities).length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center p-6 text-slate-400 mt-8">
                     <Calendar className="w-8 h-8 text-slate-300 mb-2" />
                     <span className="text-xs font-medium">No recent activities</span>
                   </div>
                 ) : (
-                  activities.map((act, idx) => (
+                  ensureArray(activities).map((act, idx) => (
                     <div key={idx} className="flex gap-3 items-start relative">
                       {idx !== activities.length - 1 && (
                         <div className="absolute left-2.5 top-5 bottom-[-20px] w-[1px] bg-slate-200 dark:bg-slate-800" />

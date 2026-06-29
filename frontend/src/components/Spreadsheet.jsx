@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { ensureArray } from '../utils/arrayUtils';
 import { 
   TableProperties, Bold, Italic, AlignLeft, AlignCenter, AlignRight, 
   Sparkles, RefreshCw, Copy, ClipboardPaste, Download, Upload, 
@@ -97,31 +98,67 @@ export default function Spreadsheet({
   const [freezeRow, setFreezeRow] = useState(false);
   const [freezeCol, setFreezeCol] = useState(false);
 
+  const [rowCount, setRowCount] = useState(100);
+  const [columnCount, setColumnCount] = useState(26);
+
   const cellRefs = useRef({});
+  const gridContainerRef = useRef(null);
+
+  // Scroll into view to center active cell on focus
+  useEffect(() => {
+    if (activeCell) {
+      const activeEl = cellRefs.current[`${activeCell.r}-${activeCell.c}`];
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [activeCell]);
+
+  const handleGridScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight, scrollLeft, scrollWidth, clientWidth } = e.target;
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      setRowCount(prev => prev + 50);
+    }
+    if (scrollWidth - scrollLeft - clientWidth < 200) {
+      setColumnCount(prev => prev + 10);
+    }
+  };
 
   // Sheets Metadata setup from roomSettings
   const sheetsMetadata = useMemo(() => {
-    return roomSettings.sheetsMetadata || {
-      activeSheet: 'Sheet1',
-      sheets: [{ name: 'Sheet1', offset: 0 }]
+    const meta = roomSettings.sheetsMetadata || {};
+    return {
+      activeSheet: meta.activeSheet || 'Sheet1',
+      sheets: Array.isArray(meta.sheets) ? meta.sheets : [{ name: 'Sheet1', offset: 0 }]
     };
   }, [roomSettings]);
 
   const activeSheetObj = useMemo(() => {
-    return sheetsMetadata.sheets.find(s => s.name === sheetsMetadata.activeSheet) || sheetsMetadata.sheets[0];
+    const sheets = ensureArray(sheetsMetadata.sheets);
+    return sheets.find(s => s && s.name === sheetsMetadata.activeSheet) || sheets[0];
   }, [sheetsMetadata]);
 
   const sheetOffset = activeSheetObj ? activeSheetObj.offset : 0;
 
   // Active sheet grid sliced
-  const sheetGridRowsCount = 50; // View 50 rows per sheet page
   const visibleGridRows = useMemo(() => {
     const rows = [];
-    for (let r = 0; r < sheetGridRowsCount; r++) {
-      rows.push(grid[sheetOffset + r] || Array(26).fill(''));
+    for (let r = 0; r < rowCount; r++) {
+      rows.push(grid[sheetOffset + r] || Array(columnCount).fill(''));
     }
     return rows;
-  }, [grid, sheetOffset]);
+  }, [grid, sheetOffset, rowCount, columnCount]);
+
+  // Converts column index to standard alphabetical label (A, B, C... AA, AB...)
+  const getColumnHeaderLabel = (index) => {
+    let label = '';
+    let temp = index;
+    while (temp >= 0) {
+      label = String.fromCharCode((temp % 26) + 65) + label;
+      temp = Math.floor(temp / 26) - 1;
+    }
+    return label;
+  };
 
   // Display cell value
   const getCellDisplay = (cellValue) => {
@@ -134,7 +171,7 @@ export default function Spreadsheet({
 
   const getCellLabel = () => {
     if (!activeCell) return '';
-    return `${String.fromCharCode(65 + activeCell.c)}${activeCell.r + 1}`;
+    return `${getColumnHeaderLabel(activeCell.c)}${activeCell.r + 1}`;
   };
 
   // Import XLSX (SheetJS)
@@ -186,22 +223,70 @@ export default function Spreadsheet({
   };
 
   const handleCellKeyDown = (e, rIdx, cIdx) => {
-    const maxRow = sheetGridRowsCount - 1;
-    const maxCol = 25;
-
     switch (e.key) {
       case 'Tab':
         e.preventDefault();
-        const newC = cIdx < maxCol ? cIdx + 1 : 0;
-        const newR = cIdx < maxCol ? rIdx : Math.min(maxRow, rIdx + 1);
+        const newC = cIdx < columnCount - 1 ? cIdx + 1 : 0;
+        const newR = cIdx < columnCount - 1 ? rIdx : Math.min(rowCount - 1, rIdx + 1);
         setActiveCell({ r: newR, c: newC });
         cellRefs.current[`${newR}-${newC}`]?.focus();
         break;
       case 'Enter':
         e.preventDefault();
-        if (rIdx < maxRow) {
+        if (rIdx < rowCount - 1) {
           setActiveCell({ r: rIdx + 1, c: cIdx });
           cellRefs.current[`${rIdx + 1}-${cIdx}`]?.focus();
+        } else {
+          setRowCount(prev => prev + 10);
+          const nextR = rIdx + 1;
+          setActiveCell({ r: nextR, c: cIdx });
+          setTimeout(() => cellRefs.current[`${nextR}-${cIdx}`]?.focus(), 10);
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (rIdx > 0) {
+          const nextR = rIdx - 1;
+          setActiveCell({ r: nextR, c: cIdx });
+          cellRefs.current[`${nextR}-${cIdx}`]?.focus();
+        }
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        if (rIdx < rowCount - 1) {
+          const nextR = rIdx + 1;
+          setActiveCell({ r: nextR, c: cIdx });
+          cellRefs.current[`${nextR}-${cIdx}`]?.focus();
+        } else {
+          setRowCount(prev => prev + 10);
+          const nextR = rIdx + 1;
+          setActiveCell({ r: nextR, c: cIdx });
+          setTimeout(() => cellRefs.current[`${nextR}-${cIdx}`]?.focus(), 10);
+        }
+        break;
+      case 'ArrowLeft':
+        if (e.target.selectionStart === 0 || e.target.selectionStart === null) {
+          e.preventDefault();
+          if (cIdx > 0) {
+            const nextC = cIdx - 1;
+            setActiveCell({ r: rIdx, c: nextC });
+            cellRefs.current[`${rIdx}-${nextC}`]?.focus();
+          }
+        }
+        break;
+      case 'ArrowRight':
+        if (e.target.selectionStart === e.target.value.length || e.target.selectionStart === null) {
+          e.preventDefault();
+          if (cIdx < columnCount - 1) {
+            const nextC = cIdx + 1;
+            setActiveCell({ r: rIdx, c: nextC });
+            cellRefs.current[`${rIdx}-${nextC}`]?.focus();
+          } else {
+            setColumnCount(prev => prev + 5);
+            const nextC = cIdx + 1;
+            setActiveCell({ r: rIdx, c: nextC });
+            setTimeout(() => cellRefs.current[`${rIdx}-${nextC}`]?.focus(), 10);
+          }
         }
         break;
     }
@@ -252,7 +337,7 @@ export default function Spreadsheet({
     };
     const updated = {
       activeSheet: newSheetName,
-      sheets: [...sheetsMetadata.sheets, newSheet]
+      sheets: [...ensureArray(sheetsMetadata.sheets), newSheet]
     };
     updateSheetsMetadata(updated);
     toast.success(`Created sheet ${newSheetName}!`);
@@ -260,11 +345,11 @@ export default function Spreadsheet({
 
   const handleRenameSheet = (sheetName) => {
     const newName = prompt('Enter sheet name:', sheetName);
-    if (!newName || newName.trim() === '' || sheetsMetadata.sheets.some(s => s.name === newName)) {
+    if (!newName || newName.trim() === '' || ensureArray(sheetsMetadata.sheets).some(s => s && s.name === newName)) {
       toast.error('Invalid or duplicate sheet name');
       return;
     }
-    const updatedSheets = sheetsMetadata.sheets.map(s => s.name === sheetName ? { ...s, name: newName } : s);
+    const updatedSheets = ensureArray(sheetsMetadata.sheets).map(s => s.name === sheetName ? { ...s, name: newName } : s);
     const updated = {
       activeSheet: sheetsMetadata.activeSheet === sheetName ? newName : sheetsMetadata.activeSheet,
       sheets: updatedSheets
@@ -402,7 +487,7 @@ export default function Spreadsheet({
 
       {/* Main Grid View */}
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-auto bg-white dark:bg-slate-950 transition-colors">
+        <div className="flex-1 overflow-auto bg-white dark:bg-slate-950 transition-colors" ref={gridContainerRef} onScroll={handleGridScroll}>
           <table className="border-collapse w-max min-w-full">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900 select-none">
@@ -412,7 +497,7 @@ export default function Spreadsheet({
                     key={cIdx} 
                     className="w-28 border border-slate-200 dark:border-slate-800/80 text-[10px] font-bold text-slate-400 dark:text-slate-500 text-center uppercase tracking-wider sticky top-0 bg-slate-50 dark:bg-slate-900 z-20"
                   >
-                    <span>{String.fromCharCode(65 + cIdx)}</span>
+                    <span>{getColumnHeaderLabel(cIdx)}</span>
                   </th>
                 ))}
               </tr>
@@ -579,7 +664,7 @@ export default function Spreadsheet({
 
       {/* Sheets Navigation Tab bar */}
       <div className="h-10 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center gap-1.5 shrink-0 z-20 select-none overflow-x-auto no-scrollbar">
-        {sheetsMetadata.sheets.map((sheet, sIdx) => {
+        {ensureArray(sheetsMetadata.sheets).map((sheet, sIdx) => {
           const isActive = sheetsMetadata.activeSheet === sheet.name;
           return (
             <div key={sIdx} className="relative group/tab flex items-center">
