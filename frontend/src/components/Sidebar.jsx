@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, Paintbrush, TableProperties, Presentation, Settings, 
   ChevronLeft, ChevronRight, Sparkles, LogOut, Folder, 
-  Calendar as CalendarIcon, CheckSquare, Video
+  Calendar as CalendarIcon, CheckSquare, Video, Home as HomeIcon
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -20,49 +20,44 @@ export default function Sidebar({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
 
-  const sections = [
-    {
-      title: 'Workspace',
-      items: [
-        { id: 'docs', label: 'Documents', icon: FileText },
-        { id: 'whiteboard', label: 'Whiteboard', icon: Paintbrush },
-        { id: 'sheets', label: 'Spreadsheet', icon: TableProperties },
-        { id: 'slides', label: 'Presentation', icon: Presentation }
-      ]
-    },
-    {
-      title: 'Collaboration',
-      items: [
-        { id: 'meetings', label: 'Meetings', icon: Video },
-        { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
-        { id: 'tasks', label: 'Tasks', icon: CheckSquare }
-      ]
-    },
-    {
-      title: 'Resources',
-      items: [
-        { id: 'files', label: 'Shared Files', icon: Folder }
-      ]
-    },
-    {
-      title: 'Settings',
-      items: [
-        { id: 'settings', label: 'Settings', icon: Settings }
-      ]
-    }
+  const isTabActive = (itemId) => {
+    if (itemId === 'home') return activeApp === 'home';
+    if (itemId === 'docs-list') return activeApp === 'docs' || activeApp === 'docs-list';
+    if (itemId === 'sheets-list') return activeApp === 'sheets' || activeApp === 'sheets-list';
+    if (itemId === 'slides-list') return activeApp === 'slides' || activeApp === 'slides-list';
+    if (itemId === 'whiteboard-list') return activeApp === 'whiteboard' || activeApp === 'whiteboard-list';
+    return activeApp === itemId;
+  };
+
+  const navItems = [
+    { type: 'header', label: 'Workspace' },
+    { id: 'home', label: 'Home', icon: HomeIcon },
+    { type: 'separator' },
+    { id: 'docs-list', label: 'Documents', icon: FileText },
+    { id: 'sheets-list', label: 'Spreadsheets', icon: TableProperties },
+    { id: 'slides-list', label: 'Presentations', icon: Presentation },
+    { id: 'whiteboard-list', label: 'Whiteboards', icon: Paintbrush },
+    { type: 'separator' },
+    { id: 'meetings', label: 'Meetings', icon: Video },
+    { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+    { type: 'separator' },
+    { id: 'files', label: 'Shared Files', icon: Folder },
+    { type: 'separator' },
+    { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
   return (
     <motion.aside
-      animate={{ width: isCollapsed ? '64px' : '288px' }}
-      transition={{ duration: 0.2, ease: 'easeInOut' }}
+      animate={{ width: isCollapsed ? '64px' : '280px' }}
+      transition={{ duration: 0.15, ease: 'easeInOut' }}
       style={{ backgroundColor: 'var(--sidebar-bg)' }}
       className="h-full shrink-0 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between relative z-30 select-none transition-colors duration-300"
     >
       {/* Sidebar toggle control */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-6 w-6 h-6 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-full flex items-center justify-center text-neutral-500 dark:text-neutral-450 hover:text-indigo-600 dark:hover:text-indigo-400 shadow-sm z-50 transition-colors cursor-pointer"
+        className="absolute -right-3 top-6 w-6 h-6 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-full flex items-center justify-center text-neutral-500 dark:text-neutral-450 hover:text-black dark:hover:text-white shadow-sm z-50 transition-colors cursor-pointer"
       >
         {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
       </button>
@@ -73,55 +68,54 @@ export default function Sidebar({
         {/* Workspace Brand Badge */}
         {!isCollapsed && (
           <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 border-b border-neutral-100 dark:border-neutral-850">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Teamora Space</span>
+            <Sparkles className="w-3.5 h-3.5 text-black dark:text-white animate-pulse" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Teamora Workspace</span>
           </div>
         )}
 
-        {/* Section List */}
-        <div className="space-y-4">
-          {sections.map((section, idx) => (
-            <div key={idx} className="flex flex-col">
-              {!isCollapsed && (
-                <span className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-neutral-450 dark:text-neutral-500 mb-1.5 mt-2">
-                  {section.title}
+        {/* Navigation List */}
+        <div className="space-y-1">
+          {navItems.map((item, idx) => {
+            if (item.type === 'header') {
+              if (isCollapsed) return null;
+              return (
+                <span key={idx} className="block px-3 text-[10px] font-extrabold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-1.5 mt-2">
+                  {item.label}
                 </span>
-              )}
-              
-              <div className="space-y-1">
-                {section.items.map((item) => {
-                  const isActive = activeApp === item.id;
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveApp(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all group relative cursor-pointer ${
-                        isActive 
-                          ? 'bg-neutral-100 dark:bg-neutral-800/80 text-neutral-900 dark:text-white shadow-xs border border-neutral-200/50 dark:border-neutral-700/50 border-l-2! border-l-indigo-600!' 
-                          : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                      }`}
-                    >
-                      <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-transparent group-hover:bg-neutral-100 dark:group-hover:bg-neutral-800'}`}>
-                        <Icon className="w-4.5 h-4.5" />
-                      </div>
-                      {!isCollapsed && <span className="truncate">{item.label}</span>}
-                      {isCollapsed && (
-                        <div className="absolute left-16 bg-neutral-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-md">
-                          {item.label}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              
-              {/* Add a subtle separator between sections if collapsed */}
-              {isCollapsed && idx < sections.length - 1 && (
-                <div className="border-t border-neutral-100 dark:border-neutral-850/50 my-2 mx-2" />
-              )}
-            </div>
-          ))}
+              );
+            }
+
+            if (item.type === 'separator') {
+              return (
+                <div key={idx} className="border-t border-neutral-100 dark:border-neutral-850/50 my-2 mx-2" />
+              );
+            }
+
+            const isActive = isTabActive(item.id);
+            const Icon = item.icon;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveApp(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all group relative cursor-pointer ${
+                  isActive 
+                    ? 'bg-neutral-150 dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-xs border border-neutral-200 dark:border-neutral-700/50 border-l-2! border-l-black! dark:border-l-white!' 
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'text-black dark:text-white bg-neutral-200 dark:bg-neutral-700' : 'bg-transparent group-hover:bg-neutral-100 dark:group-hover:bg-neutral-800'}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                {!isCollapsed && <span className="truncate">{item.label}</span>}
+                {isCollapsed && (
+                  <div className="absolute left-16 bg-neutral-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-md">
+                    {item.label}
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
 
       </div>
@@ -130,10 +124,10 @@ export default function Sidebar({
       <div className="p-3 border-t border-neutral-100 dark:border-neutral-850/80">
         <button
           onClick={() => setShowLeaveModal(true)}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all group relative cursor-pointer border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-red-650 hover:border-red-650 dark:text-neutral-400 dark:hover:text-red-400 dark:hover:border-red-500 hover:bg-red-50/50 dark:hover:bg-red-950/10 ${isCollapsed ? 'justify-center' : ''}`}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all group relative cursor-pointer border border-neutral-200 dark:border-neutral-800 text-neutral-550 hover:text-red-600 hover:border-red-500 dark:text-neutral-400 dark:hover:text-red-400 dark:hover:border-red-500 hover:bg-red-55/10 dark:hover:bg-red-950/10 ${isCollapsed ? 'justify-center' : ''}`}
         >
           <div className="p-1.5 rounded-lg transition-colors bg-transparent group-hover:bg-red-50 dark:group-hover:bg-red-950/30">
-            <LogOut className="w-4.5 h-4.5" />
+            <LogOut className="w-4 h-4" />
           </div>
           {!isCollapsed && <span className="truncate">Leave Workspace</span>}
           {isCollapsed && (
@@ -146,7 +140,7 @@ export default function Sidebar({
 
       <AnimatePresence>
         {showLeaveModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -176,7 +170,7 @@ export default function Sidebar({
                     setShowLeaveModal(false);
                     handleLeaveRoom();
                   }}
-                  className="px-4 py-2 text-xs text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors cursor-pointer shadow-sm shadow-red-500/20"
+                  className="px-4 py-2 text-xs text-white bg-red-650 hover:bg-red-700 rounded-xl transition-colors cursor-pointer shadow-sm"
                 >
                   Leave Workspace
                 </button>
