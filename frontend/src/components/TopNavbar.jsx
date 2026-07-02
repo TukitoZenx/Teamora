@@ -1,5 +1,4 @@
 import React from 'react';
-import { UserButton } from "@clerk/clerk-react";
 import { 
   Building2, 
   Check, 
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ScreenShareButton from './ScreenShareButton';
+import ProfileDropdown from './ProfileDropdown';
 
 export default function TopNavbar({
   workspaceName,
@@ -142,7 +142,7 @@ export default function TopNavbar({
           </button>
 
           <div className="flex items-center">
-            <UserButton afterSignOutUrl="/" />
+            <ProfileDropdown />
           </div>
         </div>
       </div>

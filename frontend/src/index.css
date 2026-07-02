@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -7,6 +7,15 @@
   --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
+  --color-primary: #7C3AED;
+  --color-primary-hover: #6D28D9;
+  --color-background: #F8FAFC;
+  --color-card: #FFFFFF;
+  --color-text: #111827;
+  --color-muted: #6B7280;
+  --color-border: #E5E7EB;
+  --color-danger: #EF4444;
+  --color-success: #10B981;
 
   font-family: var(--sans);
   font-synthesis: none;
@@ -19,6 +28,10 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--sans);
+  line-height: 1.5;
 }
 
 #root {
