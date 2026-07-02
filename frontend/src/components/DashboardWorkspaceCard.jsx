@@ -3,8 +3,6 @@ import {
   Building2,
   Copy,
   Edit3,
-  Globe2,
-  Lock,
   LogOut,
   MoreHorizontal,
   Pin,
@@ -40,7 +38,6 @@ export default function DashboardWorkspaceCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const isOwner = getOwnerId(workspace)?.toString() === getUserId(user)?.toString()
-  const VisibilityIcon = workspace.visibility === 'public' ? Globe2 : Lock
 
   const handleMenuAction = (event, action) => {
     event.stopPropagation()
@@ -65,9 +62,8 @@ export default function DashboardWorkspaceCard({
           </span>
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold tracking-tight text-[#111827]">{workspace.name}</h3>
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-xs font-medium capitalize text-[#6B7280]">
-              <VisibilityIcon className="h-3.5 w-3.5" />
-              {workspace.visibility || 'private'}
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-xs font-medium text-[#6B7280]">
+              Invite-only
             </div>
           </div>
         </div>
@@ -130,8 +126,8 @@ export default function DashboardWorkspaceCard({
             onClick={(event) => handleMenuAction(event, () => onToggleFavorite(workspace._id))}
           />
           <MenuButton icon={Copy} label="Copy Workspace ID" onClick={(event) => handleMenuAction(event, () => onCopyId(workspace._id))} />
-          <MenuButton icon={UserPlus} label="Invite Members" onClick={(event) => handleMenuAction(event, () => onInvite(workspace))} />
-          {!isOwner && <MenuButton icon={LogOut} label="Leave Workspace" onClick={(event) => handleMenuAction(event, () => onLeave(workspace))} />}
+          <MenuButton icon={UserPlus} label="Copy Invite Link" onClick={(event) => handleMenuAction(event, () => onInvite(workspace))} />
+          <MenuButton icon={LogOut} label="Leave Workspace" onClick={(event) => handleMenuAction(event, () => onLeave(workspace))} />
           {isOwner && (
             <MenuButton
               icon={Trash2}

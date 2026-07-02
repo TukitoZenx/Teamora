@@ -2,9 +2,27 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, Paintbrush, TableProperties, Presentation, Settings, 
-  ChevronLeft, ChevronRight, Sparkles, LogOut, Folder, 
+  ChevronLeft, ChevronRight, LogOut, Folder, 
   Calendar as CalendarIcon, CheckSquare, Video, Home as HomeIcon
 } from 'lucide-react';
+
+function TeamoraMark() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-6 w-6" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="4" width="40" height="40" rx="12" fill="url(#teamora-gradient)" />
+      <path d="M16 14H32" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M20 14V34" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M28 14V34" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M20 24H28" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
+      <defs>
+        <linearGradient id="teamora-gradient" x1="8" y1="8" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#7C3AED" />
+          <stop offset="1" stopColor="#4F46E5" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
 
 export default function Sidebar({
   activeApp,
@@ -49,30 +67,32 @@ export default function Sidebar({
 
   return (
     <motion.aside
-      animate={{ width: isCollapsed ? '64px' : '280px' }}
-      transition={{ duration: 0.15, ease: 'easeInOut' }}
+      animate={{ width: isCollapsed ? '72px' : '280px' }}
+      transition={{ duration: 0.18, ease: 'easeInOut' }}
       style={{ backgroundColor: 'var(--sidebar-bg)' }}
-      className="h-full shrink-0 border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between relative z-30 select-none transition-colors duration-300"
+      className="h-full shrink-0 border-r border-slate-200 bg-white flex flex-col justify-between relative z-30 select-none transition-colors duration-300"
     >
-      {/* Sidebar toggle control */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-6 w-6 h-6 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-full flex items-center justify-center text-neutral-500 dark:text-neutral-450 hover:text-black dark:hover:text-white shadow-sm z-50 transition-colors cursor-pointer"
-      >
-        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-      </button>
+      <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-[0_6px_16px_rgba(124,58,237,0.16)] ring-1 ring-slate-200">
+            <TeamoraMark />
+          </div>
+          {!isCollapsed && (
+            <span className="text-[15px] font-semibold tracking-tight text-slate-900">Teamora</span>
+          )}
+        </div>
+
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-[0_1px_2px_rgba(15,23,42,0.08)] transition-all duration-180 ease-out hover:scale-105 hover:bg-violet-50 hover:text-violet-600"
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      </div>
 
       {/* Main sidebar panel content */}
-      <div className="p-3 flex-1 overflow-y-auto no-scrollbar flex flex-col space-y-4">
-        
-        {/* Workspace Brand Badge */}
-        {!isCollapsed && (
-          <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 border-b border-neutral-100 dark:border-neutral-850">
-            <Sparkles className="w-3.5 h-3.5 text-black dark:text-white animate-pulse" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Teamora Workspace</span>
-          </div>
-        )}
-
+      <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col space-y-4 p-3">
         {/* Navigation List */}
         <div className="space-y-1">
           {navItems.map((item, idx) => {
@@ -86,6 +106,7 @@ export default function Sidebar({
             }
 
             if (item.type === 'separator') {
+              if (isCollapsed) return null;
               return (
                 <div key={idx} className="border-t border-neutral-100 dark:border-neutral-850/50 my-2 mx-2" />
               );
@@ -102,7 +123,7 @@ export default function Sidebar({
                   isActive 
                     ? 'bg-neutral-150 dark:bg-neutral-800 text-neutral-950 dark:text-white shadow-xs border border-neutral-200 dark:border-neutral-700/50 border-l-2! border-l-black! dark:border-l-white!' 
                     : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                }`}
+                } ${isCollapsed ? 'justify-center' : ''}`}
               >
                 <div className={`p-1.5 rounded-lg transition-colors ${isActive ? 'text-black dark:text-white bg-neutral-200 dark:bg-neutral-700' : 'bg-transparent group-hover:bg-neutral-100 dark:group-hover:bg-neutral-800'}`}>
                   <Icon className="w-4 h-4" />

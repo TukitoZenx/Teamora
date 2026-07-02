@@ -4,7 +4,7 @@ export function DropdownMenu({ children, className }) {
   return (
     <div
       className={clsx(
-        'absolute right-0 mt-2 w-52 rounded-2xl border border-[#E5E7EB] bg-white p-2 opacity-100 shadow-md transition duration-150 ease-out',
+        'absolute right-0 z-[1200] mt-2 w-52 rounded-2xl border border-[#E5E7EB] bg-white p-2 opacity-100 shadow-md transition duration-150 ease-out',
         className
       )}
     >

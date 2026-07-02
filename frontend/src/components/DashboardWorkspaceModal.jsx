@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Globe2, Lock, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from './ui/Button'
 import Input from './ui/Input'
 import Modal from './ui/Modal'
 
 export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspace, onJoinWorkspace }) {
-  const [form, setForm] = useState({ name: '', description: '', visibility: 'private' })
+  const [form, setForm] = useState({ name: '', description: '' })
   const [inviteCode, setInviteCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const isCreate = mode === 'create'
@@ -29,8 +29,7 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
       if (isCreate) {
         await onCreateWorkspace({
           name: form.name.trim(),
-          description: form.description.trim(),
-          visibility: form.visibility
+          description: form.description.trim()
         })
       } else {
         await onJoinWorkspace(inviteCode.trim())
@@ -48,10 +47,10 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-[#111827]">
-              {isCreate ? 'New Workspace' : 'Join Workspace'}
+              {isCreate ? 'New Workspace' : 'Request Access'}
             </h2>
             <p className="mt-1 text-sm text-[#6B7280]">
-              {isCreate ? 'Create a focused place for your team.' : 'Enter an invitation code to join a team.'}
+              {isCreate ? 'Create a focused invite-only place for your team.' : 'Enter an invite link or code to request access.'}
             </p>
           </div>
           <button
@@ -86,54 +85,26 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
                   placeholder="Optional"
                 />
               </label>
-
-              <div>
-                <span className="mb-2 block text-sm font-medium text-[#374151]">Visibility</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: 'private', label: 'Private', icon: Lock },
-                    { value: 'public', label: 'Public', icon: Globe2 }
-                  ].map((option) => {
-                    const Icon = option.icon
-                    const active = form.visibility === option.value
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setForm((current) => ({ ...current, visibility: option.value }))}
-                        className={`flex h-11 items-center justify-center gap-2 rounded-[14px] border text-sm font-semibold transition duration-[180ms] ${
-                          active
-                            ? 'border-[#7C3AED] bg-[#7C3AED] text-white'
-                            : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#7C3AED] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {option.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
             </>
           ) : (
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#374151]">Invite code</span>
+              <span className="mb-2 block text-sm font-medium text-[#374151]">Invite link or code</span>
               <Input
                 value={inviteCode}
                 onChange={(event) => setInviteCode(event.target.value)}
-                className="uppercase"
-                placeholder="A1B2C3D4E5"
+                placeholder="https://teamora.app/invite/A1B2C3D4E5"
               />
             </label>
           )}
 
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="h-12 w-full"
-          >
-            {submitting ? 'Working...' : isCreate ? 'Create Workspace' : 'Join Workspace'}
-          </Button>
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={onClose} className="h-12">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting} className="h-12">
+              {submitting ? 'Working...' : isCreate ? 'Create Workspace' : 'Request Access'}
+            </Button>
+          </div>
         </form>
     </Modal>
   )
