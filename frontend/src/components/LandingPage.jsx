@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SignInButton } from '@clerk/clerk-react';
 import {
   FileText,
   Paintbrush,
@@ -210,7 +210,7 @@ export default function LandingPage() {
     },
     {
       q: "How secure is my team workspace information?",
-      a: "Teamora uses industry-standard authentication systems integrated with Clerk. All workspace databases, file resources, and socket transmissions are securely hosted, and workspaces can only be joined via explicitly authorized invite structures or secure Room IDs."
+      a: "Teamora uses industry-standard authentication systems. All workspace databases, file resources, and socket transmissions are securely hosted, and workspaces can only be joined via explicitly authorized invite structures or secure Room IDs."
     }
   ];
 
@@ -236,16 +236,12 @@ export default function LandingPage() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <SignInButton mode="modal">
-            <button className="text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 hover:bg-neutral-50 rounded-xl transition-colors cursor-pointer text-neutral-600 hover:text-neutral-900">
-              Sign In
-            </button>
-          </SignInButton>
-          <SignInButton mode="modal">
-            <button className="text-xs font-extrabold uppercase tracking-wider text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer">
-              Get Started
-            </button>
-          </SignInButton>
+          <Link to="/signin" className="text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 hover:bg-neutral-50 rounded-xl transition-colors cursor-pointer text-neutral-600 hover:text-neutral-900">
+            Sign In
+          </Link>
+          <Link to="/signup" className="text-xs font-extrabold uppercase tracking-wider text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer">
+            Get Started
+          </Link>
         </div>
       </header>
 
@@ -265,7 +261,7 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-4.5xl md:text-7xl font-black text-neutral-900 tracking-tight leading-[1.05] mb-6"
+          className="text-4.5xl md:text-7xl font-bold text-neutral-900 tracking-tight leading-[1.05] mb-6"
         >
           One Workspace.<br />
           <span className="bg-gradient-to-r from-neutral-950 via-indigo-600 to-indigo-700 bg-clip-text text-transparent">Infinite Collaboration.</span>
@@ -286,18 +282,14 @@ export default function LandingPage() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="flex flex-wrap justify-center gap-4"
         >
-          <SignInButton mode="modal">
-            <button className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md hover:shadow-indigo-600/10 cursor-pointer flex items-center gap-2">
-              <span>Get Started</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </SignInButton>
+          <Link to="/signup" className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md hover:shadow-indigo-600/10 cursor-pointer flex items-center gap-2">
+            <span>Get Started</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
 
-          <SignInButton mode="modal">
-            <button className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-900 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-xl transition-all cursor-pointer">
-              Join Workspace
-            </button>
-          </SignInButton>
+          <Link to="/signin" className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-900 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-xl transition-all cursor-pointer">
+            Join Workspace
+          </Link>
 
           <button
             onClick={() => {
@@ -316,7 +308,7 @@ export default function LandingPage() {
       {/* Feature Section */}
       <section id="features" className="py-24 px-6 md:px-12 max-w-7xl mx-auto border-t border-neutral-100 w-full scroll-mt-16">
         <div className="text-center max-w-xl mx-auto mb-16">
-          <h2 className="text-2.5xl md:text-3.5xl font-black tracking-tight text-neutral-900">Built for modern product teams</h2>
+          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Built for modern product teams</h2>
           <p className="text-neutral-500 mt-2 text-sm">Everything you need in a single platform, styled with minimal elegance.</p>
         </div>
 
@@ -348,7 +340,7 @@ export default function LandingPage() {
               <Users className="w-3.5 h-3.5" />
               <span>Multiplayer Sync</span>
             </div>
-            <h2 className="text-2.5xl md:text-3.5xl font-black tracking-tight text-neutral-900 mb-4 leading-tight">
+            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900 mb-4 leading-tight">
               All editing. All at once.
             </h2>
             <p className="text-neutral-500 text-sm leading-relaxed mb-6">
@@ -590,7 +582,7 @@ export default function LandingPage() {
       {/* Why Teamora Section */}
       <section id="why" className="py-24 px-6 md:px-12 max-w-7xl mx-auto w-full scroll-mt-16">
         <div className="text-center max-w-xl mx-auto mb-16">
-          <h2 className="text-2.5xl md:text-3.5xl font-black tracking-tight text-neutral-900">Why product teams choose Teamora</h2>
+          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Why product teams choose Teamora</h2>
           <p className="text-neutral-500 mt-2 text-sm">Experience smooth animations, cloud sync, and highly secure access control.</p>
         </div>
 
@@ -621,7 +613,7 @@ export default function LandingPage() {
       <section id="screenshots" className="py-24 bg-neutral-50 border-y border-neutral-100 px-6 md:px-12 w-full scroll-mt-16">
         <div className="max-w-7xl mx-auto w-full">
           <div className="text-center max-w-xl mx-auto mb-16">
-            <h2 className="text-2.5xl md:text-3.5xl font-black tracking-tight text-neutral-900">Stark design. Unrivaled experience.</h2>
+            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Stark design. Unrivaled experience.</h2>
             <p className="text-neutral-500 mt-2 text-sm">Take a closer look at the minimal, distraction-free workspaces.</p>
           </div>
 
@@ -644,7 +636,7 @@ export default function LandingPage() {
       {/* Pricing Section */}
       <section id="pricing" className="py-24 px-6 md:px-12 max-w-7xl mx-auto w-full scroll-mt-16">
         <div className="text-center max-w-xl mx-auto mb-16">
-          <h2 className="text-2.5xl md:text-3.5xl font-black tracking-tight text-neutral-900">Simple, transparent pricing</h2>
+          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Simple, transparent pricing</h2>
           <p className="text-neutral-500 mt-2 text-sm">Choose the tier that matches your collaboration volume.</p>
         </div>
 
@@ -670,7 +662,7 @@ export default function LandingPage() {
                     {card.tier}
                   </span>
                   <div className="flex items-baseline gap-1 mt-2">
-                    <span className="text-4xl font-black tracking-tight">{card.price}</span>
+                    <span className="text-4xl font-bold tracking-tight">{card.price}</span>
                     <span className={`text-[10px] font-semibold ${card.accent ? 'text-neutral-400' : 'text-neutral-500'}`}>/{card.period}</span>
                   </div>
                   <p className={`text-xs mt-3 leading-relaxed ${card.accent ? 'text-neutral-300' : 'text-neutral-500'}`}>
@@ -690,17 +682,16 @@ export default function LandingPage() {
                 </ul>
               </div>
 
-              <SignInButton mode="modal">
-                <button
-                  className={`w-full py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    card.accent
-                      ? 'bg-white hover:bg-neutral-100 text-neutral-950 shadow-sm'
-                      : 'bg-neutral-950 hover:bg-neutral-850 text-white'
-                  }`}
-                >
-                  {card.btnText}
-                </button>
-              </SignInButton>
+              <Link
+                to={card.btnText === 'Contact Sales' ? '/signin' : '/signup'}
+                className={`block w-full py-3.5 rounded-xl text-center text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  card.accent
+                    ? 'bg-white hover:bg-neutral-100 text-neutral-950 shadow-sm'
+                    : 'bg-neutral-950 hover:bg-neutral-850 text-white'
+                }`}
+              >
+                {card.btnText}
+              </Link>
             </div>
           ))}
         </div>
@@ -710,7 +701,7 @@ export default function LandingPage() {
       <section id="faq" className="py-24 bg-neutral-50 border-t border-neutral-100 px-6 md:px-12 w-full scroll-mt-16">
         <div className="max-w-3xl mx-auto w-full">
           <div className="text-center mb-16">
-            <h2 className="text-2.5xl md:text-3.5xl font-black tracking-tight text-neutral-900">Frequently Asked Questions</h2>
+            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Frequently Asked Questions</h2>
             <p className="text-neutral-500 mt-2 text-sm">Have details to clarify? Explore typical responses here.</p>
           </div>
 
