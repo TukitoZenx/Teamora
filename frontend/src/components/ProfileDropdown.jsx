@@ -31,7 +31,7 @@ export default function ProfileDropdown() {
 
   const openSettings = () => {
     setOpen(false)
-    navigate('/settings/profile')
+    navigate('/settings')
   }
 
   return (

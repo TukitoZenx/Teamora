@@ -41,19 +41,18 @@ export default function TopNavbar({
 
   return (
     <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-6 z-40 transition-colors duration-300">
-      {/* Left: Brand & Workspace */}
+      {/* Left: Workspace */}
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
             <Building2 className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-lg text-slate-800 dark:text-slate-100 hidden sm:inline-block">Teamora</span>
-        </div>
-        <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/50 px-3 py-1 rounded-full border border-slate-200/50 dark:border-slate-700/50">
-            {workspaceName || 'Team Workspace'}
-          </span>
+          <div className="flex flex-col">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Workspace</span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {workspaceName || 'Team Workspace'}
+            </span>
+          </div>
         </div>
       </div>
 
