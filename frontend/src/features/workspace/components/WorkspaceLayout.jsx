@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
 import ConfirmDialog from '../../../components/ConfirmDialog'
 import WorkspaceLeaveDialog from '../../../components/WorkspaceLeaveDialog'
 import WorkspaceNavbar from './WorkspaceNavbar'
@@ -19,8 +17,7 @@ export default function WorkspaceLayout({
   onDeleteWorkspace,
   children
 }) {
-  const navigate = useNavigate()
-  const { logout, user } = useAuth()
+  const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('teamora-sidebar-collapsed') === 'true')
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
@@ -30,24 +27,6 @@ export default function WorkspaceLayout({
   const selectItem = (item) => {
     setSidebarOpen(false)
     onActiveItemChange?.(item)
-  }
-
-  const copyInviteCode = async () => {
-    try {
-      const inviteLink = workspace?.inviteLink || `${window.location.origin}/invite/${workspace?.inviteCode}`
-      await navigator.clipboard.writeText(inviteLink)
-      toast.success('Invite link copied')
-    } catch {
-      toast.error('Could not copy invite link')
-    }
-  }
-
-  const handleLogout = async () => {
-    try {
-      await logout()
-    } finally {
-      navigate('/', { replace: true })
-    }
   }
 
   const handleLeaveWorkspace = async (payload) => {
@@ -95,11 +74,9 @@ export default function WorkspaceLayout({
       <WorkspaceNavbar
         workspace={workspace}
         onOpenSidebar={() => setSidebarOpen(true)}
-        onInvite={copyInviteCode}
         onBackToDashboard={onBackToDashboard}
-        onSettings={() => navigate('/settings')}
         onWorkspaceSettings={() => selectItem('settings')}
-        onLogout={handleLogout}
+        onLeaveWorkspace={requestLeaveWorkspace}
       />
 
       <div className="hidden lg:block">
@@ -139,7 +116,7 @@ export default function WorkspaceLayout({
       )}
 
       <main className={`h-full overflow-y-auto pt-[72px] transition-[padding-left] duration-220 ease-in-out ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[240px]'}`}>
-        <div className="mx-auto max-w-7xl px-5 py-6">{children}</div>
+        <div className={`mx-auto px-5 py-6 ${activeItem === 'calendar' ? 'max-w-none' : 'max-w-7xl'}`}>{children}</div>
       </main>
 
       {showLeaveConfirm && (

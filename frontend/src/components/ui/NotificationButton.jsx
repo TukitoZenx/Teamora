@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, Check, CheckCheck, Eye, UserPlus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
+import {
+  NOTIFICATIONS_CHANGED_EVENT,
+  readLocalNotifications,
+  writeLocalNotifications
+} from '../../utils/notifications'
 
 const NOTIFICATIONS_CACHE_KEY = 'teamora-notifications-cache'
 
@@ -47,19 +52,19 @@ export default function NotificationButton() {
         if (item.type === 'join_request_accepted') {
           seenDecisionIds.current.add(item._id)
           window.dispatchEvent(new Event('teamora-workspaces-refresh'))
-          toast.success(item.message || 'Workspace access accepted')
         }
 
         if (item.type === 'join_request_declined') {
           seenDecisionIds.current.add(item._id)
-          toast.error(item.message || 'Workspace access declined')
         }
       })
-      setNotifications(nextNotifications)
-      localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(nextNotifications))
+      const mergedNotifications = [...readLocalNotifications(), ...nextNotifications]
+      setNotifications(mergedNotifications)
+      localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(mergedNotifications))
     } catch {
-      setNotifications([])
-      localStorage.removeItem(NOTIFICATIONS_CACHE_KEY)
+      const localNotifications = readLocalNotifications()
+      setNotifications(localNotifications)
+      localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(localNotifications))
     }
   }, [])
 
@@ -69,18 +74,29 @@ export default function NotificationButton() {
       if (!cancelled) loadNotifications()
     })
     const timer = window.setInterval(loadNotifications, 5000)
+    const syncLocalNotifications = () => {
+      setNotifications((current) => {
+        const remoteNotifications = current.filter((item) => !item.local)
+        const nextNotifications = [...readLocalNotifications(), ...remoteNotifications]
+        localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(nextNotifications))
+        return nextNotifications
+      })
+    }
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, syncLocalNotifications)
     return () => {
       cancelled = true
       window.clearInterval(timer)
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, syncLocalNotifications)
     }
   }, [loadNotifications])
 
   const markAsRead = async (id) => {
-    setNotifications((current) => {
-      const nextNotifications = current.map((item) => (item._id === id ? { ...item, read: true } : item))
-      localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(nextNotifications))
-      return nextNotifications
-    })
+    const target = notifications.find((item) => item._id === id)
+    const nextNotifications = notifications.map((item) => (item._id === id ? { ...item, read: true } : item))
+    setNotifications(nextNotifications)
+    localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(nextNotifications))
+    writeLocalNotifications(nextNotifications.filter((item) => item.local))
+    if (target?.local) return
     try {
       await api.patch(`/api/v1/workspaces/notifications/${id}/read`)
     } catch {
@@ -90,12 +106,11 @@ export default function NotificationButton() {
 
   const markAllAsRead = async () => {
     const unread = notifications.filter((item) => !item.read)
-    setNotifications((current) => {
-      const nextNotifications = current.map((item) => ({ ...item, read: true }))
-      localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(nextNotifications))
-      return nextNotifications
-    })
-    await Promise.allSettled(unread.map((item) => api.patch(`/api/v1/workspaces/notifications/${item._id}/read`)))
+    const nextNotifications = notifications.map((item) => ({ ...item, read: true }))
+    setNotifications(nextNotifications)
+    localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(nextNotifications))
+    writeLocalNotifications(nextNotifications.filter((item) => item.local))
+    await Promise.allSettled(unread.filter((item) => !item.local).map((item) => api.patch(`/api/v1/workspaces/notifications/${item._id}/read`)))
   }
 
   const resolveRequest = async (item, action) => {
@@ -105,7 +120,6 @@ export default function NotificationButton() {
       await markAsRead(item._id)
       await loadNotifications()
       window.dispatchEvent(new Event('teamora-workspaces-refresh'))
-      toast.success(action === 'accept' ? 'Request accepted' : 'Request declined')
     } catch (error) {
       toast.error(error.message)
     } finally {
@@ -147,17 +161,18 @@ export default function NotificationButton() {
             ) : (
               notifications.map((item) => {
                 const isJoinRequest = item.type === 'join_request'
+                const isWorkspaceEvent = item.local || item.type !== 'join_request'
                 const isPending = item.requestStatus === 'pending'
 
                 return (
                   <div key={item._id} className={`rounded-[14px] border p-3 ${!item.read ? 'border-[#DDD6FE] bg-[#F8F5FF]' : 'border-[#E5E7EB] bg-white'}`}>
                     <div className="flex items-start gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#F3F4F6] text-[#7C3AED]">
-                        <UserPlus className="h-4 w-4" />
+                        {isWorkspaceEvent ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-semibold text-[#111827]">{isJoinRequest ? 'Join Request' : 'Workspace Access'}</p>
+                          <p className="truncate text-sm font-semibold text-[#111827]">{isJoinRequest ? 'Join Request' : 'Workspace Update'}</p>
                           {!item.read && <span className="h-2.5 w-2.5 rounded-full bg-[#7C3AED]" />}
                         </div>
                         <p className="mt-1 text-sm text-[#6B7280]">

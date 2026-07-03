@@ -39,7 +39,8 @@ const populateWorkspace = (query) =>
     .populate('members', USER_SELECT)
     .populate('approvedMembers.user', USER_SELECT)
     .populate('joinRequests.requester', USER_SELECT)
-    .populate('notifications.requester', USER_SELECT);
+    .populate('notifications.requester', USER_SELECT)
+    .populate('tasks.creator', USER_SELECT);
 
 const validateObjectId = (id) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -72,6 +73,51 @@ const validateDescription = (description) => {
 
   if (cleanDescription.length > 500) {
     throw createError('Description must be 500 characters or fewer');
+  }
+
+  return cleanDescription;
+};
+
+const validateDateKey = (date) => {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw createError('Task date must use YYYY-MM-DD format');
+  }
+
+  return date;
+};
+
+const validatePriority = (priority) => {
+  if (!['Low', 'Medium', 'High', 'Urgent'].includes(priority)) {
+    throw createError('Task priority is required');
+  }
+
+  return priority;
+};
+
+const validateTaskTitle = (title) => {
+  if (typeof title !== 'string' || !title.trim()) {
+    throw createError('Task title is required');
+  }
+
+  const cleanTitle = title.trim();
+
+  if (cleanTitle.length > 160) {
+    throw createError('Task title must be 160 characters or fewer');
+  }
+
+  return cleanTitle;
+};
+
+const validateTaskDescription = (description) => {
+  if (description === undefined || description === null) return '';
+  if (typeof description !== 'string') {
+    throw createError('Task description must be a string');
+  }
+
+  const cleanDescription = description.trim();
+
+  if (cleanDescription.length > 1000) {
+    throw createError('Task description must be 1000 characters or fewer');
   }
 
   return cleanDescription;
@@ -289,6 +335,21 @@ const updateWorkspace = async (userId, workspaceId, payload) => {
 
   if (payload.description !== undefined) {
     workspace.description = validateDescription(payload.description);
+  }
+
+  if (payload.icon !== undefined) {
+    workspace.icon = typeof payload.icon === 'string' ? payload.icon.trim().slice(0, 8) : '';
+  }
+
+  if (payload.visibility !== undefined) {
+    if (!['private', 'invite_only'].includes(payload.visibility)) {
+      throw createError('Invalid workspace visibility');
+    }
+    workspace.visibility = payload.visibility;
+  }
+
+  if (payload.joinApproval !== undefined) {
+    workspace.joinApproval = Boolean(payload.joinApproval);
   }
 
   await workspace.save();
@@ -532,6 +593,107 @@ const markNotificationRead = async (userId, notificationId) => {
   return { success: true };
 };
 
+const listTasks = async (userId, workspaceId) => {
+  validateObjectId(workspaceId);
+  const workspace = await populateWorkspace(Workspace.findById(workspaceId));
+
+  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+    throw createError('Workspace not found', 404);
+  }
+
+  return cleanWorkspace(workspace, userId).tasks || [];
+};
+
+const createTask = async (userId, workspaceId, payload) => {
+  validateObjectId(workspaceId);
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+    throw createError('Workspace not found', 404);
+  }
+
+  workspace.tasks.push({
+    title: validateTaskTitle(payload.title),
+    description: validateTaskDescription(payload.description),
+    date: validateDateKey(payload.date),
+    priority: validatePriority(payload.priority),
+    creator: userId
+  });
+
+  await workspace.save();
+  const populated = await populateWorkspace(Workspace.findById(workspace._id));
+  const task = populated.tasks.id(workspace.tasks[workspace.tasks.length - 1]._id);
+  return task.toObject ? task.toObject() : task;
+};
+
+const updateTask = async (userId, workspaceId, taskId, payload) => {
+  validateObjectId(workspaceId);
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+    throw createError('Workspace not found', 404);
+  }
+
+  const task = workspace.tasks.id(taskId);
+  if (!task) {
+    throw createError('Task not found', 404);
+  }
+
+  if (payload.title !== undefined) task.title = validateTaskTitle(payload.title);
+  if (payload.description !== undefined) task.description = validateTaskDescription(payload.description);
+  if (payload.priority !== undefined) task.priority = validatePriority(payload.priority);
+  if (payload.completed !== undefined) task.completed = Boolean(payload.completed);
+
+  await workspace.save();
+  const populated = await populateWorkspace(Workspace.findById(workspace._id));
+  const updatedTask = populated.tasks.id(taskId);
+  return updatedTask.toObject ? updatedTask.toObject() : updatedTask;
+};
+
+const deleteTask = async (userId, workspaceId, taskId) => {
+  validateObjectId(workspaceId);
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+    throw createError('Workspace not found', 404);
+  }
+
+  const task = workspace.tasks.id(taskId);
+  if (!task) {
+    throw createError('Task not found', 404);
+  }
+
+  task.deleteOne();
+  await workspace.save();
+  return { success: true };
+};
+
+const removeMember = async (ownerId, workspaceId, memberId) => {
+  validateObjectId(workspaceId);
+  validateObjectId(memberId);
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace) {
+    throw createError('Workspace not found', 404);
+  }
+
+  assertOwner(workspace, ownerId);
+
+  if (workspace.owner.toString() === memberId.toString()) {
+    throw createError('The workspace owner cannot be removed');
+  }
+
+  workspace.members = workspace.members.filter((id) => id.toString() !== memberId.toString());
+  const approval = workspace.approvedMembers.find((item) => getEntityId(item.user)?.toString() === memberId.toString());
+  if (approval) {
+    approval.revokedAt = new Date();
+  }
+  await workspace.save();
+  const populated = await populateWorkspace(Workspace.findById(workspace._id));
+  await upsertRecentWorkspace(memberId, populated, 'previously_joined');
+  return cleanWorkspace(populated, ownerId);
+};
+
 const removeRecentWorkspace = async (userId, workspaceId) => {
   validateObjectId(workspaceId);
   await User.updateOne({ _id: userId }, { $pull: { recentWorkspaces: { workspace: workspaceId } } });
@@ -594,6 +756,11 @@ module.exports = {
   declineJoinRequest,
   getNotifications,
   markNotificationRead,
+  listTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+  removeMember,
   removeRecentWorkspace,
   leaveWorkspace
 };

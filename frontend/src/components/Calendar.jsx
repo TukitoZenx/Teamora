@@ -1,386 +1,476 @@
-import React, { useState, useMemo } from 'react';
-import { ensureArray } from '../utils/arrayUtils';
-import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Clock, MapPin, AlignLeft, Users, Tag, Trash2, X } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useEffect, useMemo, useState } from 'react'
+import { Calendar as CalendarIcon, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, X } from 'lucide-react'
+import toast from 'react-hot-toast'
+import api from '../services/api'
+import { ensureArray } from '../utils/arrayUtils'
+
+const priorities = ['Low', 'Medium', 'High', 'Urgent']
+const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const toDateKey = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const formatDate = (dateKey) => {
+  if (!dateKey) return ''
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  })
+}
+
+const getTaskId = (task) => task?._id || task?.id
 
 export default function Calendar({
   calendarList = [],
-  socket,
-  roomId,
   userName,
-  activeUsers = [],
+  workspaceId,
   currentUserRole = 'editor'
 }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [eventTitle, setEventTitle] = useState('');
-  const [eventStart, setEventStart] = useState('');
-  const [eventEnd, setEventEnd] = useState('');
-  const [eventDesc, setEventDesc] = useState('');
-  const [eventCategory, setEventCategory] = useState('meeting'); // 'meeting', 'deadline', 'workshops', 'social', 'reminder', 'task', 'event'
-  const [eventRecurrence, setEventRecurrence] = useState('none'); // 'none', 'daily', 'weekly', 'monthly'
-  const [selectedAttendees, setSelectedAttendees] = useState([]);
+  const [currentDate, setCurrentDate] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
+  const [tasks, setTasks] = useState(() => ensureArray(calendarList))
+  const [loading, setLoading] = useState(Boolean(workspaceId))
+  const [error, setError] = useState('')
+  const [activeDate, setActiveDate] = useState('')
+  const [modalMode, setModalMode] = useState(null)
+  const [editingTask, setEditingTask] = useState(null)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [priority, setPriority] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [monthPulse, setMonthPulse] = useState(0)
 
-  const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter';
+  const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter'
+  const todayKey = toDateKey(new Date())
 
-  const monthYear = useMemo(() => {
-    return currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-  }, [currentDate]);
+  const monthLabel = useMemo(() => (
+    currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  ), [currentDate])
 
-  // Days in month calculation
-  const daysInMonthData = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDayIndex = new Date(year, month, 1).getDay(); // Index of starting day (0 = Sun, 6 = Sat)
-    const totalDays = new Date(year, month + 1, 0).getDate(); // Days in month
-    return { firstDayIndex, totalDays };
-  }, [currentDate]);
-
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  };
-
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  };
-
-  const handleCreateEvent = () => {
-    if (!eventTitle.trim() || !eventStart || !eventEnd) {
-      toast.error('Please fill in the title, start, and end times.');
-      return;
+  useEffect(() => {
+    if (!workspaceId) {
+      queueMicrotask(() => {
+        setTasks(ensureArray(calendarList))
+        setLoading(false)
+      })
+      return
     }
 
-    const baseEvent = {
-      id: 'event-' + Math.random().toString(36).substring(7),
-      title: eventTitle,
-      start: eventStart,
-      end: eventEnd,
-      description: eventDesc,
-      category: eventCategory,
-      recurring: eventRecurrence,
-      attendees: selectedAttendees,
-      createdBy: userName,
-      createdAt: new Date().toISOString()
-    };
-
-    const newEvents = [baseEvent];
-
-    // Generate recurring events instances (up to 5 occurrences to display in grid)
-    if (eventRecurrence !== 'none') {
-      const startD = new Date(eventStart);
-      const endD = new Date(eventEnd);
-      for (let i = 1; i <= 5; i++) {
-        const nextStart = new Date(startD);
-        const nextEnd = new Date(endD);
-        
-        if (eventRecurrence === 'daily') {
-          nextStart.setDate(startD.getDate() + i);
-          nextEnd.setDate(endD.getDate() + i);
-        } else if (eventRecurrence === 'weekly') {
-          nextStart.setDate(startD.getDate() + i * 7);
-          nextEnd.setDate(endD.getDate() + i * 7);
-        } else if (eventRecurrence === 'monthly') {
-          nextStart.setMonth(startD.getMonth() + i);
-          nextEnd.setMonth(endD.getMonth() + i);
-        }
-
-        newEvents.push({
-          ...baseEvent,
-          id: 'event-' + Math.random().toString(36).substring(7) + `-rec-${i}`,
-          start: nextStart.toISOString().slice(0, 16),
-          end: nextEnd.toISOString().slice(0, 16)
-        });
+    let cancelled = false
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setLoading(true)
+        setError('')
       }
+    })
+
+    api.get(`/api/v1/workspaces/${workspaceId}/tasks`)
+      .then(({ data }) => {
+        if (!cancelled) setTasks(data.tasks || [])
+      })
+      .catch((requestError) => {
+        if (!cancelled) {
+          setError(requestError.message)
+          setTasks(ensureArray(calendarList))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
     }
-
-    const updated = [...ensureArray(calendarList), ...newEvents];
-    socket.emit('update-calendar', { roomId, calendar: updated });
-    
-    // Reset Form
-    setEventTitle('');
-    setEventStart('');
-    setEventEnd('');
-    setEventDesc('');
-    setEventCategory('meeting');
-    setEventRecurrence('none');
-    setSelectedAttendees([]);
-    setShowEventModal(false);
-    toast.success('Event scheduled!');
-  };
-
-  const handleDeleteEvent = (eventId, e) => {
-    e.stopPropagation();
-    const updated = ensureArray(calendarList).filter((ev) => ev.id !== eventId);
-    socket.emit('update-calendar', { roomId, calendar: updated });
-    toast.success('Event cancelled.');
-  };
-
-  const toggleAttendee = (name) => {
-    setSelectedAttendees(prev => 
-      prev.includes(name) ? prev.filter(a => a !== name) : [...prev, name]
-    );
-  };
-
-  const getEventsForDay = (dayNum) => {
-    if (!dayNum) return [];
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(dayNum).padStart(2, '0');
-    const datePattern = `${year}-${month}-${dayStr}`;
-
-    return ensureArray(calendarList).filter((e) => e && e.start && typeof e.start === 'string' && e.start.startsWith(datePattern));
-  };
-
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case 'deadline': return 'bg-rose-500 text-white';
-      case 'workshops': return 'bg-amber-500 text-white';
-      case 'social': return 'bg-emerald-500 text-white';
-      case 'reminder': return 'bg-blue-500 text-white';
-      case 'task': return 'bg-purple-500 text-white';
-      default: return 'bg-indigo-500 text-white'; // meeting / event
-    }
-  };
+  }, [calendarList, workspaceId])
 
   const cells = useMemo(() => {
-    const tempCells = [];
-    const { firstDayIndex, totalDays } = daysInMonthData;
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const firstDay = new Date(year, month, 1).getDay()
+    const totalDays = new Date(year, month + 1, 0).getDate()
+    const previousMonthDays = new Date(year, month, 0).getDate()
+    const nextCells = []
 
-    // Empty cells
-    for (let i = 0; i < firstDayIndex; i++) {
-      tempCells.push({ day: null, events: [] });
+    for (let index = firstDay - 1; index >= 0; index -= 1) {
+      const date = new Date(year, month - 1, previousMonthDays - index)
+      nextCells.push({ date, inMonth: false, day: date.getDate(), key: toDateKey(date) })
     }
 
-    // Days cells
-    for (let d = 1; d <= totalDays; d++) {
-      const dayEvents = getEventsForDay(d);
-      tempCells.push({ day: d, events: dayEvents });
+    for (let day = 1; day <= totalDays; day += 1) {
+      const date = new Date(year, month, day)
+      nextCells.push({ date, inMonth: true, day, key: toDateKey(date) })
     }
 
-    return tempCells;
-  }, [daysInMonthData, calendarList]);
+    while (nextCells.length < 42) {
+      const date = new Date(year, month + 1, nextCells.length - firstDay - totalDays + 1)
+      nextCells.push({ date, inMonth: false, day: date.getDate(), key: toDateKey(date) })
+    }
+
+    return nextCells.map((cell) => ({
+      ...cell,
+      tasks: tasks.filter((task) => task.date === cell.key)
+    }))
+  }, [currentDate, tasks])
+
+  const selectedTasks = useMemo(() => (
+    activeDate ? tasks.filter((task) => task.date === activeDate) : []
+  ), [activeDate, tasks])
+
+  const openCreateModal = (dateKey) => {
+    if (!canEdit) return
+    setActiveDate(dateKey)
+    setEditingTask(null)
+    setTitle('')
+    setDescription('')
+    setPriority('')
+    setSubmitted(false)
+    setModalMode('create')
+  }
+
+  const openEditModal = (task) => {
+    if (!canEdit) return
+    setActiveDate(task.date)
+    setEditingTask(task)
+    setTitle(task.title || '')
+    setDescription(task.description || '')
+    setPriority(task.priority || '')
+    setSubmitted(false)
+    setModalMode('edit')
+  }
+
+  const closeModal = () => {
+    setModalMode(null)
+    setEditingTask(null)
+    setSubmitted(false)
+    setSaving(false)
+  }
+
+  const saveTask = async () => {
+    setSubmitted(true)
+    if (!title.trim() || !priority) return
+
+    setSaving(true)
+    const payload = {
+      title: title.trim(),
+      description: description.trim(),
+      date: activeDate,
+      priority
+    }
+
+    try {
+      if (modalMode === 'edit' && editingTask) {
+        const { data } = await api.patch(`/api/v1/workspaces/${workspaceId}/tasks/${getTaskId(editingTask)}`, payload)
+        setTasks((current) => current.map((task) => (getTaskId(task) === getTaskId(editingTask) ? data.task : task)))
+        toast.success('Task updated')
+      } else {
+        const { data } = await api.post(`/api/v1/workspaces/${workspaceId}/tasks`, payload)
+        setTasks((current) => [...current, data.task])
+        toast.success('Task created')
+      }
+      closeModal()
+    } catch (requestError) {
+      toast.error(requestError.message)
+      setSaving(false)
+    }
+  }
+
+  const deleteTask = async (task) => {
+    if (!canEdit) return
+    const taskId = getTaskId(task)
+    try {
+      await api.delete(`/api/v1/workspaces/${workspaceId}/tasks/${taskId}`)
+      setTasks((current) => current.filter((item) => getTaskId(item) !== taskId))
+      toast.success('Task deleted')
+    } catch (requestError) {
+      toast.error(requestError.message)
+    }
+  }
+
+  const toggleComplete = async (task) => {
+    if (!canEdit) return
+    const taskId = getTaskId(task)
+    try {
+      const { data } = await api.patch(`/api/v1/workspaces/${workspaceId}/tasks/${taskId}`, {
+        completed: !task.completed
+      })
+      setTasks((current) => current.map((item) => (getTaskId(item) === taskId ? data.task : item)))
+      toast.success('Task updated')
+    } catch (requestError) {
+      toast.error(requestError.message)
+    }
+  }
+
+  const changeMonth = (direction) => {
+    setMonthPulse((value) => value + 1)
+    setCurrentDate((date) => new Date(date.getFullYear(), date.getMonth() + direction, 1))
+  }
+
+  const selectMonth = (month) => {
+    setMonthPulse((value) => value + 1)
+    setCurrentDate((date) => new Date(date.getFullYear(), Number(month), 1))
+  }
 
   return (
-    <div className="flex-1 flex bg-slate-50 dark:bg-slate-950 overflow-hidden h-full">
-      {/* Expanded Grid (Occupies 100% width) */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-colors">
-        {/* Navigation Header */}
-        <div className="h-14 border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-500 shrink-0">
-              <CalendarIcon className="w-4 h-4" />
-            </div>
-            <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{monthYear}</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200/50">
-              <button 
-                onClick={handlePrevMonth}
-                className="p-1.5 text-slate-550 rounded-lg hover:bg-white cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={handleNextMonth}
-                className="p-1.5 text-slate-550 rounded-lg hover:bg-white cursor-pointer"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+    <section className="flex h-[calc(100vh-120px)] min-h-[620px] flex-col rounded-[20px] border border-[#E5E7EB] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)] xl:min-h-0">
+      <div className="flex shrink-0 flex-col gap-4 border-b border-[#E5E7EB] px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F5F3FF] text-[#7C3AED]">
+            <CalendarIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">Calendar</h1>
+            <p className="text-sm text-[#6B7280]">{loading ? 'Loading tasks...' : error || monthLabel}</p>
           </div>
         </div>
 
-        {/* Days Header */}
-        <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 text-center py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none shrink-0">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <span key={d}>{d}</span>
-          ))}
-        </div>
-
-        {/* Calendar grid cells */}
-        <div className="flex-1 grid grid-cols-7 grid-rows-6 auto-rows-fr overflow-hidden bg-slate-100/30 dark:bg-slate-950/20">
-          {cells.map((cell, idx) => {
-            const hasEvents = cell.events && cell.events.length > 0;
-            return (
-              <div
-                key={idx}
-                className={`border-b border-r border-slate-200/50 dark:border-slate-800/50 p-1.5 flex flex-col cursor-pointer select-none transition-all relative group ${
-                  cell.day ? 'bg-white dark:bg-slate-900 hover:bg-slate-50/40' : 'bg-slate-50/25'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-bold ${cell.day ? 'text-slate-650 dark:text-slate-300' : 'text-slate-300'}`}>
-                    {cell.day}
-                  </span>
-                  
-                  {/* Hover Cell Plus Button */}
-                  {cell.day && canEdit && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const year = currentDate.getFullYear();
-                        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-                        const day = String(cell.day).padStart(2, '0');
-                        setEventStart(`${year}-${month}-${day}T09:00`);
-                        setEventEnd(`${year}-${month}-${day}T10:00`);
-                        setShowEventModal(true);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-md cursor-pointer transition-all border border-indigo-200/20"
-                      title="Add Item"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Render events inside cell directly */}
-                {cell.day && ensureArray(cell.events).length > 0 && (
-                  <div className="flex-1 overflow-y-auto space-y-1 mt-1 no-scrollbar max-h-[8vh]">
-                    {ensureArray(cell.events).map((e) => (
-                      <div 
-                        key={e.id}
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          if (canEdit && window.confirm(`Cancel scheduled item: "${e.title}"?`)) {
-                            handleDeleteEvent(e.id, ev);
-                          }
-                        }}
-                        className={`text-[9px] font-semibold px-1 py-0.5 rounded truncate leading-tight select-none border border-black/5 hover:opacity-80 flex items-center justify-between ${getCategoryColor(e.category)}`}
-                        title={`${e.title} (${e.start.split('T')[1]} - ${e.end.split('T')[1]})`}
-                      >
-                        <span className="truncate">{e.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => openCreateModal(toDateKey(new Date()))}
+            className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-[#7C3AED] px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#6D28D9]"
+          >
+            <Plus className="h-4 w-4" />
+            New Event
+          </button>
+          <label className="relative inline-flex h-11 items-center rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#374151] transition duration-200 hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]">
+            <select
+              value={currentDate.getMonth()}
+              onChange={(event) => selectMonth(event.target.value)}
+              className="appearance-none bg-transparent pr-7 outline-none"
+              aria-label="Select calendar month"
+            >
+              {Array.from({ length: 12 }).map((_, index) => (
+                <option key={index} value={index}>
+                  {new Date(2026, index, 1).toLocaleDateString(undefined, { month: 'long' })}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4" />
+          </label>
         </div>
       </div>
 
-      {/* Event modal */}
-      {showEventModal && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl max-w-md w-full flex flex-col max-h-[85vh] overflow-hidden">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 shrink-0 flex items-center gap-2">
-              <CalendarIcon className="w-4 h-4 text-indigo-500" />
-              <span>Schedule New Event</span>
-            </h3>
+      <div className="flex shrink-0 items-center justify-center gap-4 px-5 py-3">
+        <button
+          type="button"
+          onClick={() => changeMonth(-1)}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E5E7EB] text-[#6B7280] transition duration-200 hover:border-[#C4B5FD] hover:bg-[#F5F3FF] hover:text-[#7C3AED]"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <h2 key={monthPulse} className="min-w-40 animate-[teamora-content-fade_180ms_ease-out_both] text-center text-lg font-semibold text-[#111827]">
+          {monthLabel}
+        </h2>
+        <button
+          type="button"
+          onClick={() => changeMonth(1)}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E5E7EB] text-[#6B7280] transition duration-200 hover:border-[#C4B5FD] hover:bg-[#F5F3FF] hover:text-[#7C3AED]"
+          aria-label="Next month"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
 
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+      <div className="grid shrink-0 grid-cols-7 border-y border-[#E5E7EB] bg-[#FAFAFB] text-center text-[11px] font-bold uppercase tracking-[0.08em] text-[#9CA3AF]">
+        {weekdays.map((day) => (
+          <div key={day} className="py-2">{day}</div>
+        ))}
+      </div>
+
+      <div key={`grid-${monthPulse}`} className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1.5 overflow-hidden bg-[#FAFAFB] p-1.5 animate-[teamora-content-fade_180ms_ease-out_both]">
+        {cells.map((cell) => {
+          const visible = cell.tasks.slice(0, 3)
+          const hiddenCount = Math.max(0, cell.tasks.length - visible.length)
+          const isToday = cell.key === todayKey
+
+          return (
+            <div
+              key={cell.key}
+              onClick={() => setActiveDate(cell.key)}
+              onDoubleClick={() => {
+                if (cell.tasks.length === 0) openCreateModal(cell.key)
+              }}
+              className={`group relative flex min-h-0 cursor-pointer flex-col rounded-[18px] border bg-white p-2.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#7C3AED] hover:shadow-[0_16px_30px_rgba(124,58,237,0.14)] ${
+                cell.inMonth ? 'border-[#ECEEF3] text-[#111827]' : 'border-[#F1F2F5] text-[#C4C7CF]'
+              } ${isToday ? 'outline outline-2 outline-offset-[-3px] outline-[#7C3AED]' : ''}`}
+            >
+              <span className="text-sm font-semibold">{cell.day}</span>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openCreateModal(cell.key)
+                  }}
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-[#DDD6FE] bg-white text-[#7C3AED] opacity-0 shadow-sm transition duration-200 hover:bg-[#7C3AED] hover:text-white group-hover:opacity-100"
+                  aria-label={`Create task for ${formatDate(cell.key)}`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              <div className="mt-auto flex min-h-5 items-center gap-1.5 pt-2">
+                {visible.map((task) => (
+                  <span
+                    key={getTaskId(task)}
+                    className={`h-2.5 w-2.5 rounded-full ${task.completed ? 'bg-[#10B981]' : 'bg-[#7C3AED]'}`}
+                    title="Task indicator"
+                  />
+                ))}
+                {hiddenCount > 0 && (
+                  <span className="text-xs font-semibold text-[#7C3AED]">+{hiddenCount}</span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {activeDate && !modalMode && (
+        <div className="fixed inset-y-0 right-0 z-[1250] flex w-full max-w-md flex-col border-l border-[#E5E7EB] bg-white p-5 shadow-[0_24px_70px_rgba(15,23,42,0.18)] animate-[teamora-content-fade_180ms_ease-out_both]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-[#7C3AED]">Tasks</p>
+              <h3 className="mt-1 text-xl font-semibold text-[#111827]">{formatDate(activeDate)}</h3>
+            </div>
+            <button type="button" onClick={() => setActiveDate('')} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6]">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openCreateModal(activeDate)}
+            className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-[16px] bg-[#7C3AED] px-4 text-sm font-semibold text-white transition hover:bg-[#6D28D9]"
+          >
+            <Plus className="h-4 w-4" />
+            Create Task
+          </button>
+
+          <div className="mt-5 flex-1 space-y-3 overflow-y-auto">
+            {selectedTasks.length === 0 ? (
+              <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-5 text-sm text-[#6B7280]">
+                No tasks for this date.
+              </div>
+            ) : (
+              selectedTasks.map((task) => (
+                <article key={getTaskId(task)} className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className={`text-sm font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}>{task.title}</h4>
+                      {task.description && <p className="mt-1 text-sm leading-5 text-[#6B7280]">{task.description}</p>}
+                    </div>
+                    <span className="rounded-full bg-[#F5F3FF] px-2.5 py-1 text-xs font-semibold text-[#7C3AED]">{task.priority}</span>
+                  </div>
+                  <p className="mt-3 text-xs text-[#9CA3AF]">Created by {task.creator?.fullName || task.creator?.username || task.creator?.email || userName || 'Teamora user'}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => toggleComplete(task)} className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#D1FAE5] px-3 text-xs font-semibold text-[#059669] transition hover:bg-[#ECFDF5]">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {task.completed ? 'Completed' : 'Mark Complete'}
+                    </button>
+                    <button type="button" onClick={() => openEditModal(task)} className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#E5E7EB] px-3 text-xs font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => deleteTask(task)} className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#FEE2E2] px-3 text-xs font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]">
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {modalMode && (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-[#111827]/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[20px] border border-[#E5E7EB] bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)] animate-[teamora-content-fade_180ms_ease-out_both]">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Event Title</label>
+                <h3 className="text-xl font-semibold tracking-tight text-[#111827]">{modalMode === 'edit' ? 'Edit Task' : 'Create Task'}</h3>
+                <p className="mt-1 text-sm text-[#6B7280]">{formatDate(activeDate)}</p>
+              </div>
+              <button type="button" onClick={closeModal} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <label className="block">
+                <span className="text-sm font-semibold text-[#374151]">Title *</span>
                 <input
-                  type="text"
-                  placeholder="Sync alignment / Workshop"
-                  value={eventTitle}
-                  onChange={(e) => setEventTitle(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs focus:outline-none"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className={`mt-2 h-12 w-full rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${
+                    submitted && !title.trim() ? 'border-[#EF4444]' : 'border-[#E5E7EB]'
+                  }`}
+                  placeholder="Task title"
                 />
-              </div>
+                {submitted && !title.trim() && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Title is required.</p>}
+              </label>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Starts At</label>
-                  <input
-                    type="datetime-local"
-                    value={eventStart}
-                    onChange={(e) => setEventStart(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ends At</label>
-                  <input
-                    type="datetime-local"
-                    value={eventEnd}
-                    onChange={(e) => setEventEnd(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Description</label>
+              <label className="block">
+                <span className="text-sm font-semibold text-[#374151]">Description <span className="font-normal text-[#9CA3AF]">(Optional)</span></span>
                 <textarea
-                  placeholder="Details..."
-                  value={eventDesc}
-                  rows={2}
-                  onChange={(e) => setEventDesc(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs focus:outline-none resize-none"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={3}
+                  className="mt-2 w-full resize-none rounded-[16px] border border-[#E5E7EB] bg-white px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+                  placeholder="Add details"
                 />
+              </label>
+
+              <div>
+                <span className="text-sm font-semibold text-[#374151]">Date</span>
+                <div className="mt-2 rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] px-4 py-3 text-sm font-medium text-[#6B7280]">
+                  {formatDate(activeDate)}
+                </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Category Type</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {['meeting', 'reminder', 'task', 'event'].map((cat) => (
+                <span className="text-sm font-semibold text-[#374151]">Priority *</span>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {priorities.map((item) => (
                     <button
-                      key={cat}
-                      onClick={() => setEventCategory(cat)}
-                      className={`py-1.5 rounded-lg text-[10px] font-bold border capitalize transition-all cursor-pointer ${
-                        eventCategory === cat
-                          ? 'border-indigo-500 bg-indigo-500/10 text-indigo-600'
-                          : 'border-slate-200 text-slate-500'
+                      type="button"
+                      key={item}
+                      onClick={() => setPriority(item)}
+                      className={`h-11 rounded-[14px] border text-sm font-semibold transition duration-200 ${
+                        priority === item
+                          ? 'border-[#7C3AED] bg-[#F5F3FF] text-[#7C3AED]'
+                          : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
                       }`}
                     >
-                      {cat}
+                      {item}
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Recurrence</label>
-                <select
-                  value={eventRecurrence}
-                  onChange={(e) => setEventRecurrence(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-xl px-4 py-2 text-xs focus:outline-none cursor-pointer"
-                >
-                  <option value="none">One-time Event</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Attendees</label>
-                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 max-h-28 overflow-y-auto space-y-2">
-                  {ensureArray(activeUsers).map((member, i) => (
-                    <label key={i} className="flex items-center gap-2 cursor-pointer text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={selectedAttendees.includes(member.user)}
-                        onChange={() => toggleAttendee(member.user)}
-                        className="rounded border-slate-350 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                      />
-                      <span>{member.user}</span>
-                    </label>
-                  ))}
-                </div>
+                {submitted && !priority && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>}
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 shrink-0">
-              <button 
-                onClick={() => setShowEventModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
-              >
+            <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#E5E7EB] pt-5">
+              <button type="button" onClick={closeModal} className="h-11 rounded-[14px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
                 Cancel
               </button>
-              <button 
-                onClick={handleCreateEvent}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Schedule
+              <button type="button" disabled={saving} onClick={saveTask} className="h-11 rounded-[14px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60">
+                {saving ? 'Saving...' : modalMode === 'edit' ? 'Save Task' : 'Create Task'}
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
+    </section>
+  )
 }
