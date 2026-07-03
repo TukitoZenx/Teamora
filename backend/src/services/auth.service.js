@@ -200,13 +200,13 @@ const forgotPassword = async ({ email }) => {
     return { message: RESET_SUCCESS_MESSAGE };
   }
 
-  verifyPasswordResetEmailConfiguration();
-
   const user = await User.findOne({ email: cleanEmail });
 
   if (!user) {
     return { message: RESET_SUCCESS_MESSAGE };
   }
+
+  verifyPasswordResetEmailConfiguration();
 
   const resetToken = crypto.randomBytes(32).toString('hex');
   user.passwordResetToken = hashResetToken(resetToken);

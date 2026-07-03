@@ -28,6 +28,7 @@ const WORKSPACE_SECTIONS = new Set([
   'spreadsheet',
   'presentation',
   'calendar',
+  'tasks',
   'meetings',
   'members',
   'shared-files',
@@ -283,11 +284,17 @@ export default function App() {
       if (data.workspaceDeleted) {
         replaceRecentWorkspaces((current) => current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId))
       } else {
-        replaceRecentWorkspaces((current) => current.map((workspace) => (
-          workspace.workspaceId === workspaceId || workspace._id === workspaceId
-            ? { ...workspace, status: 'previously_joined', statusLabel: 'Previously Joined', canOpen: false, canRequestAccess: true }
-            : workspace
-        )))
+        replaceRecentWorkspaces((current) => {
+          const existing = current.find((workspace) => workspace.workspaceId === workspaceId || workspace._id === workspaceId)
+          const nextEntry = existing
+            ? { ...existing, status: 'previously_joined', statusLabel: 'Previously Joined', canOpen: false, canRequestAccess: true }
+            : { _id: workspaceId, workspaceId, status: 'previously_joined', statusLabel: 'Previously Joined', canOpen: false, canRequestAccess: true, lastSeenAt: new Date().toISOString() }
+
+          return [
+            nextEntry,
+            ...current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
+          ]
+        })
       }
       setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
       removeWorkspaceCache(workspaceId)
@@ -303,7 +310,7 @@ export default function App() {
       } else {
         addWorkspaceNotification({
           type: 'workspace_left',
-          message: data.ownershipTransferred ? 'You left the workspace. Ownership was transferred.' : 'You left the workspace.',
+          message: data.workspaceInactive ? 'You left the workspace. It is inactive because no members remain.' : 'You left the workspace.',
           workspaceId
         })
       }

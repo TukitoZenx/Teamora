@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Calendar as CalendarIcon, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import { ensureArray } from '../utils/arrayUtils'
@@ -23,13 +23,62 @@ const formatDate = (dateKey) => {
   })
 }
 
+const formatDateInput = (dateKey) => {
+  if (!dateKey) return ''
+  const [year, month, day] = dateKey.split('-')
+  if (!year || !month || !day) return ''
+  return `${day}/${month}/${year}`
+}
+
+const parseDateInput = (value) => {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  const slashMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch
+    const parsedDate = new Date(`${year}-${month}-${day}T12:00:00`)
+    if (
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.getFullYear() !== Number(year) ||
+      parsedDate.getMonth() + 1 !== Number(month) ||
+      parsedDate.getDate() !== Number(day)
+    ) return ''
+    return `${year}-${month}-${day}`
+  }
+
+  const dashMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dashMatch) {
+    const [, year, month, day] = dashMatch
+    const parsedDate = new Date(`${year}-${month}-${day}T12:00:00`)
+    if (
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.getFullYear() !== Number(year) ||
+      parsedDate.getMonth() + 1 !== Number(month) ||
+      parsedDate.getDate() !== Number(day)
+    ) return ''
+    return `${year}-${month}-${day}`
+  }
+
+  return ''
+}
+
 const getTaskId = (task) => task?._id || task?.id
+const getTaskBadgeColor = (task) => {
+  if (task?.completed || task?.status === 'completed') return 'bg-emerald-100 text-emerald-700'
+  if (task?.priority === 'Urgent' || task?.priority === 'High') return 'bg-rose-100 text-rose-700'
+  if (task?.priority === 'Medium') return 'bg-amber-100 text-amber-700'
+  return 'bg-slate-100 text-slate-700'
+}
 
 export default function Calendar({
   calendarList = [],
   userName,
   workspaceId,
-  currentUserRole = 'editor'
+  currentUserRole = 'editor',
+  onOpenTasksPage,
+  taskViewerPage = false
 }) {
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date()
@@ -43,10 +92,21 @@ export default function Calendar({
   const [editingTask, setEditingTask] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [dateInput, setDateInput] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
   const [priority, setPriority] = useState('')
+  const [reminder, setReminder] = useState('')
+  const [workspaceName, setWorkspaceName] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
   const [monthPulse, setMonthPulse] = useState(0)
+  const [taskViewerOpen, setTaskViewerOpen] = useState(false)
+  const [taskSearch, setTaskSearch] = useState('')
+  const [taskFilter, setTaskFilter] = useState('all')
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState('all')
+  const [taskSort, setTaskSort] = useState('newest')
+  const datePickerRef = useRef(null)
 
   const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter'
   const todayKey = toDateKey(new Date())
@@ -124,13 +184,41 @@ export default function Calendar({
     activeDate ? tasks.filter((task) => task.date === activeDate) : []
   ), [activeDate, tasks])
 
+  const visibleTasks = useMemo(() => {
+    const query = taskSearch.trim().toLowerCase()
+    const filtered = tasks.filter((task) => {
+      const matchesSearch = !query || [task.title, task.description, task.assignee, task.workspaceName].some((value) => String(value || '').toLowerCase().includes(query))
+      const matchesStatus = taskFilter === 'all' || task.status === taskFilter || (taskFilter === 'completed' && (task.completed || task.status === 'completed'))
+      const matchesPriority = taskPriorityFilter === 'all' || task.priority === taskPriorityFilter
+      return matchesSearch && matchesStatus && matchesPriority
+    })
+
+    return filtered.sort((left, right) => {
+      if (taskSort === 'priority') {
+        const priorityOrder = { Urgent: 4, High: 3, Medium: 2, Low: 1 }
+        return (priorityOrder[right.priority] || 0) - (priorityOrder[left.priority] || 0)
+      }
+
+      if (taskSort === 'oldest') {
+        return new Date(left.createdAt || left.updatedAt || 0) - new Date(right.createdAt || right.updatedAt || 0)
+      }
+
+      return new Date(right.createdAt || right.updatedAt || 0) - new Date(left.createdAt || left.updatedAt || 0)
+    })
+  }, [taskFilter, taskPriorityFilter, taskSearch, taskSort, tasks])
+
   const openCreateModal = (dateKey) => {
     if (!canEdit) return
     setActiveDate(dateKey)
     setEditingTask(null)
     setTitle('')
     setDescription('')
+    setDateInput(formatDateInput(dateKey))
+    setStartTime('')
+    setEndTime('')
     setPriority('')
+    setReminder('')
+    setWorkspaceName('')
     setSubmitted(false)
     setModalMode('create')
   }
@@ -141,7 +229,12 @@ export default function Calendar({
     setEditingTask(task)
     setTitle(task.title || '')
     setDescription(task.description || '')
+    setDateInput(formatDateInput(task.date || activeDate))
+    setStartTime(task.startTime || '')
+    setEndTime(task.endTime || '')
     setPriority(task.priority || '')
+    setReminder(task.reminder || '')
+    setWorkspaceName(task.workspaceName || '')
     setSubmitted(false)
     setModalMode('edit')
   }
@@ -153,16 +246,26 @@ export default function Calendar({
     setSaving(false)
   }
 
+  const openDatePicker = () => {
+    datePickerRef.current?.showPicker?.()
+    datePickerRef.current?.click()
+  }
+
   const saveTask = async () => {
     setSubmitted(true)
-    if (!title.trim() || !priority) return
+    const normalizedDate = parseDateInput(dateInput)
+    if (!title.trim() || !priority || !normalizedDate) return
 
     setSaving(true)
     const payload = {
       title: title.trim(),
       description: description.trim(),
-      date: activeDate,
-      priority
+      date: normalizedDate,
+      priority,
+      startTime: startTime.trim(),
+      endTime: endTime.trim(),
+      reminder: reminder.trim(),
+      workspaceName: workspaceName.trim()
     }
 
     try {
@@ -175,6 +278,7 @@ export default function Calendar({
         setTasks((current) => [...current, data.task])
         toast.success('Task created')
       }
+      setActiveDate(normalizedDate)
       closeModal()
     } catch (requestError) {
       toast.error(requestError.message)
@@ -197,9 +301,13 @@ export default function Calendar({
   const toggleComplete = async (task) => {
     if (!canEdit) return
     const taskId = getTaskId(task)
+    const nextCompleted = !task.completed
+    const nextStatus = nextCompleted ? 'completed' : 'todo'
+
     try {
       const { data } = await api.patch(`/api/v1/workspaces/${workspaceId}/tasks/${taskId}`, {
-        completed: !task.completed
+        completed: nextCompleted,
+        status: nextStatus
       })
       setTasks((current) => current.map((item) => (getTaskId(item) === taskId ? data.task : item)))
       toast.success('Task updated')
@@ -213,9 +321,139 @@ export default function Calendar({
     setCurrentDate((date) => new Date(date.getFullYear(), date.getMonth() + direction, 1))
   }
 
-  const selectMonth = (month) => {
-    setMonthPulse((value) => value + 1)
-    setCurrentDate((date) => new Date(date.getFullYear(), Number(month), 1))
+  if (taskViewerPage) {
+    return (
+      <section className="flex h-[calc(100vh-120px)] min-h-[620px] flex-col rounded-[20px] border border-[#E5E7EB] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]">
+        <div className="flex shrink-0 flex-col gap-4 border-b border-[#E5E7EB] px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F5F3FF] text-[#7C3AED]">
+              <Search className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">All Tasks</h1>
+              <p className="text-sm text-[#6B7280]">{loading ? 'Loading tasks...' : error || `${tasks.length} task${tasks.length === 1 ? '' : 's'}`}</p>
+            </div>
+          </div>
+
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => openCreateModal(toDateKey(new Date()))}
+              className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-[#7C3AED] px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#6D28D9]"
+            >
+              <Plus className="h-4 w-4" />
+              New Event
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-3 border-b border-[#E5E7EB] bg-[#FAFAFB] p-4 md:grid-cols-[1.4fr_0.9fr_0.7fr_0.7fr]">
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Search</span>
+            <input value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Title, description, assignee..." className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Status</span>
+            <select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+              <option value="all">All</option>
+              <option value="todo">Todo</option>
+              <option value="in-progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="completed">Completed</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Priority</span>
+            <select value={taskPriorityFilter} onChange={(event) => setTaskPriorityFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+              <option value="all">All</option>
+              {priorities.map((priorityOption) => <option key={priorityOption} value={priorityOption}>{priorityOption}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Sort</span>
+            <select value={taskSort} onChange={(event) => setTaskSort(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="priority">Priority</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          {visibleTasks.length === 0 ? (
+            <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-8 text-center text-sm text-[#6B7280]">No tasks match your current filters.</div>
+          ) : visibleTasks.map((task) => (
+            <article key={getTaskId(task)} className="rounded-[20px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className={`text-base font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}>{task.title}</h4>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTaskBadgeColor(task)}`}>{task.priority || 'Medium'}</span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{task.status || (task.completed ? 'completed' : 'todo')}</span>
+                  </div>
+                  {task.description && <p className="text-sm leading-6 text-[#6B7280]">{task.description}</p>}
+                  <div className="flex flex-wrap gap-3 text-sm text-[#6B7280]">
+                    <span><strong>Workspace:</strong> {task.workspaceName || 'Workspace'}</span>
+                    <span><strong>Assigned To:</strong> {task.assignee || 'Unassigned'}</span>
+                    <span><strong>Due Date:</strong> {task.date ? formatDate(task.date) : 'Not set'}</span>
+                    <span><strong>Reminder:</strong> {task.reminder || 'None'}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-xs text-[#9CA3AF]">
+                    <span><strong>Created By:</strong> {task.creator?.fullName || task.creator?.username || task.creator?.email || userName || 'Teamora user'}</span>
+                    <span><strong>Created:</strong> {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'Unknown'}</span>
+                    <span><strong>Updated:</strong> {task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown'}</span>
+                  </div>
+                </div>
+                {canEdit && (
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => toggleComplete(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#D1FAE5] px-3 text-sm font-semibold text-[#059669] transition hover:bg-[#ECFDF5]">
+                      <CheckCircle2 className="h-4 w-4" />
+                      {task.completed ? 'Completed' : 'Mark Complete'}
+                    </button>
+                    <button type="button" onClick={() => openEditModal(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+                      <Pencil className="h-4 w-4" />
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => deleteTask(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#FEE2E2] px-3 text-sm font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]">
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {modalMode && (
+          <TaskEditorModal
+            modalMode={modalMode}
+            title={title}
+            setTitle={setTitle}
+            description={description}
+            setDescription={setDescription}
+            dateInput={dateInput}
+            setDateInput={setDateInput}
+            startTime={startTime}
+            setStartTime={setStartTime}
+            endTime={endTime}
+            setEndTime={setEndTime}
+            priority={priority}
+            setPriority={setPriority}
+            reminder={reminder}
+            setReminder={setReminder}
+            workspaceName={workspaceName}
+            setWorkspaceName={setWorkspaceName}
+            submitted={submitted}
+            saving={saving}
+            datePickerRef={datePickerRef}
+            openDatePicker={openDatePicker}
+            closeModal={closeModal}
+            saveTask={saveTask}
+          />
+        )}
+      </section>
+    )
   }
 
   return (
@@ -234,27 +472,20 @@ export default function Calendar({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
+            onClick={() => (onOpenTasksPage ? onOpenTasksPage() : setTaskViewerOpen(true))}
+            className="inline-flex h-11 items-center gap-2 rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#374151] transition duration-200 hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]"
+          >
+            <Search className="h-4 w-4" />
+            View All Tasks
+          </button>
+          <button
+            type="button"
             onClick={() => openCreateModal(toDateKey(new Date()))}
             className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-[#7C3AED] px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#6D28D9]"
           >
             <Plus className="h-4 w-4" />
             New Event
           </button>
-          <label className="relative inline-flex h-11 items-center rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#374151] transition duration-200 hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]">
-            <select
-              value={currentDate.getMonth()}
-              onChange={(event) => selectMonth(event.target.value)}
-              className="appearance-none bg-transparent pr-7 outline-none"
-              aria-label="Select calendar month"
-            >
-              {Array.from({ length: 12 }).map((_, index) => (
-                <option key={index} value={index}>
-                  {new Date(2026, index, 1).toLocaleDateString(undefined, { month: 'long' })}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4" />
-          </label>
         </div>
       </div>
 
@@ -393,13 +624,105 @@ export default function Calendar({
         </div>
       )}
 
+      {taskViewerOpen && (
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-[#111827]/35 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white shadow-[0_28px_80px_rgba(15,23,42,0.22)]">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
+              <div>
+                <h3 className="text-xl font-semibold tracking-tight text-[#111827]">All Tasks</h3>
+                <p className="mt-1 text-sm text-[#6B7280]">Search, filter, sort, and manage every task in this workspace.</p>
+              </div>
+              <button type="button" onClick={() => setTaskViewerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 border-b border-[#E5E7EB] bg-[#FAFAFB] p-4 md:grid-cols-[1.4fr_0.9fr_0.7fr_0.7fr]">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Search</span>
+                <input value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Title, description, assignee..." className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Status</span>
+                <select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+                  <option value="all">All</option>
+                  <option value="todo">Todo</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="review">Review</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Priority</span>
+                <select value={taskPriorityFilter} onChange={(event) => setTaskPriorityFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+                  <option value="all">All</option>
+                  {priorities.map((priorityOption) => <option key={priorityOption} value={priorityOption}>{priorityOption}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Sort</span>
+                <select value={taskSort} onChange={(event) => setTaskSort(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="priority">Priority</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              {visibleTasks.length === 0 ? (
+                <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-8 text-center text-sm text-[#6B7280]">No tasks match your current filters.</div>
+              ) : visibleTasks.map((task) => (
+                <article key={getTaskId(task)} className="rounded-[20px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className={`text-base font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}>{task.title}</h4>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTaskBadgeColor(task)}`}>{task.priority || 'Medium'}</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{task.status || (task.completed ? 'completed' : 'todo')}</span>
+                      </div>
+                      {task.description && <p className="text-sm leading-6 text-[#6B7280]">{task.description}</p>}
+                      <div className="flex flex-wrap gap-3 text-sm text-[#6B7280]">
+                        <span><strong>Workspace:</strong> {task.workspaceName || 'Workspace'}</span>
+                        <span><strong>Assigned To:</strong> {task.assignee || 'Unassigned'}</span>
+                        <span><strong>Due Date:</strong> {task.date ? formatDate(task.date) : 'Not set'}</span>
+                        <span><strong>Reminder:</strong> {task.reminder || 'None'}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-xs text-[#9CA3AF]">
+                        <span><strong>Created By:</strong> {task.creator?.fullName || task.creator?.username || task.creator?.email || userName || 'Teamora user'}</span>
+                        <span><strong>Created:</strong> {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'Unknown'}</span>
+                        <span><strong>Updated:</strong> {task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown'}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => toggleComplete(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#D1FAE5] px-3 text-sm font-semibold text-[#059669] transition hover:bg-[#ECFDF5]">
+                        <CheckCircle2 className="h-4 w-4" />
+                        {task.completed ? 'Completed' : 'Mark Complete'}
+                      </button>
+                      <button type="button" onClick={() => { setTaskViewerOpen(false); openEditModal(task) }} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => deleteTask(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#FEE2E2] px-3 text-sm font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]">
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalMode && (
         <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-[#111827]/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[20px] border border-[#E5E7EB] bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)] animate-[teamora-content-fade_180ms_ease-out_both]">
+          <div className="w-full max-w-2xl rounded-[24px] border border-[#E5E7EB] bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)] animate-[teamora-content-fade_180ms_ease-out_both]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-semibold tracking-tight text-[#111827]">{modalMode === 'edit' ? 'Edit Task' : 'Create Task'}</h3>
-                <p className="mt-1 text-sm text-[#6B7280]">{formatDate(activeDate)}</p>
+                <h3 className="text-xl font-semibold tracking-tight text-[#111827]">{modalMode === 'edit' ? 'Edit Event' : 'New Event'}</h3>
+                <p className="mt-1 text-sm text-[#6B7280]">Fill in the details below and save the event to your calendar.</p>
               </div>
               <button type="button" onClick={closeModal} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]">
                 <X className="h-4 w-4" />
@@ -412,9 +735,7 @@ export default function Calendar({
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  className={`mt-2 h-12 w-full rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${
-                    submitted && !title.trim() ? 'border-[#EF4444]' : 'border-[#E5E7EB]'
-                  }`}
+                  className={`mt-2 h-12 w-full rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !title.trim() ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
                   placeholder="Task title"
                 />
                 {submitted && !title.trim() && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Title is required.</p>}
@@ -431,46 +752,223 @@ export default function Calendar({
                 />
               </label>
 
-              <div>
-                <span className="text-sm font-semibold text-[#374151]">Date</span>
-                <div className="mt-2 rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] px-4 py-3 text-sm font-medium text-[#6B7280]">
-                  {formatDate(activeDate)}
-                </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#374151]">Date *</span>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={dateInput}
+                      onChange={(event) => setDateInput(event.target.value)}
+                      placeholder="DD/MM/YYYY"
+                      className={`h-12 flex-1 rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !parseDateInput(dateInput) ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
+                    />
+                    <input ref={datePickerRef} type="date" value={parseDateInput(dateInput) || ''} onChange={(event) => setDateInput(formatDateInput(event.target.value))} className="sr-only" />
+                    <button type="button" onClick={openDatePicker} className="h-12 rounded-[16px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F8FAFC]">
+                      Pick
+                    </button>
+                  </div>
+                  {submitted && !parseDateInput(dateInput) && <p className="mt-2 text-xs font-semibold text-[#EF4444]">A valid date is required.</p>}
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#374151]">Reminder</span>
+                  <select value={reminder} onChange={(event) => setReminder(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10">
+                    <option value="">None</option>
+                    <option value="15 min">15 min before</option>
+                    <option value="30 min">30 min before</option>
+                    <option value="1 hour">1 hour before</option>
+                    <option value="1 day">1 day before</option>
+                  </select>
+                </label>
               </div>
 
-              <div>
-                <span className="text-sm font-semibold text-[#374151]">Priority *</span>
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {priorities.map((item) => (
-                    <button
-                      type="button"
-                      key={item}
-                      onClick={() => setPriority(item)}
-                      className={`h-11 rounded-[14px] border text-sm font-semibold transition duration-200 ${
-                        priority === item
-                          ? 'border-[#7C3AED] bg-[#F5F3FF] text-[#7C3AED]'
-                          : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#374151]">Start Time</span>
+                  <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#374151]">End Time</span>
+                  <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+                </label>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <span className="text-sm font-semibold text-[#374151]">Priority *</span>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-2">
+                    {priorities.map((item) => (
+                      <button
+                        type="button"
+                        key={item}
+                        onClick={() => setPriority(item)}
+                        className={`h-11 rounded-[14px] border text-sm font-semibold transition duration-200 ${priority === item ? 'border-[#7C3AED] bg-[#F5F3FF] text-[#7C3AED]' : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'}`}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                  {submitted && !priority && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>}
                 </div>
-                {submitted && !priority && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>}
+
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#374151]">Workspace</span>
+                  <input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" placeholder="Workspace name" />
+                </label>
               </div>
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#E5E7EB] pt-5">
-              <button type="button" onClick={closeModal} className="h-11 rounded-[14px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+              <button type="button" onClick={closeModal} className="h-11 rounded-[16px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
                 Cancel
               </button>
-              <button type="button" disabled={saving} onClick={saveTask} className="h-11 rounded-[14px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60">
-                {saving ? 'Saving...' : modalMode === 'edit' ? 'Save Task' : 'Create Task'}
+              <button type="button" disabled={saving} onClick={saveTask} className="h-11 rounded-[16px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60">
+                {saving ? 'Saving...' : modalMode === 'edit' ? 'Save Event' : 'Save Event'}
               </button>
             </div>
           </div>
         </div>
       )}
     </section>
+  )
+}
+
+function TaskEditorModal({
+  modalMode,
+  title,
+  setTitle,
+  description,
+  setDescription,
+  dateInput,
+  setDateInput,
+  startTime,
+  setStartTime,
+  endTime,
+  setEndTime,
+  priority,
+  setPriority,
+  reminder,
+  setReminder,
+  workspaceName,
+  setWorkspaceName,
+  submitted,
+  saving,
+  datePickerRef,
+  openDatePicker,
+  closeModal,
+  saveTask
+}) {
+  return (
+    <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-[#111827]/35 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-[24px] border border-[#E5E7EB] bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)] animate-[teamora-content-fade_180ms_ease-out_both]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-[#111827]">{modalMode === 'edit' ? 'Edit Event' : 'New Event'}</h3>
+            <p className="mt-1 text-sm text-[#6B7280]">Fill in the details below and save the event to your calendar.</p>
+          </div>
+          <button type="button" onClick={closeModal} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <label className="block">
+            <span className="text-sm font-semibold text-[#374151]">Title *</span>
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className={`mt-2 h-12 w-full rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !title.trim() ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
+              placeholder="Task title"
+            />
+            {submitted && !title.trim() && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Title is required.</p>}
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-[#374151]">Description</span>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+              className="mt-2 w-full resize-none rounded-[16px] border border-[#E5E7EB] bg-white px-4 py-3 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+              placeholder="Add details"
+            />
+          </label>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-semibold text-[#374151]">Date *</span>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={dateInput}
+                  onChange={(event) => setDateInput(event.target.value)}
+                  placeholder="DD/MM/YYYY"
+                  className={`h-12 flex-1 rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !parseDateInput(dateInput) ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
+                />
+                <input ref={datePickerRef} type="date" value={parseDateInput(dateInput) || ''} onChange={(event) => setDateInput(formatDateInput(event.target.value))} className="sr-only" />
+                <button type="button" onClick={openDatePicker} className="h-12 rounded-[16px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F8FAFC]">
+                  Pick
+                </button>
+              </div>
+              {submitted && !parseDateInput(dateInput) && <p className="mt-2 text-xs font-semibold text-[#EF4444]">A valid date is required.</p>}
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-semibold text-[#374151]">Reminder</span>
+              <select value={reminder} onChange={(event) => setReminder(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10">
+                <option value="">None</option>
+                <option value="15 min">15 min before</option>
+                <option value="30 min">30 min before</option>
+                <option value="1 hour">1 hour before</option>
+                <option value="1 day">1 day before</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="text-sm font-semibold text-[#374151]">Start Time</span>
+              <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+            </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-[#374151]">End Time</span>
+              <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <span className="text-sm font-semibold text-[#374151]">Priority *</span>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {priorities.map((item) => (
+                  <button
+                    type="button"
+                    key={item}
+                    onClick={() => setPriority(item)}
+                    className={`h-11 rounded-[14px] border text-sm font-semibold transition duration-200 ${priority === item ? 'border-[#7C3AED] bg-[#F5F3FF] text-[#7C3AED]' : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'}`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              {submitted && !priority && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>}
+            </div>
+
+            <label className="block">
+              <span className="text-sm font-semibold text-[#374151]">Workspace</span>
+              <input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" placeholder="Workspace name" />
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#E5E7EB] pt-5">
+          <button type="button" onClick={closeModal} className="h-11 rounded-[16px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+            Cancel
+          </button>
+          <button type="button" disabled={saving} onClick={saveTask} className="h-11 rounded-[16px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60">
+            {saving ? 'Saving...' : 'Save Event'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

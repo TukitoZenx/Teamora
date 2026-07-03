@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   Calendar,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   DoorOpen,
@@ -27,6 +28,7 @@ const groups = [
   ],
   [
     { key: 'calendar', label: 'Calendar', icon: Calendar },
+    { key: 'tasks', label: 'All Tasks', icon: CheckSquare },
     { key: 'meetings', label: 'Meetings', icon: Video }
   ],
   [

@@ -86,9 +86,44 @@ const taskSchema = new mongoose.Schema(
       enum: ['Low', 'Medium', 'High', 'Urgent'],
       required: true
     },
+    status: {
+      type: String,
+      enum: ['todo', 'in-progress', 'review', 'completed'],
+      default: 'todo'
+    },
     completed: {
       type: Boolean,
       default: false
+    },
+    assignee: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: ''
+    },
+    startTime: {
+      type: String,
+      trim: true,
+      maxlength: 10,
+      default: ''
+    },
+    endTime: {
+      type: String,
+      trim: true,
+      maxlength: 10,
+      default: ''
+    },
+    reminder: {
+      type: String,
+      trim: true,
+      maxlength: 40,
+      default: ''
+    },
+    workspaceName: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: ''
     },
     creator: {
       type: mongoose.Schema.Types.ObjectId,
@@ -165,6 +200,10 @@ const workspaceSchema = new mongoose.Schema(
       type: String,
       enum: ['private', 'invite_only'],
       default: 'invite_only'
+    },
+    active: {
+      type: Boolean,
+      default: true
     },
     joinApproval: {
       type: Boolean,
