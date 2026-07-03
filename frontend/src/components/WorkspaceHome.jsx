@@ -20,6 +20,7 @@ const sectionTitles = {
   spreadsheet: 'Spreadsheet',
   presentation: 'Presentation',
   calendar: 'Calendar',
+  tasks: 'All Tasks',
   meetings: 'Meetings',
   'shared-files': 'Shared Files'
 }
@@ -107,6 +108,14 @@ export default function WorkspaceHome({
             calendarList={workspace?.calendar || workspace?.tasks || []}
             workspaceId={workspace?._id}
             userName={getDisplayName(user)}
+            onOpenTasksPage={() => selectWorkspacePage('tasks')}
+          />
+        ) : activeItem === 'tasks' ? (
+          <Calendar
+            calendarList={workspace?.calendar || workspace?.tasks || []}
+            workspaceId={workspace?._id}
+            userName={getDisplayName(user)}
+            taskViewerPage
           />
         ) : sectionTitles[activeItem] ? (
           <WorkspaceSection workspace={workspace} title={sectionTitles[activeItem]} />

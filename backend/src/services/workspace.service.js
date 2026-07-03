@@ -79,11 +79,33 @@ const validateDescription = (description) => {
 };
 
 const validateDateKey = (date) => {
-  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw createError('Task date must use YYYY-MM-DD format');
+  if (typeof date !== 'string' || !date.trim()) {
+    throw createError('Task date is required');
   }
 
-  return date;
+  const cleanDate = date.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+    return cleanDate;
+  }
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(cleanDate)) {
+    const [day, month, year] = cleanDate.split('/');
+    const parsedDate = new Date(`${year}-${month}-${day}T12:00:00`);
+
+    if (
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.getFullYear() !== Number(year) ||
+      parsedDate.getMonth() + 1 !== Number(month) ||
+      parsedDate.getDate() !== Number(day)
+    ) {
+      throw createError('Task date must use YYYY-MM-DD or DD/MM/YYYY format');
+    }
+
+    return `${year}-${month}-${day}`;
+  }
+
+  throw createError('Task date must use YYYY-MM-DD or DD/MM/YYYY format');
 };
 
 const validatePriority = (priority) => {
@@ -121,6 +143,30 @@ const validateTaskDescription = (description) => {
   }
 
   return cleanDescription;
+};
+
+const validateTaskStatus = (status) => {
+  if (status === undefined || status === null || status === '') return 'todo';
+  if (!['todo', 'in-progress', 'review', 'completed'].includes(status)) {
+    throw createError('Task status is invalid');
+  }
+
+  return status;
+};
+
+const validateOptionalText = (value, fieldName, maxLength) => {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string') {
+    throw createError(`${fieldName} must be a string`);
+  }
+
+  const cleanValue = value.trim();
+
+  if (cleanValue.length > maxLength) {
+    throw createError(`${fieldName} must be ${maxLength} characters or fewer`);
+  }
+
+  return cleanValue;
 };
 
 const generateInviteCode = async () => {
@@ -257,11 +303,7 @@ const createWorkspace = async (userId, payload) => {
 };
 
 const getWorkspaces = async (userId) => {
-  const workspaces = await populateWorkspace(
-    Workspace.find({
-      $or: [{ owner: userId }, { members: userId }]
-    }).sort({ updatedAt: -1 })
-  );
+  const workspaces = await populateWorkspace(Workspace.find({ members: userId }).sort({ updatedAt: -1 }));
 
   const activeWorkspaceIds = new Set(workspaces.map((workspace) => workspace._id.toString()));
   const user = await User.findById(userId)
@@ -426,6 +468,7 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
 
   if (hasActiveApproval(workspace, userId)) {
     workspace.members.push(userId);
+    workspace.active = true;
     workspace.joinRequests.forEach((request) => {
       const requesterId = getEntityId(request.requester);
       if (requesterId?.toString() === userId.toString() && request.status === 'pending') {
@@ -496,6 +539,7 @@ const acceptJoinRequest = async (ownerId, workspaceId, requestId) => {
   if (!isWorkspaceMember(workspace, requesterId)) {
     workspace.members.push(requesterId);
   }
+  workspace.active = true;
   ensureApproval(workspace, requesterId);
 
   request.status = 'accepted';
@@ -617,6 +661,13 @@ const createTask = async (userId, workspaceId, payload) => {
     description: validateTaskDescription(payload.description),
     date: validateDateKey(payload.date),
     priority: validatePriority(payload.priority),
+    status: validateTaskStatus(payload.status),
+    completed: Boolean(payload.completed),
+    assignee: validateOptionalText(payload.assignee, 'Assignee', 80),
+    startTime: validateOptionalText(payload.startTime, 'Start time', 10),
+    endTime: validateOptionalText(payload.endTime, 'End time', 10),
+    reminder: validateOptionalText(payload.reminder, 'Reminder', 40),
+    workspaceName: validateOptionalText(payload.workspaceName, 'Workspace', 120),
     creator: userId
   });
 
@@ -641,8 +692,15 @@ const updateTask = async (userId, workspaceId, taskId, payload) => {
 
   if (payload.title !== undefined) task.title = validateTaskTitle(payload.title);
   if (payload.description !== undefined) task.description = validateTaskDescription(payload.description);
+  if (payload.date !== undefined) task.date = validateDateKey(payload.date);
   if (payload.priority !== undefined) task.priority = validatePriority(payload.priority);
+  if (payload.status !== undefined) task.status = validateTaskStatus(payload.status);
   if (payload.completed !== undefined) task.completed = Boolean(payload.completed);
+  if (payload.assignee !== undefined) task.assignee = validateOptionalText(payload.assignee, 'Assignee', 80);
+  if (payload.startTime !== undefined) task.startTime = validateOptionalText(payload.startTime, 'Start time', 10);
+  if (payload.endTime !== undefined) task.endTime = validateOptionalText(payload.endTime, 'End time', 10);
+  if (payload.reminder !== undefined) task.reminder = validateOptionalText(payload.reminder, 'Reminder', 40);
+  if (payload.workspaceName !== undefined) task.workspaceName = validateOptionalText(payload.workspaceName, 'Workspace', 120);
 
   await workspace.save();
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
@@ -684,6 +742,7 @@ const removeMember = async (ownerId, workspaceId, memberId) => {
   }
 
   workspace.members = workspace.members.filter((id) => id.toString() !== memberId.toString());
+  workspace.active = workspace.members.length > 0;
   const approval = workspace.approvedMembers.find((item) => getEntityId(item.user)?.toString() === memberId.toString());
   if (approval) {
     approval.revokedAt = new Date();
@@ -718,30 +777,21 @@ const leaveWorkspace = async (userId, workspaceId) => {
   const isOwner = workspace.owner.toString() === userId.toString();
 
   if (isOwner) {
-    const otherMembers = workspace.members.filter((memberId) => memberId.toString() !== userId.toString());
-
-    if (otherMembers.length === 0) {
-      await workspace.deleteOne();
-      await removeRecentWorkspaceForEveryone(workspace._id);
-
-      try {
-        await mongoose.connection.collection('rooms').deleteOne({ _id: workspaceId.toString() });
-      } catch {
-        // Workspace metadata is authoritative here; room data may live in a separate legacy service.
-      }
-
-      return { success: true, workspaceDeleted: true };
-    }
-
-    workspace.owner = otherMembers[0];
+    workspace.owner = userId;
   }
 
   workspace.members = workspace.members.filter((memberId) => memberId.toString() !== userId.toString());
+  workspace.active = workspace.members.length > 0;
   await workspace.save();
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
   await upsertRecentWorkspace(userId, populated, 'previously_joined');
 
-  return { success: true, ownershipTransferred: isOwner };
+  return {
+    success: true,
+    workspaceDeleted: false,
+    workspaceInactive: !workspace.active,
+    ownershipTransferred: false
+  };
 };
 
 module.exports = {
