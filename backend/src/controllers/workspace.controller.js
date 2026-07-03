@@ -109,6 +109,51 @@ const markNotificationRead = async (req, res, next) => {
   }
 };
 
+const listTasks = async (req, res, next) => {
+  try {
+    const tasks = await workspaceService.listTasks(req.user._id, req.params.id);
+    res.status(200).json({ success: true, tasks });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createTask = async (req, res, next) => {
+  try {
+    const task = await workspaceService.createTask(req.user._id, req.params.id, req.body);
+    res.status(201).json({ success: true, task });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateTask = async (req, res, next) => {
+  try {
+    const task = await workspaceService.updateTask(req.user._id, req.params.id, req.params.taskId, req.body);
+    res.status(200).json({ success: true, task });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteTask = async (req, res, next) => {
+  try {
+    const result = await workspaceService.deleteTask(req.user._id, req.params.id, req.params.taskId);
+    res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const removeMember = async (req, res, next) => {
+  try {
+    const workspace = await workspaceService.removeMember(req.user._id, req.params.id, req.params.memberId);
+    res.status(200).json({ success: true, workspace });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const removeRecentWorkspace = async (req, res, next) => {
   try {
     const result = await workspaceService.removeRecentWorkspace(req.user._id, req.params.workspaceId);
@@ -140,6 +185,11 @@ module.exports = {
   declineJoinRequest,
   getNotifications,
   markNotificationRead,
+  listTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+  removeMember,
   removeRecentWorkspace,
   leaveWorkspace
 };

@@ -62,6 +62,43 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const taskSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 160
+    },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: ''
+    },
+    date: {
+      type: String,
+      required: true,
+      match: /^\d{4}-\d{2}-\d{2}$/
+    },
+    priority: {
+      type: String,
+      enum: ['Low', 'Medium', 'High', 'Urgent'],
+      required: true
+    },
+    completed: {
+      type: Boolean,
+      default: false
+    },
+    creator: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    }
+  },
+  { timestamps: true }
+);
+
 const approvedMemberSchema = new mongoose.Schema(
   {
     user: {
@@ -118,6 +155,22 @@ const workspaceSchema = new mongoose.Schema(
       unique: true,
       index: true
     },
+    icon: {
+      type: String,
+      trim: true,
+      maxlength: 8,
+      default: ''
+    },
+    visibility: {
+      type: String,
+      enum: ['private', 'invite_only'],
+      default: 'invite_only'
+    },
+    joinApproval: {
+      type: Boolean,
+      default: true
+    },
+    tasks: [taskSchema],
     joinRequests: [joinRequestSchema],
     approvedMembers: [approvedMemberSchema],
     notifications: [notificationSchema]

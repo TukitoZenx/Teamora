@@ -14,6 +14,7 @@ import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
 import api from './services/api'
 import { useAuth } from './hooks/useAuth'
 import WorkspaceLayout from './features/workspace/components/WorkspaceLayout'
+import { addWorkspaceNotification } from './utils/notifications'
 
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 const LAST_PAGE_KEY = 'teamora-last-page'
@@ -227,7 +228,12 @@ export default function App() {
       cacheWorkspace(data.workspace)
       localStorage.setItem(LAST_WORKSPACE_KEY, data.workspace._id)
       navigate(`/workspace/${data.workspace._id}`)
-      toast.success('Workspace joined')
+      addWorkspaceNotification({
+        type: 'workspace_joined',
+        message: `You joined ${data.workspace.name}`,
+        workspaceId: data.workspace._id,
+        workspaceName: data.workspace.name
+      })
       return data.workspace
     }
 
@@ -295,7 +301,11 @@ export default function App() {
       if (data.workspaceDeleted) {
         toast.success('Workspace deleted because no members remained.')
       } else {
-        toast.success(data.ownershipTransferred ? 'You left the workspace. Ownership was transferred.' : 'You left the workspace.')
+        addWorkspaceNotification({
+          type: 'workspace_left',
+          message: data.ownershipTransferred ? 'You left the workspace. Ownership was transferred.' : 'You left the workspace.',
+          workspaceId
+        })
       }
     } catch (error) {
       const message = error?.response?.data?.message || error?.message || 'Failed to leave workspace'
@@ -364,6 +374,7 @@ export default function App() {
             onBack={goToDashboard}
             onLeaveWorkspace={leaveWorkspace}
             onDeleteWorkspace={deleteWorkspace}
+            onUpdateWorkspace={updateWorkspace}
             initialActiveItem={workspacePage}
             onWorkspacePageChange={(page) => {
               const nextPage = WORKSPACE_SECTIONS.has(page) ? page : 'home'
