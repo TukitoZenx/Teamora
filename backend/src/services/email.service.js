@@ -37,19 +37,15 @@ const getTransport = () => {
   const config = getEmailConfig();
 
   return nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
+    service: 'gmail',
     auth: {
       user: config.user,
       pass: config.pass
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-    tls: {
-      minVersion: 'TLSv1.2'
-    }
+    // Increased timeouts to prevent Render/Cloud network drops
+    connectionTimeout: 60000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000
   });
 };
 
