@@ -12,6 +12,11 @@ const app = express();
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
+const normalizeUrl = (url) => (url || '').replace(/\/$/, '');
+const clientUrl = normalizeUrl(process.env.CLIENT_URL || 'http://localhost:5173');
+const allowedOrigins = new Set([clientUrl, 'http://localhost:5173']);
+const isAllowedVercelPreview = (origin = '') => /^https:\/\/teamora-[a-z0-9-]+\.vercel\.app$/i.test(origin);
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -36,7 +41,13 @@ if (process.env.NODE_ENV === 'production') {
 }
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin) || isAllowedVercelPreview(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true
   })
 );

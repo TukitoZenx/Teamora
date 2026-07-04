@@ -10,6 +10,7 @@ const getTransport = () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, EMAIL_FROM } = process.env;
   const values = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM];
   const configuredValues = values.filter(Boolean);
+  const port = Number(SMTP_PORT);
 
   if (configuredValues.length > 0 && configuredValues.length < values.length) {
     throw createEmailError('Email service is not fully configured.', 503);
@@ -19,13 +20,20 @@ const getTransport = () => {
     return null;
   }
 
+  if (!Number.isInteger(port) || port <= 0) {
+    throw createEmailError('Email service port is invalid.', 503);
+  }
+
   return nodemailer.createTransport({
     host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: SMTP_SECURE === 'true',
+    port,
+    secure: SMTP_SECURE ? SMTP_SECURE === 'true' : port === 465,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS
+    },
+    tls: {
+      minVersion: 'TLSv1.2'
     }
   });
 };
@@ -84,7 +92,15 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
       from: process.env.EMAIL_FROM,
       to,
       subject: 'Reset your Teamora password',
-      html: buildResetEmail({ resetUrl })
+      html: buildResetEmail({ resetUrl }),
+      text: [
+        'Reset your Teamora password',
+        '',
+        'Use this link to choose a new password:',
+        resetUrl,
+        '',
+        'This link expires in 15 minutes. If you did not request this, you can ignore this email.'
+      ].join('\n')
     });
     console.info('Teamora password reset email sent', { to, from: process.env.EMAIL_FROM });
   } catch (error) {

@@ -3,6 +3,11 @@ const authService = require('../services/auth.service');
 
 const sessionCookieName = () => process.env.SESSION_COOKIE_NAME || 'teamora.sid';
 const clientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+const sessionCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+});
 
 const setSessionUser = (req, user) =>
   new Promise((resolve, reject) => {
@@ -64,7 +69,10 @@ const forgotPassword = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const result = await authService.resetPassword(req.body);
+    const result = await authService.resetPassword({
+      token: req.params.token || req.body.token,
+      password: req.body.password
+    });
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     next(error);
@@ -73,7 +81,7 @@ const resetPassword = async (req, res, next) => {
 
 const logout = (req, res, next) => {
   if (!req.session) {
-    res.clearCookie(sessionCookieName());
+    res.clearCookie(sessionCookieName(), sessionCookieOptions());
     return res.status(200).json({ success: true, message: 'Logged out' });
   }
 
@@ -82,7 +90,7 @@ const logout = (req, res, next) => {
       return next(error);
     }
 
-    res.clearCookie(sessionCookieName());
+    res.clearCookie(sessionCookieName(), sessionCookieOptions());
     return res.status(200).json({ success: true, message: 'Logged out' });
   });
 };
