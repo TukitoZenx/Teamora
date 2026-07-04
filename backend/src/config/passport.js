@@ -20,11 +20,12 @@ passport.deserializeUser(async (id, done) => {
 
 const getGoogleCallbackUrl = () => {
   if (process.env.GOOGLE_CALLBACK_URL) {
-    return process.env.GOOGLE_CALLBACK_URL;
+    return normalizeUrl(process.env.GOOGLE_CALLBACK_URL);
   }
 
   const serverUrl = normalizeUrl(
-    process.env.SERVER_URL ||
+    process.env.BACKEND_URL ||
+      process.env.SERVER_URL ||
       process.env.RENDER_EXTERNAL_URL ||
       `http://localhost:${process.env.PORT || 5000}`
   );

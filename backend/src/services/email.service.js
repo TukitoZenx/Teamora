@@ -1,37 +1,59 @@
 const nodemailer = require('nodemailer');
 
-const createEmailError = (message, statusCode = 502) => {
+const createEmailError = (message, statusCode = 503) => {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
 };
 
-const getTransport = () => {
+const getEmailConfig = () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, EMAIL_FROM } = process.env;
-  const values = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM];
-  const configuredValues = values.filter(Boolean);
-  const port = Number(SMTP_PORT);
+  const requiredValues = [SMTP_USER, SMTP_PASS, EMAIL_FROM];
+  const configuredRequiredValues = requiredValues.filter(Boolean);
 
-  if (configuredValues.length > 0 && configuredValues.length < values.length) {
+  if (configuredRequiredValues.length > 0 && configuredRequiredValues.length < requiredValues.length) {
     throw createEmailError('Email service is not fully configured.', 503);
   }
 
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS || !EMAIL_FROM) {
+  if (!SMTP_USER || !SMTP_PASS || !EMAIL_FROM) {
     return null;
   }
+
+  const host = SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(SMTP_PORT || 465);
 
   if (!Number.isInteger(port) || port <= 0) {
     throw createEmailError('Email service port is invalid.', 503);
   }
 
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
+  return {
+    host,
     port,
     secure: SMTP_SECURE ? SMTP_SECURE === 'true' : port === 465,
+    user: SMTP_USER,
+    pass: SMTP_PASS,
+    from: EMAIL_FROM
+  };
+};
+
+const getTransport = () => {
+  const config = getEmailConfig();
+
+  if (!config) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
     auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS
+      user: config.user,
+      pass: config.pass
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     tls: {
       minVersion: 'TLSv1.2'
     }
@@ -39,17 +61,13 @@ const getTransport = () => {
 };
 
 const verifyPasswordResetEmailConfiguration = () => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM } = process.env;
-  const values = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM];
-  const configuredValues = values.filter(Boolean);
+  const config = getEmailConfig();
 
-  if (configuredValues.length > 0 && configuredValues.length < values.length) {
-    throw createEmailError('Email service is not fully configured.', 503);
-  }
-
-  if (configuredValues.length === 0) {
+  if (!config) {
     throw createEmailError('Email service is not configured.', 503);
   }
+
+  return config;
 };
 
 const buildResetEmail = ({ resetUrl }) => `
@@ -75,11 +93,16 @@ const buildResetEmail = ({ resetUrl }) => `
 
 const sendPasswordResetEmail = async ({ to, resetUrl }) => {
   let transport;
+  let config;
 
   try {
+    config = verifyPasswordResetEmailConfiguration();
     transport = getTransport();
   } catch (error) {
-    console.error('Teamora email configuration error:', error);
+    console.error('Teamora email configuration error:', {
+      message: error.message,
+      statusCode: error.statusCode
+    });
     throw error;
   }
 
@@ -89,7 +112,7 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
 
   try {
     await transport.sendMail({
-      from: process.env.EMAIL_FROM,
+      from: config.from,
       to,
       subject: 'Reset your Teamora password',
       html: buildResetEmail({ resetUrl }),
@@ -102,16 +125,16 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
         'This link expires in 15 minutes. If you did not request this, you can ignore this email.'
       ].join('\n')
     });
-    console.info('Teamora password reset email sent', { to, from: process.env.EMAIL_FROM });
+    console.info('Teamora password reset email sent', { to, from: config.from });
   } catch (error) {
     console.error('Teamora password reset email failed:', {
       to,
       message: error.message,
       code: error.code,
       command: error.command,
-      response: error.response
+      responseCode: error.responseCode
     });
-    throw createEmailError('Unable to send reset email. Please try again later.');
+    throw createEmailError('Unable to send reset email. Please try again later.', 503);
   }
 };
 

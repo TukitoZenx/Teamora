@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const User = require('../models/User');
 const { comparePassword } = require('../utils/password');
-const { sendPasswordResetEmail, verifyPasswordResetEmailConfiguration } = require('./email.service');
+const { sendPasswordResetEmail } = require('./email.service');
 
 const normalizeUsername = (username) => username.trim().toLowerCase();
 const normalizeEmail = (email) => email.trim().toLowerCase();
@@ -206,8 +206,6 @@ const forgotPassword = async ({ email }) => {
     return { message: RESET_SUCCESS_MESSAGE };
   }
 
-  verifyPasswordResetEmailConfiguration();
-
   const resetToken = crypto.randomBytes(32).toString('hex');
   user.passwordResetToken = hashResetToken(resetToken);
   user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
@@ -220,7 +218,11 @@ const forgotPassword = async ({ email }) => {
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save({ validateBeforeSave: false });
-    throw error;
+    console.error('Teamora forgot-password email delivery failed:', {
+      userId: user._id.toString(),
+      statusCode: error.statusCode,
+      message: error.message
+    });
   }
 
   return { message: RESET_SUCCESS_MESSAGE };
