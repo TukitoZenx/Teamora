@@ -8,22 +8,16 @@ const createEmailError = (message, statusCode = 503) => {
 
 const getEmailConfig = () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, EMAIL_FROM } = process.env;
-  const requiredValues = [SMTP_USER, SMTP_PASS, EMAIL_FROM];
-  const configuredRequiredValues = requiredValues.filter(Boolean);
-
-  if (configuredRequiredValues.length > 0 && configuredRequiredValues.length < requiredValues.length) {
-    throw createEmailError('Email service is not fully configured.', 503);
-  }
 
   if (!SMTP_USER || !SMTP_PASS || !EMAIL_FROM) {
-    return null;
+    throw createEmailError('Email service is not configured (Missing credentials).', 500);
   }
 
   const host = (SMTP_HOST || 'smtp.gmail.com').trim();
   const port = Number(SMTP_PORT || 465);
 
   if (!Number.isInteger(port) || port <= 0) {
-    throw createEmailError('Email service port is invalid.', 503);
+    throw createEmailError('Email service port is invalid.', 500);
   }
 
   const cleanPass = SMTP_PASS.replace(/\s+/g, '');
@@ -41,10 +35,6 @@ const getEmailConfig = () => {
 
 const getTransport = () => {
   const config = getEmailConfig();
-
-  if (!config) {
-    return null;
-  }
 
   return nodemailer.createTransport({
     host: config.host,
@@ -64,13 +54,8 @@ const getTransport = () => {
 };
 
 const verifyPasswordResetEmailConfiguration = () => {
-  const config = getEmailConfig();
-
-  if (!config) {
-    throw createEmailError('Email service is not configured.', 503);
-  }
-
-  return config;
+  getEmailConfig();
+  return true;
 };
 
 const buildResetEmail = ({ resetUrl }) => `
@@ -99,7 +84,7 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
   let config;
 
   try {
-    config = verifyPasswordResetEmailConfiguration();
+    config = getEmailConfig();
     transport = getTransport();
   } catch (error) {
     console.error('Teamora email configuration error:', {
@@ -107,10 +92,6 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
       statusCode: error.statusCode
     });
     throw error;
-  }
-
-  if (!transport) {
-    throw createEmailError('Email service is not configured.', 503);
   }
 
   try {
@@ -131,10 +112,12 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
         'This link expires in 15 minutes. If you did not request this, you can ignore this email.'
       ].join('\n')
     });
+
     console.log("EMAIL SEND RESPONSE:", info.response);
     console.info('Teamora password reset email sent', { to, from: config.from });
   } catch (error) {
     console.error('Teamora password reset email failed. Full error stack:', error.stack || error);
+    if (error.statusCode) throw error;
     throw createEmailError('Unable to send reset email. Please try again later.', 503);
   }
 };
