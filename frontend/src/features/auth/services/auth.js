@@ -37,7 +37,7 @@ export const forgotPassword = async (email) => {
 }
 
 export const resetPassword = async ({ token, password }) => {
-  const { data } = await api.post('/api/auth/reset-password', { token, password })
+  const { data } = await api.post(`/api/auth/reset-password/${encodeURIComponent(token)}`, { password })
   return data
 }
 

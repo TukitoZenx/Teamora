@@ -3,6 +3,8 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const authService = require('../services/auth.service');
 const User = require('../models/User');
 
+const normalizeUrl = (url) => (url || '').replace(/\/$/, '');
+
 passport.serializeUser((user, done) => {
   done(null, user._id || user.id);
 });
@@ -16,8 +18,22 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
+const getGoogleCallbackUrl = () => {
+  if (process.env.GOOGLE_CALLBACK_URL) {
+    return process.env.GOOGLE_CALLBACK_URL;
+  }
+
+  const serverUrl = normalizeUrl(
+    process.env.SERVER_URL ||
+      process.env.RENDER_EXTERNAL_URL ||
+      `http://localhost:${process.env.PORT || 5000}`
+  );
+
+  return `${serverUrl}/api/auth/google/callback`;
+};
+
 const configurePassport = () => {
-  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL } = process.env;
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     return;
@@ -28,7 +44,7 @@ const configurePassport = () => {
       {
         clientID: GOOGLE_CLIENT_ID,
         clientSecret: GOOGLE_CLIENT_SECRET,
-        callbackURL: GOOGLE_CALLBACK_URL || '/api/auth/google/callback'
+        callbackURL: getGoogleCallbackUrl()
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
