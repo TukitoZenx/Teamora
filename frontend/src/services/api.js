@@ -1,7 +1,19 @@
 import axios from 'axios'
 
+const getDefaultApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+
+  if (typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')) {
+    return 'https://teamora-3vgk.onrender.com'
+  }
+
+  return 'http://localhost:5000'
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  baseURL: getDefaultApiUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
@@ -10,6 +22,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   config.headers.Accept = 'application/json'
+  config.withCredentials = true
   return config
 })
 
