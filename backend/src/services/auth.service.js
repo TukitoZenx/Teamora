@@ -223,6 +223,7 @@ const forgotPassword = async ({ email }) => {
       statusCode: error.statusCode,
       message: error.message
     });
+    throw error;
   }
 
   return { message: RESET_SUCCESS_MESSAGE };

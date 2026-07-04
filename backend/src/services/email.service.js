@@ -19,20 +19,23 @@ const getEmailConfig = () => {
     return null;
   }
 
-  const host = SMTP_HOST || 'smtp.gmail.com';
+  const host = (SMTP_HOST || 'smtp.gmail.com').trim();
   const port = Number(SMTP_PORT || 465);
 
   if (!Number.isInteger(port) || port <= 0) {
     throw createEmailError('Email service port is invalid.', 503);
   }
 
+  const cleanPass = SMTP_PASS.replace(/\s+/g, '');
+  const cleanUser = SMTP_USER.trim();
+
   return {
     host,
     port,
     secure: SMTP_SECURE ? SMTP_SECURE === 'true' : port === 465,
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-    from: EMAIL_FROM
+    user: cleanUser,
+    pass: cleanPass,
+    from: EMAIL_FROM.trim()
   };
 };
 
@@ -111,7 +114,10 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
   }
 
   try {
-    await transport.sendMail({
+    console.log("SMTP USER:", process.env.SMTP_USER);
+    console.log("SMTP HOST:", process.env.SMTP_HOST);
+
+    const info = await transport.sendMail({
       from: config.from,
       to,
       subject: 'Reset your Teamora password',
@@ -125,15 +131,10 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
         'This link expires in 15 minutes. If you did not request this, you can ignore this email.'
       ].join('\n')
     });
+    console.log("EMAIL SEND RESPONSE:", info.response);
     console.info('Teamora password reset email sent', { to, from: config.from });
   } catch (error) {
-    console.error('Teamora password reset email failed:', {
-      to,
-      message: error.message,
-      code: error.code,
-      command: error.command,
-      responseCode: error.responseCode
-    });
+    console.error('Teamora password reset email failed. Full error stack:', error.stack || error);
     throw createEmailError('Unable to send reset email. Please try again later.', 503);
   }
 };
