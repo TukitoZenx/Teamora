@@ -38,23 +38,23 @@ const subtitles = [
 const statusStyles = {
   active: {
     label: 'Active',
-    className: 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    className: 'border-success/30 bg-success/10 text-success'
   },
   pending: {
     label: 'Pending',
-    className: 'border-amber-200 bg-amber-50 text-amber-700'
+    className: 'border-warning/30 bg-warning/10 text-warning'
   },
   previously_joined: {
     label: 'Previously Joined',
-    className: 'border-[#E5E7EB] bg-[#F3F4F6] text-[#6B7280]'
+    className: 'border-border bg-muted/10 text-muted'
   },
   removed: {
     label: 'Removed',
-    className: 'border-red-200 bg-red-50 text-red-700'
+    className: 'border-danger/30 bg-danger/10 text-danger'
   },
   trashed: {
     label: 'Trash',
-    className: 'border-slate-300 bg-slate-100 text-slate-700'
+    className: 'border-border bg-muted/20 text-muted'
   }
 }
 
@@ -281,20 +281,20 @@ export default function Dashboard({
   return (
     <main className="mx-auto max-w-7xl px-5 py-6">
       {authNotice && (
-        <div className="mb-5 rounded-[14px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+        <div className="mb-5 rounded-card border border-warning/20 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
           {authNotice}
         </div>
       )}
 
-      <section className="mb-6 flex flex-col gap-3 border-b border-[#E5E7EB] pb-5 md:flex-row md:items-end md:justify-between">
+      <section className="mb-6 flex flex-col gap-3 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">
+          <h1 className="text-2xl font-semibold tracking-tight text-text">
             {getGreeting()}, {firstName} 👋
           </h1>
-          <p className="mt-1 text-sm text-[#6B7280]">{subtitle}</p>
+          <p className="mt-1 text-sm text-muted">{subtitle}</p>
         </div>
-        <div className="inline-flex items-center gap-2 text-sm font-medium text-[#6B7280]">
-          <CalendarDays className="h-4 w-4 text-[#7C3AED]" />
+        <div className="inline-flex items-center gap-2 text-sm font-medium text-muted">
+          <CalendarDays className="h-4 w-4 text-primary" />
           {formatDate()}
         </div>
       </section>
@@ -302,31 +302,31 @@ export default function Dashboard({
       <section className="space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="group relative min-w-0 lg:basis-[60%]">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF] transition group-focus-within:text-[#7C3AED]" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted transition group-focus-within:text-primary" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search workspaces..."
-              className="h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white pl-11 pr-24 text-sm text-[#111827] outline-none transition duration-[180ms] placeholder:text-[#9CA3AF] hover:border-[#7C3AED] focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+              className="h-12 w-full rounded-2xl border border-border bg-card pl-11 pr-24 text-sm text-text outline-none transition duration-[180ms] placeholder:text-muted/65 hover:border-primary focus:border-primary focus:ring-4 focus:ring-primary/10"
             />
             {query && (
               <button
                 type="button"
                 onClick={clearQuery}
-                className="absolute right-16 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-xl text-[#9CA3AF] transition hover:bg-[#F3F4F6] hover:text-[#111827]"
+                className="absolute right-16 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-xl text-muted transition hover:bg-primary/10 hover:text-primary"
                 aria-label="Clear search"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
-            <kbd className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] px-2 py-1 text-[11px] font-semibold text-[#9CA3AF]">
+            <kbd className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg border border-border bg-card-sunken px-2 py-1 text-[11px] font-semibold text-muted">
               Ctrl K
             </kbd>
           </div>
           <Button
             type="button"
             variant="secondary"
-            className="h-12 border-[#7C3AED] px-5 text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white"
+            className="h-12 border-primary text-primary hover:bg-primary hover:text-white px-5"
             onClick={() => setModalMode('join')}
           >
             <UserPlus className="h-4 w-4" />
@@ -338,7 +338,7 @@ export default function Dashboard({
           </Button>
         </div>
 
-        <div className="flex flex-col gap-3 border-b border-[#E5E7EB] pb-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border pb-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap gap-2">
             {tabs.map((tab) => (
               <button
@@ -347,24 +347,24 @@ export default function Dashboard({
                 onClick={() => setActiveTab(tab)}
                 className={`relative rounded-full px-4 py-2 text-sm font-semibold transition duration-[180ms] ${
                   activeTab === tab
-                    ? 'bg-[#7C3AED] text-white'
-                    : 'bg-white text-[#6B7280] ring-1 ring-[#E5E7EB] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
+                    ? 'bg-primary text-white'
+                    : 'bg-card text-muted ring-1 ring-border hover:bg-primary/10 hover:text-primary'
                 }`}
               >
                 {tab}
                 {activeTab === tab && (
-                  <span className="absolute -bottom-[13px] left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[#7C3AED]" />
+                  <span className="absolute -bottom-[13px] left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary" />
                 )}
               </button>
             ))}
           </div>
 
-          <label className="flex h-10 w-full items-center justify-between rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#6B7280] md:w-44">
+          <label className="flex h-10 w-full items-center justify-between rounded-[14px] border border-border bg-card px-3 text-sm font-semibold text-muted md:w-44">
             <span>Sort</span>
             <select
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
-              className="bg-transparent text-right text-sm font-semibold text-[#111827] outline-none"
+              className="bg-transparent text-right text-sm font-semibold text-text outline-none"
             >
               {sortOptions.map(([value, label]) => (
                 <option key={value} value={value}>
@@ -428,7 +428,7 @@ function SkeletonBlock({ className = '' }) {
 
 function WorkspaceCardSkeleton() {
   return (
-    <article className="rounded-[20px] border border-[#E5E7EB] bg-white p-5 shadow-sm">
+    <article className="rounded-card border border-border bg-card p-5 shadow-card">
       <div className="mb-5 flex items-start gap-3">
         <SkeletonBlock className="h-12 w-12 shrink-0 rounded-2xl" />
         <div className="min-w-0 flex-1">
@@ -438,7 +438,7 @@ function WorkspaceCardSkeleton() {
       </div>
       <SkeletonBlock className="h-4 w-32" />
       <SkeletonBlock className="mt-3 h-4 w-44" />
-      <div className="mt-5 flex items-center justify-between border-t border-[#F3F4F6] pt-4">
+      <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
         <SkeletonBlock className="h-7 w-24 rounded-full" />
         <SkeletonBlock className="h-10 w-24" />
       </div>
@@ -473,15 +473,15 @@ function WorkspaceLauncherCard({
   }
 
   return (
-    <article className="group relative rounded-[20px] border border-[#E5E7EB] bg-white p-5 shadow-sm transition duration-[180ms] ease-out hover:-translate-y-1 hover:border-[#7C3AED] hover:shadow-lg">
+    <article className="group relative rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms] ease-out hover:-translate-y-1 hover:border-primary hover:shadow-card">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Building2 className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold tracking-tight text-[#111827]">{workspace.name}</h3>
-            <p className="mt-1 truncate text-sm text-[#6B7280]">by {workspace.ownerName || 'Teamora user'}</p>
+            <h3 className="truncate text-base font-semibold tracking-tight text-text">{workspace.name}</h3>
+            <p className="mt-1 truncate text-sm text-muted">by {workspace.ownerName || 'Teamora user'}</p>
           </div>
         </div>
 
@@ -506,7 +506,7 @@ function WorkspaceLauncherCard({
               event.stopPropagation()
               setMenuOpen((current) => !current)
             }}
-            className="rounded-xl p-2 text-[#9CA3AF] transition duration-[180ms] hover:bg-[#F5F3FF] hover:text-[#7C3AED]"
+            className="rounded-xl p-2 text-muted transition duration-[180ms] hover:bg-primary/10 hover:text-primary"
             aria-label="Workspace actions"
           >
             <MoreHorizontal className="h-4 w-4" />
@@ -514,18 +514,18 @@ function WorkspaceLauncherCard({
         </div>
       </div>
 
-      <div className="space-y-3 text-sm text-[#6B7280]">
+      <div className="space-y-3 text-sm text-muted">
         <p className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-[#9CA3AF]" />
+          <Users className="h-4 w-4 text-muted/65" />
           {workspace.memberCount || 0} Members
         </p>
         <p className="flex items-center gap-2">
-          <Clock3 className="h-4 w-4 text-[#9CA3AF]" />
+          <Clock3 className="h-4 w-4 text-muted/65" />
           Last opened {formatRelativeTime(workspace.lastOpenedAt)}
         </p>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-3 border-t border-[#F3F4F6] pt-4">
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
         <span
           className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${status.className}`}
         >
@@ -595,7 +595,7 @@ function IconAction({ active, label, onClick, children }) {
         event.stopPropagation()
         onClick()
       }}
-      className={`rounded-xl p-2 transition duration-[180ms] hover:bg-[#F5F3FF] ${active ? 'text-[#7C3AED]' : 'text-[#9CA3AF]'}`}
+      className={`rounded-xl p-2 transition duration-[180ms] hover:bg-primary/10 ${active ? 'text-primary' : 'text-muted'}`}
       aria-label={label}
     >
       {children}
@@ -605,12 +605,12 @@ function IconAction({ active, label, onClick, children }) {
 
 function DashboardEmptyState({ onCreate, onJoin }) {
   return (
-    <section className="mx-auto flex min-h-[380px] max-w-xl flex-col items-center justify-center rounded-[20px] border border-dashed border-[#E5E7EB] bg-white p-10 text-center shadow-sm">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[20px] bg-[#F5F3FF] text-[#7C3AED]">
+    <section className="mx-auto flex min-h-[380px] max-w-xl flex-col items-center justify-center rounded-card border border-dashed border-border bg-card p-10 text-center shadow-card">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[20px] bg-primary/10 text-primary">
         <Building2 className="h-7 w-7" />
       </div>
-      <h2 className="text-2xl font-semibold tracking-tight text-[#111827]">No Workspaces Found</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#6B7280]">
+      <h2 className="text-2xl font-semibold tracking-tight text-text">No Workspaces Found</h2>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted">
         Create a new workspace or join one using an invitation.
       </p>
       <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -620,7 +620,7 @@ function DashboardEmptyState({ onCreate, onJoin }) {
         <Button
           type="button"
           variant="secondary"
-          className="border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white"
+          className="border-primary text-primary hover:bg-primary hover:text-white"
           onClick={onJoin}
         >
           Join Workspace

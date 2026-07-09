@@ -74,13 +74,13 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
   const renderPreview = () => {
     if (!file || !file.content) {
       return (
-        <div className="text-center text-slate-400 py-12">
-          <HelpCircle className="w-16 h-16 mx-auto mb-4 opacity-30 text-slate-450" />
-          <p className="text-sm font-semibold">No Preview Available</p>
-          <p className="text-xs text-slate-500 mt-1">This file type must be downloaded to be viewed.</p>
+        <div className="text-center text-muted py-12">
+          <HelpCircle className="w-16 h-16 mx-auto mb-4 opacity-30 text-muted" />
+          <p className="text-sm font-semibold text-text">No Preview Available</p>
+          <p className="text-xs text-muted mt-1">This file type must be downloaded to be viewed.</p>
           <button
             onClick={() => onDownload(file)}
-            className="mt-5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-md"
+            className="mt-5 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-sm"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download {file.name}</span>
@@ -95,8 +95,8 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
     // Images Preview
     if (type.startsWith('image/')) {
       return (
-        <div className="flex items-center justify-center p-6 bg-slate-900 rounded-2xl border border-white/5 max-h-[50vh] overflow-hidden">
-          <img src={file.content} alt={name} className="max-w-full max-h-[45vh] object-contain rounded-lg shadow-lg" />
+        <div className="flex items-center justify-center p-6 bg-card rounded-2xl border border-border max-h-[50vh] overflow-hidden">
+          <img src={file.content} alt={name} className="max-w-full max-h-[45vh] object-contain rounded-lg shadow-sm" />
         </div>
       )
     }
@@ -104,8 +104,8 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
     // Video Previews
     if (type.startsWith('video/')) {
       return (
-        <div className="flex items-center justify-center p-4 bg-slate-950 rounded-2xl border border-white/5 overflow-hidden">
-          <video src={file.content} controls className="w-full max-w-2xl rounded-lg shadow-lg" />
+        <div className="flex items-center justify-center p-4 bg-card-sunken rounded-2xl border border-border overflow-hidden">
+          <video src={file.content} controls className="w-full max-w-2xl rounded-lg shadow-sm" />
         </div>
       )
     }
@@ -113,11 +113,11 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
     // Audio Previews
     if (type.startsWith('audio/')) {
       return (
-        <div className="flex flex-col items-center justify-center p-8 bg-slate-900 rounded-2xl border border-white/5 text-center">
-          <div className="w-16 h-16 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center mb-4">
+        <div className="flex flex-col items-center justify-center p-8 bg-card rounded-2xl border border-border text-center">
+          <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
             <Volume2 className="w-7 h-7" />
           </div>
-          <p className="text-xs font-semibold text-slate-350 mb-4">{name}</p>
+          <p className="text-xs font-semibold text-text mb-4">{name}</p>
           <audio src={file.content} controls className="w-full max-w-md" />
         </div>
       )
@@ -126,7 +126,7 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
     // PDFs Preview
     if (type === 'application/pdf') {
       return (
-        <iframe src={file.content} title={name} className="w-full h-[55vh] rounded-2xl border border-white/5 shadow" />
+        <iframe src={file.content} title={name} className="w-full h-[55vh] rounded-2xl border border-border shadow-sm" />
       )
     }
 
@@ -134,8 +134,8 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
     if (isCodeOrText(type, name)) {
       const codeHTML = highlightCode(file.content, getLanguage(name))
       return (
-        <div className="relative border border-slate-800 rounded-2xl overflow-hidden bg-slate-950 text-slate-300 w-full text-left font-mono text-[11px] leading-relaxed shadow-lg max-h-[55vh] flex flex-col">
-          <div className="h-8 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between text-[9px] font-bold text-slate-500 uppercase select-none">
+        <div className="relative border border-border rounded-2xl overflow-hidden bg-card-sunken text-text w-full text-left font-mono text-[11px] leading-relaxed shadow-sm max-h-[55vh] flex flex-col">
+          <div className="h-8 bg-card border-b border-border px-4 flex items-center justify-between text-[9px] font-bold text-muted uppercase select-none">
             <span>{getLanguage(name)} Preview</span>
             <span>{file.content.split('\n').length} Lines</span>
           </div>
@@ -148,13 +148,13 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
 
     // Fallback info
     return (
-      <div className="text-center text-slate-400 py-12">
-        <HelpCircle className="w-16 h-16 mx-auto mb-4 opacity-30 text-slate-450" />
-        <p className="text-sm font-semibold">Preview Unavailable</p>
-        <p className="text-xs text-slate-500 mt-1">Downloading is recommended for this format.</p>
+      <div className="text-center text-muted py-12">
+        <HelpCircle className="w-16 h-16 mx-auto mb-4 opacity-30 text-muted" />
+        <p className="text-sm font-semibold text-text">Preview Unavailable</p>
+        <p className="text-xs text-muted mt-1">Downloading is recommended for this format.</p>
         <button
           onClick={() => onDownload(file)}
-          className="mt-5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-md"
+          className="mt-5 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer shadow-sm"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Download {file.name}</span>
@@ -164,15 +164,15 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[80vh] overflow-hidden">
+    <div className="fixed inset-0 bg-card-sunken/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-card border border-border rounded-2xl shadow-card max-w-2xl w-full flex flex-col max-h-[80vh] overflow-hidden">
         {/* Preview Titlebar */}
-        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between shrink-0 select-none">
+        <div className="px-5 py-3.5 border-b border-border bg-card flex items-center justify-between shrink-0 select-none">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-1 bg-indigo-50 dark:bg-indigo-950 rounded text-indigo-500">
+            <div className="p-1 bg-primary/10 rounded text-primary">
               <Eye className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-800 dark:text-white truncate" title={file.name}>
+            <span className="text-xs font-bold text-text truncate" title={file.name}>
               {file.name}
             </span>
           </div>
@@ -180,14 +180,14 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => onDownload(file)}
-              className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-450 rounded-lg cursor-pointer"
+              className="p-1.5 hover:bg-primary/10 text-muted hover:text-primary rounded-lg cursor-pointer"
               title="Download"
             >
               <Download className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-850 rounded-lg cursor-pointer"
+              className="p-1 hover:bg-primary/10 text-muted hover:text-primary rounded-lg cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -195,16 +195,16 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
         </div>
 
         {/* Viewport tabs */}
-        <div className="h-8 border-b border-slate-100 dark:border-slate-850 bg-white dark:bg-slate-900 px-5 flex items-center gap-4 text-[10px] font-bold text-slate-400 shrink-0 select-none">
+        <div className="h-8 border-b border-border bg-card px-5 flex items-center gap-4 text-[10px] font-bold text-muted shrink-0 select-none">
           <button
             onClick={() => setActiveTab('preview')}
-            className={`border-b-2 py-1 cursor-pointer ${activeTab === 'preview' ? 'border-indigo-500 text-indigo-600' : 'border-transparent hover:text-slate-700'}`}
+            className={`border-b-2 py-1 cursor-pointer ${activeTab === 'preview' ? 'border-primary text-primary' : 'border-transparent hover:text-text'}`}
           >
             File Preview
           </button>
           <button
             onClick={() => setActiveTab('meta')}
-            className={`border-b-2 py-1 cursor-pointer ${activeTab === 'meta' ? 'border-indigo-500 text-indigo-600' : 'border-transparent hover:text-slate-700'}`}
+            className={`border-b-2 py-1 cursor-pointer ${activeTab === 'meta' ? 'border-primary text-primary' : 'border-transparent hover:text-text'}`}
           >
             Properties & History
           </button>
@@ -216,50 +216,50 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
             renderPreview()
           ) : (
             <div className="space-y-4 text-xs select-none">
-              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/50 space-y-2">
-                <div className="flex items-center gap-2 text-slate-400 font-bold uppercase tracking-wider text-[9px] mb-1">
-                  <Info className="w-3.5 h-3.5 text-indigo-500" />
+              <div className="bg-card-sunken p-4 rounded-xl border border-border space-y-2">
+                <div className="flex items-center gap-2 text-muted font-bold uppercase tracking-wider text-[9px] mb-1">
+                  <Info className="w-3.5 h-3.5 text-primary" />
                   <span>Metadata Details</span>
                 </div>
-                <p className="text-slate-700">
+                <p className="text-text">
                   <span className="font-semibold">Type:</span> {file.type || 'unknown'}
                 </p>
-                <p className="text-slate-700">
+                <p className="text-text">
                   <span className="font-semibold">Size:</span> {formatSize(file.size)}
                 </p>
-                <p className="text-slate-700">
+                <p className="text-text">
                   <span className="font-semibold">Owner:</span> {file.uploadedBy || 'system'}
                 </p>
-                <p className="text-slate-700">
+                <p className="text-text">
                   <span className="font-semibold">Created:</span>{' '}
                   {file.uploadedAt ? new Date(file.uploadedAt).toLocaleString() : '—'}
                 </p>
-                <p className="text-slate-700">
+                <p className="text-text">
                   <span className="font-semibold">Modified:</span>{' '}
                   {file.lastModified ? new Date(file.lastModified).toLocaleString() : '—'}
                 </p>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/50">
-                <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] block mb-3">
+              <div className="bg-card-sunken p-4 rounded-xl border border-border">
+                <span className="text-muted font-bold uppercase tracking-wider text-[9px] block mb-3">
                   Version History
                 </span>
                 {file.versionHistory && file.versionHistory.length > 0 ? (
                   <div className="space-y-2.5">
                     {file.versionHistory.map((ver, idx) => (
                       <div key={idx} className="flex gap-2.5 items-center">
-                        <div className="w-5 h-5 rounded-full bg-indigo-50 text-indigo-600 font-bold text-[9px] flex items-center justify-center">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold text-[9px] flex items-center justify-center">
                           v{ver.version || 1}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-700 truncate w-48">{ver.name}</p>
-                          <p className="text-[8px] text-slate-400 mt-0.5">{ver.uploadedAt || '—'}</p>
+                          <p className="font-semibold text-text truncate w-48">{ver.name}</p>
+                          <p className="text-[8px] text-muted mt-0.5">{ver.uploadedAt || '—'}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="italic text-slate-400">Version history not tracked.</p>
+                  <p className="italic text-muted">Version history not tracked.</p>
                 )}
               </div>
             </div>
@@ -267,10 +267,10 @@ export default function FilePreviewer({ file, onClose, onDownload }) {
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-850 flex justify-end shrink-0 select-none">
+        <div className="px-5 py-3 border-t border-border flex justify-end shrink-0 select-none">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
+            className="px-4 py-2 bg-card border border-border text-text rounded-xl text-xs font-semibold hover:bg-primary/10 hover:text-primary cursor-pointer transition-colors"
           >
             Close Viewer
           </button>

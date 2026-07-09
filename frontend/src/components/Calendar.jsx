@@ -103,7 +103,7 @@ const getTaskBadgeColor = (task) => {
   if (task?.completed || task?.status === 'completed') return 'bg-emerald-100 text-emerald-700'
   if (task?.priority === 'Urgent' || task?.priority === 'High') return 'bg-rose-100 text-rose-700'
   if (task?.priority === 'Medium') return 'bg-amber-100 text-amber-700'
-  return 'bg-slate-100 text-slate-700'
+  return 'bg-card-sunken text-text'
 }
 
 export default function Calendar({
@@ -483,7 +483,7 @@ export default function Calendar({
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTaskBadgeColor(task)}`}>
                         {task.priority || 'Medium'}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                      <span className="rounded-full bg-card-sunken px-2.5 py-1 text-[11px] font-semibold text-muted">
                         {task.status || (task.completed ? 'completed' : 'todo')}
                       </span>
                     </div>
@@ -588,15 +588,15 @@ export default function Calendar({
   }
 
   return (
-    <section className="flex h-[calc(100vh-120px)] min-h-[620px] flex-col rounded-[20px] border border-[#E5E7EB] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)] xl:min-h-0">
-      <div className="flex shrink-0 flex-col gap-4 border-b border-[#E5E7EB] px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+    <section className="flex h-[calc(100vh-120px)] min-h-[620px] flex-col rounded-card border border-border bg-card shadow-card xl:min-h-0">
+      <div className="flex shrink-0 flex-col gap-4 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#F5F3FF] text-[#7C3AED]">
+          <span className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-primary/10 text-primary">
             <CalendarIcon className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">Calendar</h1>
-            <p className="text-sm text-[#6B7280]">{loading ? 'Loading tasks...' : error || monthLabel}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-text">Calendar</h1>
+            <p className="text-sm text-muted">{loading ? 'Loading tasks...' : error || monthLabel}</p>
           </div>
         </div>
 
@@ -604,7 +604,7 @@ export default function Calendar({
           <button
             type="button"
             onClick={() => (onOpenTasksPage ? onOpenTasksPage() : setTaskViewerOpen(true))}
-            className="inline-flex h-11 items-center gap-2 rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm font-semibold text-[#374151] transition duration-200 hover:border-[#DDD6FE] hover:bg-[#F8F5FF] hover:text-[#7C3AED]"
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-text transition duration-200 hover:border-primary hover:bg-primary/10 hover:text-primary"
           >
             <Search className="h-4 w-4" />
             View All Tasks
@@ -616,28 +616,28 @@ export default function Calendar({
         <button
           type="button"
           onClick={() => changeMonth(-1)}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E5E7EB] text-[#6B7280] transition duration-200 hover:border-[#C4B5FD] hover:bg-[#F5F3FF] hover:text-[#7C3AED]"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted transition duration-200 hover:border-primary hover:bg-primary/10 hover:text-primary"
           aria-label="Previous month"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
         <h2
           key={monthPulse}
-          className="min-w-40 animate-[teamora-content-fade_180ms_ease-out_both] text-center text-lg font-semibold text-[#111827]"
+          className="min-w-40 animate-[teamora-content-fade_180ms_ease-out_both] text-center text-lg font-semibold text-text"
         >
           {monthLabel}
         </h2>
         <button
           type="button"
           onClick={() => changeMonth(1)}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E5E7EB] text-[#6B7280] transition duration-200 hover:border-[#C4B5FD] hover:bg-[#F5F3FF] hover:text-[#7C3AED]"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted transition duration-200 hover:border-primary hover:bg-primary/10 hover:text-primary"
           aria-label="Next month"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
-      <div className="grid shrink-0 grid-cols-7 border-y border-[#E5E7EB] bg-[#FAFAFB] text-center text-[11px] font-bold uppercase tracking-[0.08em] text-[#9CA3AF]">
+      <div className="grid shrink-0 grid-cols-7 border-y border-border bg-card-sunken text-center text-[11px] font-bold uppercase tracking-[0.08em] text-muted/65">
         {weekdays.map((day) => (
           <div key={day} className="py-2">
             {day}
@@ -647,7 +647,7 @@ export default function Calendar({
 
       <div
         key={`grid-${monthPulse}`}
-        className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1.5 overflow-hidden bg-[#FAFAFB] p-1.5 animate-[teamora-content-fade_180ms_ease-out_both]"
+        className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1.5 overflow-hidden bg-card-sunken p-1.5 animate-[teamora-content-fade_180ms_ease-out_both]"
       >
         {cells.map((cell) => {
           const visible = cell.tasks.slice(0, 3)
@@ -661,9 +661,9 @@ export default function Calendar({
               onDoubleClick={() => {
                 if (cell.tasks.length === 0) openCreateModal(cell.key)
               }}
-              className={`group relative flex min-h-0 cursor-pointer flex-col rounded-[18px] border bg-white p-2.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#7C3AED] hover:shadow-[0_16px_30px_rgba(124,58,237,0.14)] ${
-                cell.inMonth ? 'border-[#ECEEF3] text-[#111827]' : 'border-[#F1F2F5] text-[#C4C7CF]'
-              } ${isToday ? 'outline outline-2 outline-offset-[-3px] outline-[#7C3AED]' : ''}`}
+              className={`group relative flex min-h-0 cursor-pointer flex-col rounded-card border bg-card p-2.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary hover:shadow-card ${
+                cell.inMonth ? 'border-border text-text' : 'border-border/40 text-muted/65'
+              } ${isToday ? 'outline outline-2 outline-offset-[-3px] outline-primary' : ''}`}
             >
               <span className="text-sm font-semibold">{cell.day}</span>
               {canEdit && (
@@ -673,7 +673,7 @@ export default function Calendar({
                     event.stopPropagation()
                     openCreateModal(cell.key)
                   }}
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-[#DDD6FE] bg-white text-[#7C3AED] opacity-0 shadow-sm transition duration-200 hover:bg-[#7C3AED] hover:text-white group-hover:opacity-100"
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-primary/20 bg-card text-primary opacity-0 shadow-card transition duration-200 hover:bg-primary hover:text-white group-hover:opacity-100"
                   aria-label={`Create task for ${formatDate(cell.key)}`}
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -684,11 +684,11 @@ export default function Calendar({
                 {visible.map((task) => (
                   <span
                     key={getTaskId(task)}
-                    className={`h-2.5 w-2.5 rounded-full ${task.completed ? 'bg-[#10B981]' : 'bg-[#7C3AED]'}`}
+                    className={`h-2.5 w-2.5 rounded-full ${task.completed ? 'bg-success' : 'bg-primary'}`}
                     title="Task indicator"
                   />
                 ))}
-                {hiddenCount > 0 && <span className="text-xs font-semibold text-[#7C3AED]">+{hiddenCount}</span>}
+                {hiddenCount > 0 && <span className="text-xs font-semibold text-primary">+{hiddenCount}</span>}
               </div>
             </div>
           )
@@ -696,16 +696,16 @@ export default function Calendar({
       </div>
 
       {activeDate && !modalMode && (
-        <div className="fixed inset-y-0 right-0 z-[1250] flex w-full max-w-md flex-col border-l border-[#E5E7EB] bg-white p-5 shadow-[0_24px_70px_rgba(15,23,42,0.18)] animate-[teamora-content-fade_180ms_ease-out_both]">
+        <div className="fixed inset-y-0 right-0 z-[1250] flex w-full max-w-md flex-col border-l border-border bg-card p-5 shadow-card animate-[teamora-content-fade_180ms_ease-out_both]">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-[#7C3AED]">Tasks</p>
-              <h3 className="mt-1 text-xl font-semibold text-[#111827]">{formatDate(activeDate)}</h3>
+              <p className="text-sm font-semibold text-primary">Tasks</p>
+              <h3 className="mt-1 text-xl font-semibold text-text">{formatDate(activeDate)}</h3>
             </div>
             <button
               type="button"
               onClick={() => setActiveDate('')}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6]"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-primary/10 hover:text-primary"
             >
               <X className="h-4 w-4" />
             </button>
@@ -714,7 +714,7 @@ export default function Calendar({
           <button
             type="button"
             onClick={() => openCreateModal(activeDate)}
-            className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-[16px] bg-[#7C3AED] px-4 text-sm font-semibold text-white transition hover:bg-[#6D28D9]"
+            className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white transition hover:bg-primary-hover"
           >
             <Plus className="h-4 w-4" />
             Create Task
@@ -722,29 +722,29 @@ export default function Calendar({
 
           <div className="mt-5 flex-1 space-y-3 overflow-y-auto">
             {selectedTasks.length === 0 ? (
-              <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-5 text-sm text-[#6B7280]">
+              <div className="rounded-card border border-dashed border-border p-5 text-sm text-muted">
                 No tasks for this date.
               </div>
             ) : (
               selectedTasks.map((task) => (
                 <article
                   key={getTaskId(task)}
-                  className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
+                  className="rounded-card border border-border bg-card p-4 shadow-card"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h4
-                        className={`text-sm font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}
+                        className={`text-sm font-semibold text-text ${task.completed ? 'line-through decoration-success' : ''}`}
                       >
                         {task.title}
                       </h4>
-                      {task.description && <p className="mt-1 text-sm leading-5 text-[#6B7280]">{task.description}</p>}
+                      {task.description && <p className="mt-1 text-sm leading-5 text-muted">{task.description}</p>}
                     </div>
-                    <span className="rounded-full bg-[#F5F3FF] px-2.5 py-1 text-xs font-semibold text-[#7C3AED]">
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                       {task.priority}
                     </span>
                   </div>
-                  <p className="mt-3 text-xs text-[#9CA3AF]">
+                  <p className="mt-3 text-xs text-muted/65">
                     Created by{' '}
                     {task.creator?.fullName ||
                       task.creator?.username ||
@@ -889,7 +889,7 @@ export default function Calendar({
                           >
                             {task.priority || 'Medium'}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                          <span className="rounded-full bg-card-sunken px-2.5 py-1 text-[11px] font-semibold text-muted">
                             {task.status || (task.completed ? 'completed' : 'todo')}
                           </span>
                         </div>

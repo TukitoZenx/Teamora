@@ -47,12 +47,12 @@ export default function CompleteProfilePage() {
   return (
     <AuthShell mode="signup">
       <div className="mb-8">
-        <h2 className="text-4xl font-medium tracking-tight text-[#111111]">Complete your profile</h2>
-        <p className="mt-3 text-base text-[#6B7280]">Finish setting up your Teamora account.</p>
+        <h2 className="text-4xl font-medium tracking-tight text-text">Complete your profile</h2>
+        <p className="mt-3 text-base text-muted">Finish setting up your Teamora account.</p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-card border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}

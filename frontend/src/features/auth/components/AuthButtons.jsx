@@ -25,7 +25,7 @@ export const PrimaryButton = ({ children, disabled, loading }) => (
   <button
     type="submit"
     disabled={disabled}
-    className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#7C3AED] px-4 text-sm font-medium text-white transition duration-200 hover:bg-[#6D28D9] disabled:cursor-not-allowed disabled:opacity-60"
+    className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition duration-200 hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
   >
     {children}
     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
@@ -37,7 +37,7 @@ export const GoogleButton = ({ onClick, disabled, loading }) => (
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className="flex h-[52px] w-full items-center justify-center gap-3 rounded-[14px] border border-[#E5E7EB] bg-white px-4 text-sm font-medium text-[#111111] transition duration-200 hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:opacity-70"
+    className="flex h-[52px] w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 text-sm font-medium text-text transition duration-200 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-70"
   >
     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleMark />}
     {loading ? 'Connecting...' : 'Continue with Google'}

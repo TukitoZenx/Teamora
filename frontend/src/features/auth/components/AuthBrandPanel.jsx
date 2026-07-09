@@ -30,7 +30,7 @@ export default function AuthBrandPanel() {
 
         <div className="space-y-4 text-sm text-white/70">
           {['Live Collaboration', 'Secure Workspace', 'Cloud Sync'].map((item) => (
-            <div key={item} className="flex items-cter gap-3">
+            <div key={item} className="flex items-center gap-3">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/8 text-white">
                 <Check className="h-3.5 w-3.5" />
               </span>

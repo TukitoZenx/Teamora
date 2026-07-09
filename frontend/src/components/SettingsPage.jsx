@@ -5,6 +5,7 @@ import { Bell, Camera, ChevronLeft, Laptop, Lock, Menu, ShieldCheck, Smartphone,
 import Button from './ui/Button'
 import Input from './ui/Input'
 import Avatar from './ui/Avatar'
+import Switch from './ui/Switch'
 import { useAuth } from '../hooks/useAuth'
 import { completeProfile, forgotPassword, getGoogleAuthUrl } from '../features/auth/services/auth'
 
@@ -365,16 +366,12 @@ function AppearanceSection() {
     const saved = window.localStorage.getItem('teamora-appearance')
     return saved
       ? JSON.parse(saved)
-      : { density: 'Comfortable', language: 'English', timeZone: 'UTC', dateFormat: 'MM/DD/YYYY' }
+      : { theme: 'Light', density: 'Comfortable', language: 'English', timeZone: 'UTC', dateFormat: 'MM/DD/YYYY' }
   })
 
   useEffect(() => {
     window.localStorage.setItem('teamora-appearance', JSON.stringify(preferences))
-    document.documentElement.dataset.density = preferences.density.toLowerCase()
-    document.documentElement.lang =
-      preferences.language === 'Español' ? 'es' : preferences.language === 'Français' ? 'fr' : 'en'
-    document.documentElement.dataset.timeZone = preferences.timeZone
-    document.documentElement.dataset.dateFormat = preferences.dateFormat
+    window.dispatchEvent(new CustomEvent('teamora-appearance-changed', { detail: preferences }))
   }, [preferences])
 
   return (
@@ -384,6 +381,12 @@ function AppearanceSection() {
         description="Adjust layout and regional preferences for your workspace experience."
       />
       <div className="space-y-3">
+        <SelectRow
+          label="Color theme"
+          value={preferences.theme || 'Light'}
+          options={['Light', 'Dark', 'System']}
+          onChange={(value) => setPreferences((current) => ({ ...current, theme: value }))}
+        />
         <SelectRow
           label="Interface density"
           value={preferences.density}
@@ -459,16 +462,7 @@ function ToggleRow({ label, active = false, onToggle, onTest }) {
             Test
           </button>
         )}
-        <button
-          type="button"
-          onClick={onToggle}
-          className={`flex h-6 w-11 items-center rounded-full p-1 transition duration-[180ms] ${active ? 'bg-[#7C3AED]' : 'bg-[#E5E7EB]'}`}
-          aria-label={label}
-        >
-          <span
-            className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${active ? 'translate-x-5' : 'translate-x-0'}`}
-          />
-        </button>
+        <Switch checked={active} onClick={onToggle} aria-label={label} />
       </div>
     </div>
   )

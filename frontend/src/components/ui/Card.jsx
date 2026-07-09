@@ -4,7 +4,7 @@ export default function Card({ as: Component = 'div', className, children, ...pr
   return (
     <Component
       className={clsx(
-        'rounded-[20px] border border-[#E5E7EB] bg-white p-5 shadow-sm transition duration-[180ms]',
+        'rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms]',
         className
       )}
       {...props}

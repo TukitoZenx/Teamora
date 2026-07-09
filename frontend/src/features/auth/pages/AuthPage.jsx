@@ -29,10 +29,10 @@ export default function AuthPage({ mode }) {
         transition={{ duration: 0.18 }}
       >
         <div className="mb-10 text-center">
-          <h2 className="text-4xl font-medium tracking-tight text-[#111111]">
+          <h2 className="text-4xl font-medium tracking-tight text-text">
             {isSignup ? 'Create your account' : 'Welcome back'}
           </h2>
-          <p className="mt-4 text-base text-[#6B7280]">
+          <p className="mt-4 text-base text-muted">
             {isSignup ? 'Get started with Teamora for free.' : 'Welcome back to Teamora.'}
           </p>
         </div>
@@ -42,15 +42,15 @@ export default function AuthPage({ mode }) {
             <GoogleButton onClick={startGoogleAuth} disabled={submitting || googleLoading} loading={googleLoading} />
 
             <div className="my-8 flex items-center gap-4">
-              <div className="h-px flex-1 bg-[#E5E7EB]" />
-              <span className="text-xs font-medium text-[#6B7280]">OR</span>
-              <div className="h-px flex-1 bg-[#E5E7EB]" />
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs font-medium text-muted">OR</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
           </>
         )}
 
         {error && (
-          <div className="mb-4 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-card border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
             {error}
           </div>
         )}
@@ -78,7 +78,7 @@ export default function AuthPage({ mode }) {
             />
 
             <div className="flex justify-end text-sm">
-              <Link to="/forgot-password" className="font-medium text-[#7C3AED] hover:underline">
+              <Link to="/forgot-password" className="font-medium text-primary hover:underline">
                 Forgot password
               </Link>
             </div>
@@ -143,9 +143,9 @@ export default function AuthPage({ mode }) {
           </form>
         )}
 
-        <p className="mt-8 text-center text-sm text-[#6B7280]">
+        <p className="mt-8 text-center text-sm text-muted">
           {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <Link to={isSignup ? '/signin' : '/signup'} className="font-medium text-[#7C3AED] hover:underline">
+          <Link to={isSignup ? '/signin' : '/signup'} className="font-medium text-primary hover:underline">
             {isSignup ? 'Sign In' : 'Create Account'}
           </Link>
         </p>
