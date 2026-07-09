@@ -158,8 +158,7 @@ export default function WorkspaceHome({
 
         setWorkspaceFiles((current) => {
           // Prefer remote when local is empty/seed-only (single default folder).
-          const onlySeed =
-            current.length <= 1 && current.every((item) => item.type === 'folder' || !item.kind)
+          const onlySeed = current.length <= 1 && current.every((item) => item.type === 'folder' || !item.kind)
           if (onlySeed || current.length === 0) {
             filesChannel.emit('update-files', { roomId: workspaceId, files: remoteFiles })
             return remoteFiles
