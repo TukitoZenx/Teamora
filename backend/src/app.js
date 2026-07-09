@@ -63,7 +63,7 @@ const requireJsonContentType = (req, res, next) => {
 app.use(helmet());
 app.use(compression());
 configurePassport();
-app.use(morgan('dev'));
+app.use(morgan(isProduction ? 'combined' : 'dev'));
 if (isProduction) {
   app.set('trust proxy', 1);
 }
@@ -81,10 +81,10 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
-// Cap JSON body size so profile avatar data-URLs (and similar) cannot inflate
-// request memory or MongoDB user documents without bound.
-app.use(express.json({ limit: '300kb' }));
-app.use(express.urlencoded({ extended: true, limit: '300kb' }));
+// Cap JSON body size. 2mb supports workspace content blobs (docs/files) while
+// still bounding memory; avatars remain capped server-side at ~200k chars.
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(requireJsonContentType);
 app.use(cookieParser());
 app.use(

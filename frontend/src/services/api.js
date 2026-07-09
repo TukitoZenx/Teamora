@@ -23,12 +23,12 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   config.headers.Accept = 'application/json'
   config.headers['Content-Type'] = 'application/json'
-  
+
   const method = config.method ? config.method.toUpperCase() : ''
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && config.data === undefined) {
     config.data = {}
   }
-  
+
   config.withCredentials = true
   return config
 })

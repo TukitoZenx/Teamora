@@ -92,15 +92,15 @@ export default function WorkspaceLayout({
           isOwner={isOwner}
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebarCollapsed}
-          className="fixed bottom-0 left-0 top-[72px]"
+          className="fixed bottom-0 left-0 top-navbar"
         />
       </div>
 
       {sidebarOpen && (
-        <div className="fixed inset-0 z-[1100] lg:hidden">
+        <div className="fixed inset-0 z-sidebar lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-black/25 backdrop-blur-[10px]"
+            className="absolute inset-0 teamora-scrim"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close workspace navigation"
           />
@@ -119,7 +119,7 @@ export default function WorkspaceLayout({
       )}
 
       <main
-        className={`h-full overflow-y-auto pt-[72px] transition-[padding-left] duration-220 ease-in-out ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[240px]'}`}
+        className={`h-full overflow-y-auto pt-navbar transition-[padding-left] duration-slow ease-in-out ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
       >
         <div
           className={`mx-auto ${

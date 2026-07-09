@@ -490,14 +490,13 @@ export default function Spreadsheet({
           </label>
           <button
             onClick={handleExportXLSX}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-semibold text-xs cursor-pointer shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-on-primary rounded-xl font-semibold text-xs cursor-pointer shadow-sm"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export</span>
           </button>
         </div>
       </div>
-
       {/* Formula Bar */}
       <div className="h-9 border-b border-border bg-card-sunken/80 px-4 flex items-center gap-3 shrink-0">
         <div className="text-[11px] font-mono font-bold text-muted bg-card px-2.5 py-0.5 rounded border border-border w-12 text-center select-none">
@@ -513,7 +512,6 @@ export default function Spreadsheet({
           className="flex-1 bg-card border border-border rounded-lg px-3 py-1 text-xs text-text placeholder-muted/65 focus:outline-none focus:border-primary font-mono"
         />
       </div>
-
       {/* Main Grid View */}
       <div className="flex-1 flex overflow-hidden">
         <div
@@ -542,11 +540,7 @@ export default function Spreadsheet({
                 return (
                   <tr
                     key={rIdx}
-                    className={
-                      isFrozenRow
-                        ? 'sticky top-7 z-20 shadow-sm bg-primary/10'
-                        : 'hover:bg-primary/5'
-                    }
+                    className={isFrozenRow ? 'sticky top-7 z-20 shadow-sm bg-primary/10' : 'hover:bg-primary/5'}
                   >
                     <td className="w-10 h-7 border border-border text-[10px] font-bold text-muted text-center bg-card-sunken sticky left-0 z-20 select-none">
                       {rIdx + 1}
@@ -586,7 +580,7 @@ export default function Spreadsheet({
                           />
                           {!isActive && hasOtherUsers && (
                             <div
-                              className="absolute -top-3.5 left-0 text-[8px] text-white px-1.5 py-0.5 rounded-t-md font-bold z-30 select-none pointer-events-none whitespace-nowrap"
+                              className="absolute -top-3.5 left-0 text-[8px] text-on-primary px-1.5 py-0.5 rounded-t-md font-bold z-30 select-none pointer-events-none whitespace-nowrap"
                               style={{ backgroundColor: primaryOtherUser.color }}
                             >
                               {primaryOtherUser.user}
@@ -600,7 +594,8 @@ export default function Spreadsheet({
               })}
             </tbody>
           </table>
-        </div>        {/* Dynamic Charts Preview */}
+        </div>{' '}
+        {/* Dynamic Charts Preview */}
         {showCharts && (
           <div className="w-80 border-l border-border bg-card p-5 flex flex-col shrink-0 text-xs">
             <div className="flex items-center justify-between mb-4">
@@ -619,10 +614,7 @@ export default function Spreadsheet({
                 Enter numbers in the current column to display charts.
               </p>
             ) : chartType === 'bar' ? (
-              <svg
-                viewBox="0 0 200 120"
-                className="w-full h-44 border border-border rounded-lg p-2 bg-card-sunken"
-              >
+              <svg viewBox="0 0 200 120" className="w-full h-44 border border-border rounded-lg p-2 bg-card-sunken">
                 {chartData.map((d, i) => {
                   const maxVal = Math.max(...chartData.map((dp) => dp.val), 1)
                   const barHeight = (d.val / maxVal) * 80
@@ -642,10 +634,7 @@ export default function Spreadsheet({
                 })}
               </svg>
             ) : (
-              <svg
-                viewBox="0 0 200 120"
-                className="w-full h-44 border border-border rounded-lg p-2 bg-card-sunken"
-              >
+              <svg viewBox="0 0 200 120" className="w-full h-44 border border-border rounded-lg p-2 bg-card-sunken">
                 <path
                   fill="none"
                   stroke="#10b981"
@@ -678,17 +667,12 @@ export default function Spreadsheet({
             )}
           </div>
         )}
-
         {/* Pivot Summary Drawer */}
         {showPivotBuilder && (
           <div className="w-80 border-l border-border bg-card p-5 flex flex-col shrink-0 text-xs">
-            <h4 className="font-bold text-[10px] text-muted uppercase tracking-wider mb-4">
-              Pivot Builder Summary
-            </h4>
+            <h4 className="font-bold text-[10px] text-muted uppercase tracking-wider mb-4">Pivot Builder Summary</h4>
             <div className="bg-card-sunken p-4 rounded-xl border border-border">
-              <span className="font-bold text-text block mb-2">
-                Column A (Tags) & Column B (Sums)
-              </span>
+              <span className="font-bold text-text block mb-2">Column A (Tags) & Column B (Sums)</span>
               <table className="w-full text-left text-[11px]">
                 <thead>
                   <tr className="border-b border-border font-bold text-muted">
@@ -728,7 +712,8 @@ export default function Spreadsheet({
             </div>
           </div>
         )}
-      </div>      {/* Sheets Navigation Tab bar */}
+      </div>{' '}
+      {/* Sheets Navigation Tab bar */}
       <div className="h-10 border-t border-border bg-card px-4 flex items-center gap-1.5 shrink-0 z-20 select-none overflow-x-auto no-scrollbar">
         {ensureArray(sheetsMetadata.sheets).map((sheet, sIdx) => {
           const isActive = sheetsMetadata.activeSheet === sheet.name
@@ -738,7 +723,7 @@ export default function Spreadsheet({
                 onClick={() => updateSheetsMetadata({ ...sheetsMetadata, activeSheet: sheet.name })}
                 className={`h-7 px-3 text-xs font-semibold rounded-lg flex items-center gap-1.5 border transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-primary text-white border-primary shadow-sm'
+                    ? 'bg-primary text-on-primary border-primary shadow-sm'
                     : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'
                 }`}
               >
@@ -772,7 +757,6 @@ export default function Spreadsheet({
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
-
       {/* Formatting Modal */}
       {showFormattingModal && (
         <div className="fixed inset-0 bg-card-sunken/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -833,7 +817,7 @@ export default function Spreadsheet({
               </button>
               <button
                 onClick={addFormattingRule}
-                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold"
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-on-primary rounded-xl text-xs font-semibold"
               >
                 Apply Rule
               </button>

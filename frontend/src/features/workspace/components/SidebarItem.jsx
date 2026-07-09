@@ -5,7 +5,7 @@ export default function SidebarItem({ icon: Icon, label, active = false, danger 
       onClick={onClick}
       title={collapsed ? label : undefined}
       aria-label={label}
-      className={`group relative flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition duration-[180ms] ${
+      className={`group relative flex w-full items-center rounded-xl px-3 py-2.5 text-left text-sm font-medium transition duration-normal ${
         collapsed ? 'justify-center px-2' : 'gap-3'
       } ${
         active

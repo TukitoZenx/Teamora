@@ -355,7 +355,7 @@ export default function Slides({
               setIsPresenting(false)
               setPresenterMode(false)
             }}
-            className="absolute top-4 right-4 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all cursor-pointer z-50"
+            className="absolute top-4 right-4 p-2.5 bg-card/10 hover:bg-card/20 text-on-primary rounded-full transition-all cursor-pointer z-50"
             title="Exit Slideshow (Esc)"
           >
             <X className="w-5 h-5" />
@@ -369,14 +369,14 @@ export default function Slides({
                 <div
                   className={`aspect-[16/9] w-full bg-gradient-to-br ${theme.gradient} rounded-xl p-8 flex flex-col justify-center text-center relative border border-white/5 overflow-hidden`}
                 >
-                  <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-4">
+                  <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-on-primary mb-4">
                     {activeSlideData.title || 'Untitled Slide'}
                   </h1>
                   <p className="text-xs md:text-sm text-muted leading-relaxed max-w-md mx-auto">
                     {activeSlideData.content}
                   </p>
                 </div>
-                <div className="text-xs text-white/50">
+                <div className="text-xs text-on-primary/50">
                   Slide {activeSlide + 1} of {slides.length}
                 </div>
               </div>
@@ -386,7 +386,7 @@ export default function Slides({
                   <span className="text-[10px] font-bold tracking-wider text-muted uppercase block mb-3">
                     Speaker Notes
                   </span>
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 min-h-[150px] text-xs text-slate-200 leading-relaxed overflow-y-auto">
+                  <div className="bg-card/5 border border-white/10 rounded-xl p-4 min-h-[150px] text-xs text-slate-200 leading-relaxed overflow-y-auto">
                     {activeSlideData.notes || 'No notes added to this slide.'}
                   </div>
                 </div>
@@ -394,8 +394,8 @@ export default function Slides({
                 <div className="flex-1 border-t border-white/10 pt-4 flex flex-col justify-between">
                   <span className="text-[10px] font-bold tracking-wider text-muted uppercase">Up Next</span>
                   {slides[activeSlide + 1] ? (
-                    <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-left">
-                      <p className="font-bold text-xs text-white">{slides[activeSlide + 1].title}</p>
+                    <div className="p-3 bg-card/5 rounded-xl border border-white/5 text-left">
+                      <p className="font-bold text-xs text-on-primary">{slides[activeSlide + 1].title}</p>
                       <p className="text-[10px] text-muted truncate mt-1">{slides[activeSlide + 1].content}</p>
                     </div>
                   ) : (
@@ -414,7 +414,7 @@ export default function Slides({
                   className={`w-full h-full bg-gradient-to-br ${theme.gradient} rounded-2xl p-12 md:p-20 shadow-2xl flex flex-col justify-center items-center text-center relative border border-white/5 overflow-hidden`}
                 >
                   <div className={`absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r ${theme.accent} rounded-t-2xl`} />
-                  <h1 className="text-4xl md:text-6xl font-bold text-slate-900 dark:text-white mb-6 leading-tight select-none">
+                  <h1 className="text-4xl md:text-6xl font-bold text-slate-900 dark:text-on-primary mb-6 leading-tight select-none">
                     {activeSlideData.title || 'Untitled Slide'}
                   </h1>
                   <p className="text-lg md:text-2xl text-slate-200 max-w-2xl leading-relaxed select-none">
@@ -437,11 +437,16 @@ export default function Slides({
                       {el.type === 'image' ? (
                         <img src={el.src} className="w-full h-full object-cover rounded shadow" alt="slide-elem" />
                       ) : el.type === 'video' ? (
-                        <iframe src={el.src} className="w-full h-full rounded shadow" title="slide-video" frameBorder="0" />
+                        <iframe
+                          src={el.src}
+                          className="w-full h-full rounded shadow"
+                          title="slide-video"
+                          frameBorder="0"
+                        />
                       ) : el.type === 'shape' ? (
                         <div className="w-full h-full bg-indigo-500/35 rounded-full border-2 border-indigo-500" />
                       ) : el.type === 'table' ? (
-                        <table className="w-full h-full border border-slate-300 text-slate-800 text-[10px] bg-white">
+                        <table className="w-full h-full border border-slate-300 text-slate-800 text-[10px] bg-card">
                           <tbody>
                             <tr>
                               <td className="border p-1">Row Cell</td>
@@ -472,11 +477,11 @@ export default function Slides({
                 socket.emit('change-slide', { roomId, slideIndex: prevIndex })
               }}
               disabled={activeSlide === 0}
-              className="p-1.5 hover:bg-white/15 disabled:opacity-35 text-white/80 hover:text-white rounded-full transition-all cursor-pointer"
+              className="p-1.5 hover:bg-card/15 disabled:opacity-35 text-on-primary/80 hover:text-on-primary rounded-full transition-all cursor-pointer"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <span className="text-xs font-bold text-white select-none">
+            <span className="text-xs font-bold text-on-primary select-none">
               {activeSlide + 1} / {slides.length}
             </span>
             <button
@@ -486,14 +491,14 @@ export default function Slides({
                 socket.emit('change-slide', { roomId, slideIndex: nextIndex })
               }}
               disabled={activeSlide === slides.length - 1}
-              className="p-1.5 hover:bg-white/15 disabled:opacity-35 text-white/80 hover:text-white rounded-full transition-all cursor-pointer"
+              className="p-1.5 hover:bg-card/15 disabled:opacity-35 text-on-primary/80 hover:text-on-primary rounded-full transition-all cursor-pointer"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
-            <div className="w-px h-5 bg-white/10" />
+            <div className="w-px h-5 bg-card/10" />
             <button
               onClick={() => setPresenterMode(!presenterMode)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded-full text-[10px] font-bold transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1 bg-card/10 hover:bg-card/20 text-on-primary rounded-full text-[10px] font-bold transition-all cursor-pointer"
             >
               <Tv className="w-3.5 h-3.5" />
               <span>Presenter Mode</span>
@@ -638,7 +643,7 @@ export default function Slides({
             onClick={() => {
               setIsPresenting(true)
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-xl cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-on-primary text-xs font-semibold rounded-xl cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Present</span>
@@ -656,9 +661,7 @@ export default function Slides({
               const usersHere = getUsersOnSlide(i)
               return (
                 <div key={i} className="flex gap-2 items-start relative group">
-                  <span className="text-[10px] font-bold text-muted mt-2.5 w-4 text-right select-none">
-                    {i + 1}
-                  </span>
+                  <span className="text-[10px] font-bold text-muted mt-2.5 w-4 text-right select-none">{i + 1}</span>
 
                   {/* Reorder actions */}
                   <div className="absolute left-[-2px] top-6 flex flex-col gap-0.5 hidden group-hover:flex z-40 bg-card-sunken border border-border text-text rounded p-0.5">
@@ -696,7 +699,7 @@ export default function Slides({
                         {ensureArray(usersHere).map((u, uIdx) => (
                           <img
                             key={uIdx}
-                            className="inline-block h-4 w-4 rounded-full border bg-white object-cover"
+                            className="inline-block h-4 w-4 rounded-full border bg-card object-cover"
                             src={u.imageUrl || 'https://www.gravatar.com/avatar/?d=mp'}
                             alt={u.user}
                             title={u.user}
@@ -721,7 +724,7 @@ export default function Slides({
               <button
                 key={l}
                 onClick={() => handleSlideUpdate('layout', l)}
-                className={`px-3 py-0.5 rounded-lg text-[10px] font-bold border capitalize cursor-pointer ${activeSlideData.layout === l ? 'bg-primary border-primary text-white' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
+                className={`px-3 py-0.5 rounded-lg text-[10px] font-bold border capitalize cursor-pointer ${activeSlideData.layout === l ? 'bg-primary border-primary text-on-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
               >
                 {l}
               </button>
@@ -850,7 +853,7 @@ export default function Slides({
                           e.stopPropagation()
                           deleteElement(el.id)
                         }}
-                        className="absolute -top-6 -right-6 p-1 bg-danger hover:bg-danger-hover text-white rounded-full z-50 cursor-pointer"
+                        className="absolute -top-6 -right-6 p-1 bg-danger hover:bg-danger-hover text-on-primary rounded-full z-50 cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>

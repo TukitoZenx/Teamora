@@ -81,30 +81,35 @@ export default function App() {
     const applyAppearance = () => {
       try {
         const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')
-        
+
         // Handle density, language, etc.
         const density = preferences?.density || 'Comfortable'
         document.documentElement.dataset.density = String(density).toLowerCase()
-        
+
         const language = preferences?.language || 'English'
-        document.documentElement.lang =
-          language === 'Español' ? 'es' : language === 'Français' ? 'fr' : 'en'
-          
+        document.documentElement.lang = language === 'Español' ? 'es' : language === 'Français' ? 'fr' : 'en'
+
         document.documentElement.dataset.timeZone = preferences?.timeZone || 'UTC'
         document.documentElement.dataset.dateFormat = preferences?.dateFormat || 'MM/DD/YYYY'
 
-        // Theme Engine
-        const theme = preferences?.theme || 'Light'
+        // Theme engine — Light / Dark / System only.
+        // Migrate any legacy "High Contrast" preference to Light so users who
+        // hit the old navbar cycle are not stuck with thick black borders.
+        let theme = preferences?.theme || 'Light'
+        if (theme === 'High Contrast') {
+          theme = 'Light'
+          const migrated = { ...preferences, theme: 'Light' }
+          localStorage.setItem('teamora-appearance', JSON.stringify(migrated))
+        }
+
+        const root = document.documentElement
+        root.classList.remove('dark', 'high-contrast')
+
         if (theme === 'Dark') {
-          document.documentElement.classList.add('dark')
-        } else if (theme === 'Light') {
-          document.documentElement.classList.remove('dark')
+          root.classList.add('dark')
         } else if (theme === 'System') {
-          const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-          if (systemDark) {
-            document.documentElement.classList.add('dark')
-          } else {
-            document.documentElement.classList.remove('dark')
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            root.classList.add('dark')
           }
         }
       } catch {
@@ -116,7 +121,7 @@ export default function App() {
 
     // Listen for storage changes (tab-to-tab sync)
     window.addEventListener('storage', applyAppearance)
-    
+
     // Listen for custom appearance updates from Settings Page
     window.addEventListener('teamora-appearance-changed', applyAppearance)
 
@@ -126,11 +131,7 @@ export default function App() {
       try {
         const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')
         if (preferences?.theme === 'System') {
-          if (mediaQuery.matches) {
-            document.documentElement.classList.add('dark')
-          } else {
-            document.documentElement.classList.remove('dark')
-          }
+          document.documentElement.classList.toggle('dark', mediaQuery.matches)
         }
       } catch {
         // Ignore errors in system theme detection.
@@ -186,12 +187,10 @@ export default function App() {
         return nextWorkspaces
       })
       .catch((error) => {
+        // Keep the last known list/cache so a transient network blip does not
+        // look like every workspace was deleted.
         setAuthNotice(error.message)
-        setWorkspaces([])
-        setRecentWorkspaces([])
-        writeJsonCache(WORKSPACES_CACHE_KEY, [])
-        writeJsonCache(RECENT_WORKSPACES_CACHE_KEY, [])
-        return []
+        return null
       })
       .finally(() => {
         setWorkspacesLoading(false)
@@ -484,6 +483,7 @@ export default function App() {
       return (
         <ProtectedRoute>
           <WorkspaceHome
+            key={currentWorkspace._id}
             workspace={currentWorkspace}
             loading={workspaceLoading}
             currentUserName={displayName}
@@ -520,25 +520,26 @@ export default function App() {
 
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-[#F8FAFC] pt-[72px] text-[#111827] transition-colors">
+        <div className="min-h-screen bg-background text-text transition-colors">
           <AppNavbar onDashboard={goToDashboard} />
-
-          <Dashboard
-            user={user}
-            displayName={displayName}
-            workspaces={workspaces}
-            recentWorkspaces={recentWorkspaces}
-            loading={workspacesLoading}
-            authNotice={authNotice}
-            onCreateWorkspace={createWorkspace}
-            onJoinWorkspace={joinWorkspace}
-            onOpenWorkspace={openWorkspace}
-            onUpdateWorkspace={updateWorkspace}
-            onLeaveWorkspace={leaveWorkspace}
-            onRemoveRecentWorkspace={removeRecentWorkspace}
-            onDeleteWorkspace={deleteWorkspace}
-            onRefresh={loadWorkspaces}
-          />
+          <div className="pt-navbar">
+            <Dashboard
+              user={user}
+              displayName={displayName}
+              workspaces={workspaces}
+              recentWorkspaces={recentWorkspaces}
+              loading={workspacesLoading}
+              authNotice={authNotice}
+              onCreateWorkspace={createWorkspace}
+              onJoinWorkspace={joinWorkspace}
+              onOpenWorkspace={openWorkspace}
+              onUpdateWorkspace={updateWorkspace}
+              onLeaveWorkspace={leaveWorkspace}
+              onRemoveRecentWorkspace={removeRecentWorkspace}
+              onDeleteWorkspace={deleteWorkspace}
+              onRefresh={loadWorkspaces}
+            />
+          </div>
         </div>
       </ProtectedRoute>
     )
@@ -546,9 +547,11 @@ export default function App() {
 
   const renderSettingsFrame = () => (
     <ProtectedRoute>
-      <div className="min-h-screen bg-[#F8FAFC] pt-[72px] text-[#111827]">
+      <div className="min-h-screen bg-background text-text">
         <AppNavbar onDashboard={goToDashboard} />
-        <SettingsPage user={user} />
+        <div className="pt-navbar">
+          <SettingsPage user={user} />
+        </div>
       </div>
     </ProtectedRoute>
   )
@@ -557,7 +560,17 @@ export default function App() {
 
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          className:
+            '!rounded-button !border !border-border !bg-card !text-text !shadow-dropdown !text-sm !font-medium',
+          success: { iconTheme: { primary: 'var(--tw-success)', secondary: 'var(--tw-card)' } },
+          error: { iconTheme: { primary: 'var(--tw-danger)', secondary: 'var(--tw-card)' } },
+          duration: 3500
+        }}
+        containerStyle={{ zIndex: 1300 }}
+      />
       <Routes>
         <Route
           path="/"
@@ -707,6 +720,11 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
     setSubmitting(true)
     try {
       const { data } = await api.post(`/api/v1/workspaces/invite/${inviteCode}/request`, {})
+      if (data.joined && data.workspace?._id) {
+        toast.success('Joined workspace')
+        onOpenWorkspace(data.workspace._id)
+        return
+      }
       setWorkspace(data.workspace)
       toast.success('Access request sent')
     } catch (error) {
@@ -718,10 +736,10 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] pt-[72px] text-[#111827]">
+      <div className="min-h-screen bg-background pt-navbar text-text">
         <AppNavbar onDashboard={() => navigate('/dashboard')} />
         <main className="mx-auto max-w-3xl px-5 py-10">
-          <div className="rounded-[20px] border border-[#E5E7EB] bg-white p-8 shadow-sm">
+          <div className="rounded-card border border-border bg-card p-8 shadow-sm">
             <SkeletonBlock className="h-4 w-36" />
             <SkeletonBlock className="mt-4 h-9 w-64" />
             <SkeletonBlock className="mt-4 h-16 w-full" />
@@ -736,26 +754,33 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pt-[72px] text-[#111827]">
+    <div className="min-h-screen bg-background pt-navbar text-text">
       <AppNavbar onDashboard={() => navigate('/dashboard')} />
-      <main className="mx-auto flex min-h-[calc(100vh-72px)] max-w-3xl items-center px-5 py-10">
-        <section className="w-full rounded-[20px] border border-[#E5E7EB] bg-white p-8 shadow-sm">
-          <p className="text-sm font-semibold text-[#7C3AED]">Invite-only workspace</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{workspace?.name}</h1>
-          <p className="mt-3 text-sm leading-6 text-[#6B7280]">
-            {workspace?.description || 'No description provided.'}
+      <main className="mx-auto flex min-h-[calc(100vh-var(--tw-navbar-height))] max-w-3xl items-center px-5 py-10">
+        <section className="w-full rounded-card border border-border bg-card p-8 shadow-sm">
+          <p className="text-sm font-semibold text-primary">
+            {workspace?.visibility === 'private' ? 'Private workspace' : 'Invite-only workspace'}
           </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{workspace?.name}</h1>
+          <p className="mt-3 text-sm leading-6 text-muted">{workspace?.description || 'No description provided.'}</p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <InfoTile label="Workspace ID" value={workspace?.workspaceId} />
             <InfoTile label="Members" value={String(workspace?.memberCount || 0)} />
           </div>
 
+          {!workspace?.isMember && workspace?.allowsJoin === false && (
+            <p className="mt-6 rounded-button border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+              This workspace is private. Invite links cannot add new members. Ask the owner to switch visibility to
+              invite-only or to share access another way.
+            </p>
+          )}
+
           <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => navigate('/dashboard')}
-              className="h-12 rounded-[14px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]"
+              className="h-12 rounded-button border border-border px-5 text-sm font-semibold text-text-secondary transition hover:bg-card-sunken"
             >
               Back to Dashboard
             </button>
@@ -763,18 +788,24 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
               <button
                 type="button"
                 onClick={() => onOpenWorkspace(workspace._id)}
-                className="h-12 rounded-[14px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9]"
+                className="h-12 rounded-button bg-primary px-5 text-sm font-semibold text-on-primary transition hover:bg-primary-hover"
               >
                 Open Workspace
               </button>
             ) : (
               <button
                 type="button"
-                disabled={workspace?.hasPendingRequest || submitting}
+                disabled={workspace?.allowsJoin === false || workspace?.hasPendingRequest || submitting}
                 onClick={requestAccess}
-                className="h-12 rounded-[14px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:cursor-not-allowed disabled:bg-[#C4B5FD]"
+                className="h-12 rounded-button bg-primary px-5 text-sm font-semibold text-on-primary transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary-muted"
               >
-                {workspace?.hasPendingRequest ? 'Request Pending' : submitting ? 'Sending...' : 'Request Access'}
+                {workspace?.allowsJoin === false
+                  ? 'Joining disabled'
+                  : workspace?.hasPendingRequest
+                    ? 'Request Pending'
+                    : submitting
+                      ? 'Sending...'
+                      : 'Request Access'}
               </button>
             )}
           </div>
@@ -786,16 +817,20 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
 
 function InfoTile({ label, value }) {
   return (
-    <div className="rounded-[16px] border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-      <p className="text-xs font-semibold uppercase text-[#9CA3AF]">{label}</p>
-      <p className="mt-2 break-all text-sm font-semibold text-[#111827]">{value || 'N/A'}</p>
+    <div className="rounded-input border border-border bg-background p-4">
+      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
+      <p className="mt-2 break-all text-sm font-semibold text-text">{value || 'N/A'}</p>
     </div>
   )
 }
 
 function PublicRoute({ children, loading, authenticated, profileComplete }) {
   if (loading) {
-    return children
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-live="polite">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-muted border-t-primary" />
+      </div>
+    )
   }
 
   if (!authenticated) return children
@@ -844,7 +879,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
     return (
       <section className="space-y-4">
         <SkeletonBlock className="h-8 w-48" />
-        <SkeletonBlock className="h-[520px] w-full rounded-[20px]" />
+        <SkeletonBlock className="h-[520px] w-full rounded-card" />
       </section>
     )
   }
@@ -853,7 +888,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
     return (
       <section className="space-y-4">
         <SkeletonBlock className="h-8 w-52" />
-        <div className="rounded-[20px] border border-[#E5E7EB] bg-white p-4">
+        <div className="rounded-card border border-border bg-card p-4">
           <div className="grid grid-cols-6 gap-2">
             {Array.from({ length: 36 }).map((_, index) => (
               <SkeletonBlock key={index} className="h-10 w-full" />
@@ -872,7 +907,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
             <SkeletonBlock key={index} className="h-28 w-full" />
           ))}
         </div>
-        <SkeletonBlock className="h-[460px] w-full rounded-[20px]" />
+        <SkeletonBlock className="h-[460px] w-full rounded-card" />
       </section>
     )
   }
@@ -881,7 +916,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
     return (
       <section className="space-y-4">
         <SkeletonBlock className="h-8 w-44" />
-        <div className="rounded-[20px] border border-[#E5E7EB] bg-white p-6">
+        <div className="rounded-card border border-border bg-card p-6">
           <SkeletonBlock className="h-7 w-2/3" />
           <SkeletonBlock className="mt-5 h-4 w-full" />
           <SkeletonBlock className="mt-3 h-4 w-11/12" />
@@ -900,7 +935,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
       </div>
       <div className="grid gap-5 md:grid-cols-2">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="rounded-[20px] border border-[#E5E7EB] bg-white p-5">
+          <div key={index} className="rounded-card border border-border bg-card p-5">
             <SkeletonBlock className="h-5 w-40" />
             <SkeletonBlock className="mt-4 h-4 w-full" />
             <SkeletonBlock className="mt-3 h-4 w-3/4" />
@@ -929,7 +964,16 @@ function WorkspaceRoute({ authenticated, activeWorkspace, fetchWorkspace, goToDa
       if (activeWorkspace?._id === id) return
 
       fetchWorkspace(id).catch((error) => {
-        toast.error(error.message)
+        // Drop stale last-workspace pointer and history cache so the user is
+        // not bounced back into a 404 loop on next dashboard open.
+        if (error.status === 404) {
+          if (localStorage.getItem(LAST_WORKSPACE_KEY) === id) {
+            localStorage.removeItem(LAST_WORKSPACE_KEY)
+          }
+          removeWorkspaceCache(id)
+          window.dispatchEvent(new Event('teamora-workspaces-refresh'))
+        }
+        toast.error(error.status === 404 ? 'Workspace not found or you no longer have access.' : error.message)
         goToDashboard()
       })
       return

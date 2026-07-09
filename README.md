@@ -61,6 +61,8 @@ npm run build
 
 ## Architectural Highlights
 
-- **Local Collaboration Channel**: Uses `BroadcastChannel` and `localStorage` to provide cross-tab live synchronization for Whiteboard, Documents, Spreadsheet, Slides, Files, and Meetings without requiring a dedicated WebSocket server dependency.
-- **Security Hardened**: Enforces `Content-Type: application/json` for mutating requests to prevent simple-request CSRF vulnerabilities across origins, scopes rate limiting strictly to brute-forceable authentication routes, and secures session cookie configurations.
+- **Local Collaboration Channel**: Uses `BroadcastChannel` and `localStorage` for cross-tab live sync (Documents, Whiteboard, Spreadsheet, Slides, Files, Meetings).
+- **Server content blobs**: Workspace files and document HTML also persist via `GET/PUT /api/v1/workspaces/:id/content/:key` (last-write-wins) so members can open the same content on another browser/device. Live multi-user OT and cross-device WebRTC still need a future realtime layer.
+- **Workspace visibility**: `invite_only` accepts invite links (with optional join approval); `private` blocks all invite joins.
+- **Security Hardened**: JSON Content-Type CSRF mitigation, production rate limits on auth + workspace create/join/content writes, session cookie hardening.
 - **Code-Split Features**: Lazy-loads heavy collaboration sections (`quill`, `xlsx`, `html2pdf.js`) to keep initial bundle size minimal.

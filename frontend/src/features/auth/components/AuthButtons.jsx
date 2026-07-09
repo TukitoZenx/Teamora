@@ -1,7 +1,9 @@
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import Button from '../../../components/ui/Button'
 
 export const GoogleMark = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5">
+    {/* Google brand colors are fixed by logo guidelines */}
     <path
       fill="#EA4335"
       d="M12 5.04c1.69 0 3.19.58 4.38 1.72l3.27-3.27C17.67 1.65 15.1.5 12 .5 7.65.5 3.89 2.99 2.06 6.62l3.8 2.95C6.75 6.91 9.22 5.04 12 5.04Z"
@@ -22,24 +24,23 @@ export const GoogleMark = () => (
 )
 
 export const PrimaryButton = ({ children, disabled, loading }) => (
-  <button
-    type="submit"
-    disabled={disabled}
-    className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition duration-200 hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
-  >
+  <Button type="submit" size="lg" className="h-[52px] w-full" disabled={disabled} loading={loading}>
     {children}
-    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-  </button>
+    {!loading && <ArrowRight className="h-4 w-4" aria-hidden />}
+  </Button>
 )
 
 export const GoogleButton = ({ onClick, disabled, loading }) => (
-  <button
+  <Button
     type="button"
+    variant="secondary"
+    size="lg"
+    className="h-[52px] w-full"
     onClick={onClick}
-    disabled={disabled}
-    className="flex h-[52px] w-full items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 text-sm font-medium text-text transition duration-200 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-70"
+    disabled={disabled || loading}
+    loading={loading}
   >
-    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleMark />}
+    {!loading && <GoogleMark />}
     {loading ? 'Connecting...' : 'Continue with Google'}
-  </button>
+  </Button>
 )

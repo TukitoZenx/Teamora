@@ -144,7 +144,7 @@ export default function LandingPage() {
             <div className="h-3 w-5/6 bg-neutral-250 rounded" />
             <div className="h-3 w-1/2 bg-neutral-200 rounded" />
           </div>
-          <div className="mt-4 flex items-center justify-between bg-white border border-neutral-150 p-2 rounded-lg">
+          <div className="mt-4 flex items-center justify-between bg-card border border-neutral-150 p-2 rounded-lg">
             <span className="text-[9px] font-semibold text-neutral-500">Live revisions: v1.4</span>
             <span className="text-[9px] text-indigo-650 font-bold">Autosaved</span>
           </div>
@@ -158,7 +158,9 @@ export default function LandingPage() {
         <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 h-full flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between border-b border-neutral-200 pb-2 mb-3">
             <span className="text-[10px] font-bold text-neutral-400 font-mono">BOARD CANVAS</span>
-            <span className="text-[8px] font-bold px-2 py-0.5 bg-neutral-900 text-white rounded-md">MULTIPLAYER</span>
+            <span className="text-[8px] font-bold px-2 py-0.5 bg-neutral-900 text-on-primary rounded-md">
+              MULTIPLAYER
+            </span>
           </div>
           <div className="flex flex-col items-center justify-center my-auto py-2">
             <div className="w-12 h-12 rounded-full border-2 border-dashed border-neutral-300 flex items-center justify-center mb-2">
@@ -167,7 +169,7 @@ export default function LandingPage() {
             <span className="text-[10px] text-neutral-500 text-center font-medium">David added stroke</span>
           </div>
           {/* Mock cursor bubble */}
-          <div className="absolute right-4 top-10 bg-amber-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+          <div className="absolute right-4 top-10 bg-amber-500 text-on-primary text-[8px] font-bold px-1.5 py-0.5 rounded shadow-sm">
             David
           </div>
         </div>
@@ -270,12 +272,12 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="bg-white text-neutral-900 font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300 w-full relative">
+    <div className="bg-card text-neutral-900 font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300 w-full relative">
       {/* Top Header Navigation - Sticky and translucent */}
-      <header className="sticky top-0 inset-x-0 h-16 bg-white/80 backdrop-blur-md border-b border-neutral-100 z-50 flex items-center justify-between px-6 md:px-12 w-full">
+      <header className="sticky top-0 inset-x-0 h-16 bg-card/80 backdrop-blur-md border-b border-neutral-100 z-50 flex items-center justify-between px-6 md:px-12 w-full">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-neutral-900 rounded-lg flex items-center justify-center shadow-sm">
-            <Building2 className="w-4.5 h-4.5 text-white" />
+            <Building2 className="w-4.5 h-4.5 text-on-primary" />
           </div>
           <span className="font-extrabold text-lg tracking-tight">Teamora</span>
         </div>
@@ -310,7 +312,7 @@ export default function LandingPage() {
           </Link>
           <Link
             to="/signup"
-            className="text-xs font-extrabold uppercase tracking-wider text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
+            className="text-xs font-extrabold uppercase tracking-wider text-on-primary bg-neutral-900 hover:bg-neutral-800 px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
           >
             Get Started
           </Link>
@@ -359,7 +361,7 @@ export default function LandingPage() {
         >
           <Link
             to="/signup"
-            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md hover:shadow-indigo-600/10 cursor-pointer flex items-center gap-2"
+            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-on-primary bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md hover:shadow-indigo-600/10 cursor-pointer flex items-center gap-2"
           >
             <span>Get Started</span>
             <ArrowRight className="w-4 h-4" />
@@ -367,7 +369,7 @@ export default function LandingPage() {
 
           <Link
             to="/signin"
-            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-900 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-xl transition-all cursor-pointer"
+            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-900 bg-card hover:bg-neutral-50 border border-neutral-200 rounded-xl transition-all cursor-pointer"
           >
             Join Workspace
           </Link>
@@ -406,7 +408,7 @@ export default function LandingPage() {
             return (
               <div
                 key={feat.id}
-                className="p-6 bg-white border border-neutral-150 rounded-2xl shadow-xs hover:shadow-md hover:border-neutral-300 transition-all duration-300 group flex flex-col items-start"
+                className="p-6 bg-card border border-neutral-150 rounded-2xl shadow-xs hover:shadow-md hover:border-neutral-300 transition-all duration-300 group flex flex-col items-start"
               >
                 <div className="p-3 bg-neutral-50 group-hover:bg-indigo-50 rounded-xl mb-4 transition-colors">
                   <Icon className="w-5 h-5 text-neutral-800 group-hover:text-indigo-650 transition-colors" />
@@ -447,10 +449,10 @@ export default function LandingPage() {
               ].map((member, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-3 bg-white border border-neutral-150 p-2.5 rounded-xl shadow-xs"
+                  className="flex items-center gap-3 bg-card border border-neutral-150 p-2.5 rounded-xl shadow-xs"
                 >
                   <div
-                    className={`w-8 h-8 rounded-full ${member.color} flex items-center justify-center text-white font-bold text-xs shadow-xs`}
+                    className={`w-8 h-8 rounded-full ${member.color} flex items-center justify-center text-on-primary font-bold text-xs shadow-xs`}
                   >
                     {member.name.charAt(0)}
                   </div>
@@ -468,9 +470,9 @@ export default function LandingPage() {
 
           <div className="lg:col-span-8">
             {/* Visual Canvas Mockup with Interactive Tabs */}
-            <div className="bg-white border border-neutral-200 rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-card border border-neutral-200 rounded-2xl shadow-xl overflow-hidden">
               {/* Fake Window Header */}
-              <div className="h-12 bg-neutral-900 text-white flex items-center justify-between px-4 border-b border-neutral-850">
+              <div className="h-12 bg-neutral-900 text-on-primary flex items-center justify-between px-4 border-b border-neutral-850">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
                   <div className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
@@ -507,7 +509,7 @@ export default function LandingPage() {
                       onClick={() => setActiveTab(tab.id)}
                       className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-white text-indigo-650 border-t-2 border-indigo-650 shadow-xs'
+                          ? 'bg-card text-indigo-650 border-t-2 border-indigo-650 shadow-xs'
                           : 'text-neutral-500 hover:text-neutral-800'
                       }`}
                     >
@@ -519,7 +521,7 @@ export default function LandingPage() {
               </div>
 
               {/* Showcase Workspace viewport */}
-              <div className="p-8 h-80 relative overflow-hidden bg-white select-none">
+              <div className="p-8 h-80 relative overflow-hidden bg-card select-none">
                 <AnimatePresence mode="wait">
                   {activeTab === 'docs' && (
                     <motion.div
@@ -555,7 +557,7 @@ export default function LandingPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="absolute right-8 bottom-8 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-md">
+                      <div className="absolute right-8 bottom-8 bg-emerald-500 text-on-primary text-[10px] font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-md">
                         <Users className="w-3.5 h-3.5" />
                         <span>Alice is writing...</span>
                       </div>
@@ -603,7 +605,7 @@ export default function LandingPage() {
                               <td className="p-2 border-r border-neutral-100">Development Staging</td>
                               <td className="p-2 border-r border-neutral-100 bg-blue-50/50 relative border-2 border-blue-500">
                                 <span>$45,000</span>
-                                <div className="absolute -top-3.5 -right-2 bg-blue-500 text-white text-[8px] px-1 rounded font-bold shadow-sm">
+                                <div className="absolute -top-3.5 -right-2 bg-blue-500 text-on-primary text-[8px] px-1 rounded font-bold shadow-sm">
                                   Bob
                                 </div>
                               </td>
@@ -623,8 +625,8 @@ export default function LandingPage() {
                       exit={{ opacity: 0 }}
                       className="h-full flex items-center justify-center"
                     >
-                      <div className="w-3/4 aspect-video bg-neutral-900 border border-neutral-850 rounded-xl p-4 flex flex-col justify-between text-white relative shadow-lg">
-                        <div className="absolute top-2 right-2 bg-purple-500 text-white text-[8px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shadow-sm">
+                      <div className="w-3/4 aspect-video bg-neutral-900 border border-neutral-850 rounded-xl p-4 flex flex-col justify-between text-on-primary relative shadow-lg">
+                        <div className="absolute top-2 right-2 bg-purple-500 text-on-primary text-[8px] px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 shadow-sm">
                           <span>Charlie</span>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -673,13 +675,13 @@ export default function LandingPage() {
                           y: [30, -40, 20, 30]
                         }}
                         transition={{ duration: 6, repeat: Infinity }}
-                        className="absolute bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-0.5 shadow-md"
+                        className="absolute bg-amber-500 text-on-primary text-[9px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-0.5 shadow-md"
                       >
                         <Paintbrush className="w-2.5 h-2.5" />
                         <span>David drawing...</span>
                       </motion.div>
 
-                      <div className="border border-dashed border-neutral-250 p-4 rounded-xl text-center bg-white/60 backdrop-blur-xs shadow-xs">
+                      <div className="border border-dashed border-neutral-250 p-4 rounded-xl text-center bg-card/60 backdrop-blur-xs shadow-xs">
                         <span className="text-xs font-bold text-neutral-700">Project Canvas</span>
                         <p className="text-[10px] text-neutral-400 mt-1">Brainstorming layout components</p>
                       </div>
@@ -709,10 +711,10 @@ export default function LandingPage() {
             return (
               <div
                 key={i}
-                className="p-6 bg-white border border-neutral-150 hover:border-neutral-300 rounded-2xl transition-all duration-300 group flex gap-4"
+                className="p-6 bg-card border border-neutral-150 hover:border-neutral-300 rounded-2xl transition-all duration-300 group flex gap-4"
               >
                 <div className="p-3 bg-neutral-50 group-hover:bg-neutral-900 border border-neutral-100 rounded-xl h-fit transition-colors shrink-0 shadow-2xs">
-                  <Icon className="w-5 h-5 text-indigo-650 group-hover:text-white transition-colors" />
+                  <Icon className="w-5 h-5 text-indigo-650 group-hover:text-on-primary transition-colors" />
                 </div>
                 <div className="flex flex-col">
                   <h3 className="font-bold text-sm text-neutral-900 mb-1.5 group-hover:text-indigo-650 transition-colors">
@@ -745,7 +747,7 @@ export default function LandingPage() {
             {mockScreenshots.map((snap, i) => (
               <div
                 key={i}
-                className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
+                className="bg-card border border-neutral-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
               >
                 <div className="mb-6">
                   <h3 className="font-bold text-sm text-neutral-950 group-hover:text-indigo-650 transition-colors">
@@ -775,12 +777,12 @@ export default function LandingPage() {
               key={i}
               className={`p-8 rounded-3xl flex flex-col justify-between border transition-all duration-300 relative ${
                 card.accent
-                  ? 'bg-neutral-950 text-white border-neutral-900 shadow-xl scale-105 z-10'
-                  : 'bg-white text-neutral-900 border-neutral-200 hover:border-neutral-350 shadow-xs'
+                  ? 'bg-neutral-950 text-on-primary border-neutral-900 shadow-xl scale-105 z-10'
+                  : 'bg-card text-neutral-900 border-neutral-200 hover:border-neutral-350 shadow-xs'
               }`}
             >
               {card.accent && (
-                <div className="absolute -top-3.5 right-6 bg-indigo-600 text-white text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                <div className="absolute -top-3.5 right-6 bg-indigo-600 text-on-primary text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                   Popular
                 </div>
               )}
@@ -823,8 +825,8 @@ export default function LandingPage() {
                 to={card.btnText === 'Contact Sales' ? '/signin' : '/signup'}
                 className={`block w-full py-3.5 rounded-xl text-center text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   card.accent
-                    ? 'bg-white hover:bg-neutral-100 text-neutral-950 shadow-sm'
-                    : 'bg-neutral-950 hover:bg-neutral-850 text-white'
+                    ? 'bg-card hover:bg-neutral-100 text-neutral-950 shadow-sm'
+                    : 'bg-neutral-950 hover:bg-neutral-850 text-on-primary'
                 }`}
               >
                 {card.btnText}
@@ -850,7 +852,7 @@ export default function LandingPage() {
               return (
                 <div
                   key={idx}
-                  className="bg-white border border-neutral-150 rounded-2xl overflow-hidden transition-all duration-200"
+                  className="bg-card border border-neutral-150 rounded-2xl overflow-hidden transition-all duration-normal"
                 >
                   <button
                     onClick={() => toggleFaq(idx)}
@@ -858,7 +860,7 @@ export default function LandingPage() {
                   >
                     <span className="text-xs md:text-sm tracking-tight">{item.q}</span>
                     <ChevronDown
-                      className={`w-4.5 h-4.5 text-neutral-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-indigo-650' : ''}`}
+                      className={`w-4.5 h-4.5 text-neutral-400 shrink-0 transition-transform duration-normal ${isOpen ? 'rotate-180 text-indigo-650' : ''}`}
                     />
                   </button>
 
@@ -888,10 +890,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 border-b border-neutral-900 pb-12 mb-8">
           <div className="md:col-span-4 flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm shrink-0">
+              <div className="w-8 h-8 bg-card rounded-lg flex items-center justify-center shadow-sm shrink-0">
                 <Building2 className="w-4.5 h-4.5 text-neutral-950" />
               </div>
-              <span className="font-extrabold text-white text-base tracking-tight">Teamora</span>
+              <span className="font-extrabold text-on-primary text-base tracking-tight">Teamora</span>
             </div>
             <p className="text-neutral-500 text-xs leading-relaxed max-w-sm">
               The premium, minimal collaboration platform designed to keep multiplayer product teams highly focused and
@@ -901,38 +903,38 @@ export default function LandingPage() {
 
           <div className="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
             <div className="flex flex-col gap-3">
-              <span className="text-white text-[10px] font-extrabold uppercase tracking-widest">Product</span>
-              <a href="#features" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <span className="text-on-primary text-[10px] font-extrabold uppercase tracking-widest">Product</span>
+              <a href="#features" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Features
               </a>
-              <a href="#collaboration" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <a href="#collaboration" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Showcase
               </a>
-              <a href="#pricing" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <a href="#pricing" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Pricing
               </a>
             </div>
             <div className="flex flex-col gap-3">
-              <span className="text-white text-[10px] font-extrabold uppercase tracking-widest">Resources</span>
-              <a href="#faq" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <span className="text-on-primary text-[10px] font-extrabold uppercase tracking-widest">Resources</span>
+              <a href="#faq" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 FAQ
               </a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <a href="#" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Changelog
               </a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <a href="#" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Status Logs
               </a>
             </div>
             <div className="flex flex-col gap-3">
-              <span className="text-white text-[10px] font-extrabold uppercase tracking-widest">Company</span>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <span className="text-on-primary text-[10px] font-extrabold uppercase tracking-widest">Company</span>
+              <a href="#" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Security
               </a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <a href="#" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Privacy Policy
               </a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+              <a href="#" className="text-xs text-neutral-500 hover:text-on-primary transition-colors">
                 Terms of Use
               </a>
             </div>
@@ -965,7 +967,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative bg-white border border-neutral-200 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col z-10"
+              className="relative bg-card border border-neutral-200 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col z-10"
             >
               <div className="h-12 bg-neutral-50 px-4 border-b border-neutral-150 flex items-center justify-between">
                 <span className="text-xs font-bold text-neutral-700 flex items-center gap-2">
@@ -1044,7 +1046,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-4 mt-6">
                   <button
                     onClick={() => setDemoPlaying(!demoPlaying)}
-                    className="px-4 py-2 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
+                    className="px-4 py-2 text-xs font-bold text-on-primary bg-neutral-900 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
                   >
                     {demoPlaying ? 'Pause Walkthrough' : 'Resume Walkthrough'}
                   </button>

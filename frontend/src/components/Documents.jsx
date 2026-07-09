@@ -33,7 +33,9 @@ const MARGINS = ['0.5 in', '0.75 in', '1.0 in']
 const PAPER_SIZES = ['A4', 'Letter', 'Legal']
 
 export default function Documents({
-  wrapperRef,
+  mountElRef,
+  quillRef,
+  editorReady = false,
   isSaving,
   activeUsersCount,
   comments = [],
@@ -42,25 +44,55 @@ export default function Documents({
   userName,
   versions = [],
   onRevertVersion,
-  activeFileId,
   initialTitle,
   onCreateNewDocument,
   onRenameDocument,
+  onDuplicateDocument,
+  onForceSave,
+  onDirtyChange,
   onMount
 }) {
   const [docTitle, setDocTitle] = useState(initialTitle || 'Untitled Document')
-  const [titleFileId, setTitleFileId] = useState(activeFileId)
-  const [, setOpenMenu] = useState(null)
+  const [titleSource, setTitleSource] = useState(initialTitle || '')
+  // Keep title in sync when switching between open document tabs.
+  if ((initialTitle || '') !== titleSource) {
+    setTitleSource(initialTitle || '')
+    setDocTitle(initialTitle || 'Untitled Document')
+  }
+  const [openMenu, setOpenMenu] = useState(null) // 'file' | 'insert' | 'layout' | null
   const [activeSidePanel, setActiveSidePanel] = useState(null) // null | 'comments' | 'versions'
   const [commentInput, setCommentInput] = useState('')
+  const menuBarRef = useRef(null)
 
   useEffect(() => {
     if (onMount) onMount()
   }, [onMount])
 
-  if (activeFileId !== titleFileId) {
-    setTitleFileId(activeFileId)
-    setDocTitle(initialTitle || 'Untitled Document')
+  // Click-outside / Escape closes ribbon menus. Use `click` (not mousedown) so
+  // menu item onClick still fires before the menu unmounts.
+  useEffect(() => {
+    if (!openMenu) return undefined
+
+    const handlePointerDown = (event) => {
+      if (!menuBarRef.current?.contains(event.target)) {
+        setOpenMenu(null)
+      }
+    }
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setOpenMenu(null)
+    }
+
+    // Capture phase after the menu button's own click has been handled.
+    document.addEventListener('click', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('click', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [openMenu])
+
+  const toggleMenu = (menuId) => {
+    setOpenMenu((current) => (current === menuId ? null : menuId))
   }
 
   // Format states
@@ -81,14 +113,6 @@ export default function Documents({
   const [currentPage, setCurrentPage] = useState(1)
   const scrollContainerRef = useRef(null)
 
-  const getQuillInstance = () => {
-    const container = wrapperRef.current?.querySelector('.ql-container')
-    if (container && window.Quill) {
-      return window.Quill.find(container)
-    }
-    return null
-  }
-
   // Scroll handler to monitor visible page
   useEffect(() => {
     const handleScroll = () => {
@@ -108,69 +132,55 @@ export default function Documents({
   // Monitor statistics
   useEffect(() => {
     const interval = setInterval(() => {
-      const quill = getQuillInstance()
+      const quill = quillRef?.current
       if (quill) {
         const text = quill.getText().trim()
         const words = text ? text.split(/\s+/).filter(Boolean).length : 0
         const chars = text.length
         const readTime = Math.max(1, Math.ceil(words / 200))
-        // A4 page splits height math (1056px page height + 20px margins)
         const pages = Math.max(1, Math.ceil(quill.root.scrollHeight / 1076))
         setStats({ words, characters: chars, readTime, pages })
       }
     }, 800)
     return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wrapperRef])
+  }, [quillRef, editorReady])
 
-  // Set page style rules dynamically in Document component
+  // Set page style rules dynamically on the Quill editor root
   useEffect(() => {
-    const editor = wrapperRef.current?.querySelector('.ql-editor')
-    if (editor) {
-      editor.style.fontFamily =
-        fontFamily === 'Sans-Serif'
-          ? 'sans-serif'
-          : fontFamily === 'Serif'
-            ? 'serif'
-            : fontFamily === 'Monospace'
-              ? 'monospace'
-              : fontFamily
-      editor.style.fontSize = fontSize
-      editor.style.lineHeight = lineSpacing
-      editor.style.color = textColor
-      editor.style.columnCount = columnsCount
-      editor.style.columnGap = '24px'
+    const root = quillRef?.current?.root
+    if (!(root instanceof HTMLElement)) return
 
-      const marginVal = pageMargin === '0.5 in' ? '0.5in' : pageMargin === '0.75 in' ? '0.75in' : '1in'
-      editor.style.padding = marginVal
+    const family =
+      fontFamily === 'Sans-Serif'
+        ? 'sans-serif'
+        : fontFamily === 'Serif'
+          ? 'serif'
+          : fontFamily === 'Monospace'
+            ? 'monospace'
+            : fontFamily
+    const marginVal = pageMargin === '0.5 in' ? '0.5in' : pageMargin === '0.75 in' ? '0.75in' : '1in'
+    const isDark = document.documentElement.classList.contains('dark')
+    const sheetBg = pageColor || (isDark ? '#020617' : '#ffffff')
+    const gapBg = isDark ? '#0f172a' : '#e2e8f0'
 
-      editor.style.border = pageBorder === 'none' ? 'none' : `2px ${pageBorder} #cbd5e1`
-
-      const isDark = document.documentElement.classList.contains('dark')
-      const sheetBg = pageColor || (isDark ? '#020617' : '#ffffff')
-      const gapBg = isDark ? '#0f172a' : '#e2e8f0'
-
-      editor.style.background = `
-        repeating-linear-gradient(
-          to bottom,
-          ${sheetBg},
-          ${sheetBg} 1056px,
-          ${gapBg} 1056px,
-          ${gapBg} 1076px
-        )
-      `
-      editor.style.backgroundSize = '100% 1076px'
-
-      if (orientation === 'landscape') {
-        editor.style.aspectRatio = '1.414'
-        editor.style.maxWidth = '1056px'
-        editor.style.minHeight = '816px'
-      } else {
-        editor.style.aspectRatio = '0.707'
-        editor.style.maxWidth = '816px'
-        editor.style.minHeight = '1056px'
-      }
-    }
+    root.setAttribute(
+      'style',
+      [
+        `font-family:${family}`,
+        `font-size:${fontSize}`,
+        `line-height:${lineSpacing}`,
+        `color:${textColor}`,
+        `column-count:${columnsCount}`,
+        'column-gap:24px',
+        `padding:${marginVal}`,
+        pageBorder === 'none' ? 'border:none' : `border:2px ${pageBorder} #cbd5e1`,
+        `background:repeating-linear-gradient(to bottom,${sheetBg},${sheetBg} 1056px,${gapBg} 1056px,${gapBg} 1076px)`,
+        'background-size:100% 1076px',
+        orientation === 'landscape'
+          ? 'aspect-ratio:1.414;max-width:1056px;min-height:816px'
+          : 'aspect-ratio:0.707;max-width:816px;min-height:1056px'
+      ].join(';')
+    )
   }, [
     fontFamily,
     fontSize,
@@ -181,24 +191,64 @@ export default function Documents({
     pageMargin,
     pageBorder,
     orientation,
-    wrapperRef
+    editorReady,
+    quillRef
   ])
 
   const applyFormat = (name, value) => {
-    const quill = getQuillInstance()
-    if (quill) {
-      quill.focus()
-      const range = quill.getSelection()
-      if (range) {
-        quill.format(name, value)
-      }
+    const quill = quillRef?.current
+    if (!quill) {
+      toast.error('Editor is not ready yet. Click in the page and try again.')
+      return
     }
+
+    quill.focus()
+    // Force a selection so format applies even with a collapsed caret.
+    let range = quill.getSelection(true)
+    if (!range) {
+      const end = Math.max(0, quill.getLength() - 1)
+      quill.setSelection(end, 0, 'silent')
+      range = quill.getSelection(true)
+    }
+    if (!range) return
+
+    const current = quill.getFormat(range)
+
+    if (name === 'bold' || name === 'italic' || name === 'underline' || name === 'strike') {
+      quill.format(name, !current[name])
+      quill.focus()
+      return
+    }
+
+    if (name === 'list') {
+      quill.format('list', current.list === value ? false : value)
+      quill.focus()
+      return
+    }
+
+    if (name === 'align') {
+      quill.format('align', value || false)
+      quill.focus()
+      return
+    }
+
+    if (name === 'background' && current.background === value) {
+      quill.format('background', false)
+      quill.focus()
+      return
+    }
+
+    quill.format(name, value)
+    quill.focus()
   }
 
   const handleMenuAction = (action) => {
     setOpenMenu(null)
-    const quill = getQuillInstance()
-    if (!quill) return
+    const quill = quillRef?.current
+    if (!quill && action !== 'newDoc') {
+      toast.error('Editor is not ready yet. Click in the page and try again.')
+      return
+    }
 
     switch (action) {
       case 'newDoc': {
@@ -206,22 +256,31 @@ export default function Documents({
           onCreateNewDocument()
           break
         }
-        quill.setText('')
+        quill?.setText('')
         setDocTitle('Untitled Document')
-        toast.success('Cleared document.')
+        toast.success('New document ready.')
         break
       }
       case 'openDoc': {
         const input = document.createElement('input')
         input.type = 'file'
-        input.accept = '.txt,.html,.docx'
+        input.accept = '.txt,.html,.htm,.md,text/plain,text/html'
         input.onchange = (e) => {
-          const file = e.target.files[0]
-          if (!file) return
+          const file = e.target.files?.[0]
+          if (!file || !quill) return
           const reader = new FileReader()
           reader.onload = (evt) => {
-            quill.clipboard.dangerouslyPasteHTML(evt.target.result)
-            setDocTitle(file.name.split('.')[0])
+            const raw = String(evt.target?.result || '')
+            const looksHtml = /<\/?[a-z][\s\S]*>/i.test(raw)
+            if (looksHtml) {
+              quill.clipboard.dangerouslyPasteHTML(raw)
+            } else {
+              quill.setText(raw)
+            }
+            const baseName = file.name.replace(/\.[^.]+$/, '')
+            setDocTitle(baseName)
+            onRenameDocument?.(baseName)
+            onDirtyChange?.(true)
             toast.success('Document imported!')
           }
           reader.readAsText(file)
@@ -230,7 +289,11 @@ export default function Documents({
         break
       }
       case 'saveDoc': {
-        // Autosave covers this, manually notify
+        onForceSave?.()
+        if (socket && quill) {
+          socket.emit('doc-content-sync', { roomId, html: quill.root.innerHTML })
+        }
+        onDirtyChange?.(false)
         toast.success('Document saved successfully!')
         break
       }
@@ -241,23 +304,31 @@ export default function Documents({
           user: userName,
           data: quill.root.innerHTML
         }
-        const updatedHistory = [draftVersion, ...versions]
-        socket.emit('update-document-versions', { roomId, versions: updatedHistory })
-        toast.success('Document draft saved to Version History!')
+        const updatedHistory = [draftVersion, ...ensureArray(versions)]
+        socket?.emit('update-document-versions', { roomId, versions: updatedHistory })
+        onForceSave?.()
+        toast.success('Draft saved to Version History!')
         break
       }
       case 'renameDoc': {
         const newTitle = prompt('Enter document title:', docTitle)
-        if (newTitle) {
-          setDocTitle(newTitle)
-          onRenameDocument?.(newTitle)
+        if (newTitle?.trim()) {
+          const clean = newTitle.trim()
+          setDocTitle(clean)
+          onRenameDocument?.(clean)
+          toast.success('Document renamed')
         }
         break
       }
       case 'duplicateDoc': {
         const dupTitle = `${docTitle} (Copy)`
-        setDocTitle(dupTitle)
-        toast.success('Document duplicated!')
+        if (onDuplicateDocument) {
+          onDuplicateDocument({ title: dupTitle, html: quill.root.innerHTML })
+        } else {
+          setDocTitle(dupTitle)
+          onRenameDocument?.(dupTitle)
+          toast.success('Document duplicated!')
+        }
         break
       }
       case 'openVersions': {
@@ -280,24 +351,36 @@ export default function Documents({
         break
       }
       case 'exportDocx': {
-        // Generate an HTML content download with doc extension
-        const htmlContent = quill.root.innerHTML
-        const blob = new Blob([htmlContent], {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        })
+        // Honest HTML export (real OOXML DOCX is out of scope without a new dependency).
+        const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${String(docTitle)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')}</title></head><body>${quill.root.innerHTML}</body></html>`
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
         const link = document.createElement('a')
         link.href = URL.createObjectURL(blob)
-        link.download = `${docTitle}.docx`
+        link.download = `${docTitle || 'document'}.html`
         link.click()
-        toast.success('Exported as Word file.')
+        URL.revokeObjectURL(link.href)
+        toast.success('Exported as HTML.')
         break
       }
       case 'printDoc': {
         const printWindow = window.open('', '_blank')
+        if (!printWindow) {
+          toast.error('Pop-up blocked. Allow pop-ups to print.')
+          break
+        }
+        const safeTitle = String(docTitle || 'Document')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
         printWindow.document.write(`
           <html>
             <head>
-              <title>${docTitle}</title>
+              <title>${safeTitle}</title>
               <style>
                 body { font-family: sans-serif; padding: 2in; line-height: 1.5; }
               </style>
@@ -364,10 +447,7 @@ export default function Documents({
       case 'insertHr': {
         quill.focus()
         const rangeHr = quill.getSelection() || { index: quill.getLength() }
-        quill.clipboard.dangerouslyPasteHTML(
-          rangeHr.index,
-          '<hr class="my-4 border-border" />'
-        )
+        quill.clipboard.dangerouslyPasteHTML(rangeHr.index, '<hr class="my-4 border-border" />')
         break
       }
       case 'insertHeader': {
@@ -489,7 +569,7 @@ export default function Documents({
             onClick={() => setActiveSidePanel(activeSidePanel === 'comments' ? null : 'comments')}
             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
               activeSidePanel === 'comments'
-                ? 'bg-primary text-white border-primary'
+                ? 'bg-primary text-on-primary border-primary'
                 : 'bg-card hover:bg-primary/10 border-border text-muted'
             }`}
             title="Comments Sidebar"
@@ -500,7 +580,7 @@ export default function Documents({
             onClick={() => setActiveSidePanel(activeSidePanel === 'versions' ? null : 'versions')}
             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
               activeSidePanel === 'versions'
-                ? 'bg-primary text-white border-primary'
+                ? 'bg-primary text-on-primary border-primary'
                 : 'bg-card hover:bg-primary/10 border-border text-muted'
             }`}
             title="Version History"
@@ -510,264 +590,351 @@ export default function Documents({
         </div>
       </div>
 
-      {/* Menu / Ribbon Bar */}
-      <div className="h-9 border-b border-border bg-card-sunken/85 px-3 flex items-center gap-0.5 shrink-0 relative z-30 select-none">
+      {/* Menu / Ribbon Bar — click to open (not hover), Escape / outside click to close */}
+      <div
+        ref={menuBarRef}
+        className="h-9 border-b border-border bg-card-sunken/85 px-3 flex items-center gap-0.5 shrink-0 relative z-30 select-none"
+      >
         {/* FILE */}
-        <div className="relative group">
-          <button className="px-3 py-1 text-xs font-medium rounded-md text-muted hover:bg-card hover:text-text">
+        <div className="relative">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={openMenu === 'file'}
+            onClick={() => toggleMenu('file')}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              openMenu === 'file' ? 'bg-card text-text shadow-sm' : 'text-muted hover:bg-card hover:text-text'
+            }`}
+          >
             File
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-card z-50 min-w-[180px] py-1 hidden group-hover:block">
-            <button
-              onClick={() => handleMenuAction('newDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+          {openMenu === 'file' && (
+            <div
+              role="menu"
+              className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-dropdown z-50 min-w-[180px] py-1"
             >
-              <FileText className="w-3.5 h-3.5" />
-              New Document
-            </button>
-            <button
-              onClick={() => handleMenuAction('openDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              Open...
-            </button>
-            <button
-              onClick={() => handleMenuAction('saveDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Save className="w-3.5 h-3.5" />
-              Save
-            </button>
-            <button
-              onClick={() => handleMenuAction('saveDraft')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Save Draft
-            </button>
-            <button
-              onClick={() => handleMenuAction('renameDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Type className="w-3.5 h-3.5" />
-              Rename
-            </button>
-            <button
-              onClick={() => handleMenuAction('duplicateDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              Duplicate
-            </button>
-            <button
-              onClick={() => handleMenuAction('openVersions')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <History className="w-3.5 h-3.5" />
-              Version History
-            </button>
-            <div className="h-px bg-border my-1"></div>
-            <button
-              onClick={() => handleMenuAction('exportPdf')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export PDF
-            </button>
-            <button
-              onClick={() => handleMenuAction('exportDocx')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export DOCX
-            </button>
-            <button
-              onClick={() => handleMenuAction('printDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              Print
-            </button>
-          </div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('newDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                New Document
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('openDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                Open...
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('saveDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Save
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('saveDraft')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Save Draft
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('renameDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Type className="w-3.5 h-3.5" />
+                Rename
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('duplicateDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Duplicate
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('openVersions')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <History className="w-3.5 h-3.5" />
+                Version History
+              </button>
+              <div className="h-px bg-border my-1" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('exportPdf')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export PDF
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('exportDocx')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export HTML
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('printDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print
+              </button>
+            </div>
+          )}
         </div>
 
         {/* INSERT */}
-        <div className="relative group">
-          <button className="px-3 py-1 text-xs font-medium rounded-md text-muted hover:bg-card hover:text-text">
+        <div className="relative">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={openMenu === 'insert'}
+            onClick={() => toggleMenu('insert')}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              openMenu === 'insert' ? 'bg-card text-text shadow-sm' : 'text-muted hover:bg-card hover:text-text'
+            }`}
+          >
             Insert
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-card z-50 min-w-[180px] py-1 hidden group-hover:block">
-            <button
-              onClick={() => handleMenuAction('insertImage')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+          {openMenu === 'insert' && (
+            <div
+              role="menu"
+              className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-dropdown z-50 min-w-[180px] py-1"
             >
-              <Image className="w-3.5 h-3.5" />
-              Image URL
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertTable')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Table2 className="w-3.5 h-3.5" />
-              Table Grid
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertLink')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Link className="w-3.5 h-3.5" />
-              Hyperlink
-            </button>
-            <div className="h-px bg-border my-1"></div>
-            <button
-              onClick={() => handleMenuAction('insertPageBreak')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Page Break
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertHr')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Horizontal Line
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertHeader')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Header
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertFooter')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Footer
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertPageNumber')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Page Number
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertDate')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Current Date
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertShape')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              <Shapes className="w-3.5 h-3.5" />
-              Shapes
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertIcon')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Icons (Star)
-            </button>
-            <button
-              onClick={() => handleMenuAction('insertEquation')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-            >
-              Math Equation
-            </button>
-          </div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertImage')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Image className="w-3.5 h-3.5" />
+                Image URL
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertTable')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Table2 className="w-3.5 h-3.5" />
+                Table Grid
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertLink')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Link className="w-3.5 h-3.5" />
+                Hyperlink
+              </button>
+              <div className="h-px bg-border my-1" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertPageBreak')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Page Break
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertHr')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Horizontal Line
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertHeader')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Header
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertFooter')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Footer
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertPageNumber')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Page Number
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertDate')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Current Date
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertShape')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Shapes className="w-3.5 h-3.5" />
+                Shapes
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertIcon')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Icons (Star)
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertEquation')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Math Equation
+              </button>
+            </div>
+          )}
         </div>
 
         {/* LAYOUT */}
-        <div className="relative group">
-          <button className="px-3 py-1 text-xs font-medium rounded-md text-muted hover:bg-card hover:text-text">
+        <div className="relative">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={openMenu === 'layout'}
+            onClick={() => toggleMenu('layout')}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              openMenu === 'layout' ? 'bg-card text-text shadow-sm' : 'text-muted hover:bg-card hover:text-text'
+            }`}
+          >
             Layout
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-card z-50 min-w-[200px] p-3 hidden group-hover:block text-[11px] text-muted space-y-3">
-            <div>
-              <span className="font-bold block mb-1">Margins</span>
-              <div className="flex gap-1.5">
-                {MARGINS.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setPageMargin(m)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer ${pageMargin === m ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
-                  >
-                    {m}
-                  </button>
-                ))}
+          {openMenu === 'layout' && (
+            <div
+              role="menu"
+              className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-dropdown z-50 min-w-[200px] p-3 text-[11px] text-muted space-y-3"
+            >
+              <div>
+                <span className="font-bold block mb-1">Margins</span>
+                <div className="flex gap-1.5">
+                  {MARGINS.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setPageMargin(m)}
+                      className={`px-2 py-0.5 border rounded cursor-pointer ${pageMargin === m ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="font-bold block mb-1">Orientation</span>
+                <div className="flex gap-1.5">
+                  {['portrait', 'landscape'].map((o) => (
+                    <button
+                      key={o}
+                      onClick={() => setOrientation(o)}
+                      className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${orientation === o ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="font-bold block mb-1">Paper Size</span>
+                <div className="flex gap-1.5">
+                  {PAPER_SIZES.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPaperSize(p)}
+                      className={`px-2 py-0.5 border rounded cursor-pointer ${paperSize === p ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="font-bold block mb-1">Columns</span>
+                <div className="flex gap-1.5">
+                  {['1', '2', '3'].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setColumnsCount(c)}
+                      className={`px-2.5 py-0.5 border rounded cursor-pointer ${columnsCount === c ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
+                    >
+                      {c} Col
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="font-bold block mb-1">Page Color</span>
+                <div className="grid grid-cols-4 gap-1">
+                  {['#ffffff', '#f8fafc', '#fffbeb', '#f1f5f9'].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setPageColor(c)}
+                      style={{ backgroundColor: c }}
+                      className={`h-6 rounded border cursor-pointer ${pageColor === c ? 'ring-2 ring-primary' : ''}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="font-bold block mb-1">Borders</span>
+                <div className="flex gap-1.5">
+                  {['none', 'solid', 'dashed', 'double'].map((b) => (
+                    <button
+                      key={b}
+                      type="button"
+                      onClick={() => setPageBorder(b)}
+                      className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${pageBorder === b ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <div>
-              <span className="font-bold block mb-1">Orientation</span>
-              <div className="flex gap-1.5">
-                {['portrait', 'landscape'].map((o) => (
-                  <button
-                    key={o}
-                    onClick={() => setOrientation(o)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${orientation === o ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
-                  >
-                    {o}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="font-bold block mb-1">Paper Size</span>
-              <div className="flex gap-1.5">
-                {PAPER_SIZES.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPaperSize(p)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer ${paperSize === p ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="font-bold block mb-1">Columns</span>
-              <div className="flex gap-1.5">
-                {['1', '2', '3'].map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setColumnsCount(c)}
-                    className={`px-2.5 py-0.5 border rounded cursor-pointer ${columnsCount === c ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
-                  >
-                    {c} Col
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="font-bold block mb-1">Page Color</span>
-              <div className="grid grid-cols-4 gap-1">
-                {['#ffffff', '#f8fafc', '#fffbeb', '#f1f5f9'].map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setPageColor(c)}
-                    style={{ backgroundColor: c }}
-                    className={`h-6 rounded border cursor-pointer ${pageColor === c ? 'ring-2 ring-primary' : ''}`}
-                  />
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="font-bold block mb-1">Borders</span>
-              <div className="flex gap-1.5">
-                {['none', 'solid', 'dashed', 'double'].map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => setPageBorder(b)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${pageBorder === b ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -827,20 +994,29 @@ export default function Documents({
 
         {/* Formatting actions */}
         <button
-          onClick={() => applyFormat('bold', true)}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary font-bold cursor-pointer"
+          type="button"
+          onClick={() => applyFormat('bold')}
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary font-bold cursor-pointer"
+          title="Bold"
+          aria-label="Bold"
         >
           B
         </button>
         <button
-          onClick={() => applyFormat('italic', true)}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary italic cursor-pointer"
+          type="button"
+          onClick={() => applyFormat('italic')}
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary italic cursor-pointer"
+          title="Italic"
+          aria-label="Italic"
         >
           I
         </button>
         <button
-          onClick={() => applyFormat('underline', true)}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary underline cursor-pointer"
+          type="button"
+          onClick={() => applyFormat('underline')}
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary underline cursor-pointer"
+          title="Underline"
+          aria-label="Underline"
         >
           U
         </button>
@@ -849,9 +1025,11 @@ export default function Documents({
 
         {/* Highlighting */}
         <button
+          type="button"
           onClick={() => applyFormat('background', '#fef08a')}
-          className="p-1 hover:bg-primary/10 rounded text-amber-500 font-bold cursor-pointer"
+          className="p-1.5 hover:bg-primary/10 rounded text-amber-500 font-bold cursor-pointer"
           title="Highlight Yellow"
+          aria-label="Highlight"
         >
           🖍️
         </button>
@@ -866,26 +1044,36 @@ export default function Documents({
           }}
           className="w-5 h-5 border-none p-0 cursor-pointer rounded-full overflow-hidden"
           title="Text Color"
+          aria-label="Text color"
         />
 
         <div className="w-px h-4 bg-border" />
 
         {/* Alignment */}
         <button
+          type="button"
           onClick={() => applyFormat('align', '')}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          title="Align left"
+          aria-label="Align left"
         >
           <AlignLeft className="w-3.5 h-3.5" />
         </button>
         <button
+          type="button"
           onClick={() => applyFormat('align', 'center')}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          title="Align center"
+          aria-label="Align center"
         >
           <AlignCenter className="w-3.5 h-3.5" />
         </button>
         <button
+          type="button"
           onClick={() => applyFormat('align', 'right')}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          title="Align right"
+          aria-label="Align right"
         >
           <AlignRight className="w-3.5 h-3.5" />
         </button>
@@ -894,14 +1082,20 @@ export default function Documents({
 
         {/* Lists */}
         <button
+          type="button"
           onClick={() => applyFormat('list', 'bullet')}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          title="Bullet list"
+          aria-label="Bullet list"
         >
           <List className="w-3.5 h-3.5" />
         </button>
         <button
+          type="button"
           onClick={() => applyFormat('list', 'ordered')}
-          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          title="Numbered list"
+          aria-label="Numbered list"
         >
           <ListOrdered className="w-3.5 h-3.5" />
         </button>
@@ -923,11 +1117,13 @@ export default function Documents({
 
         {/* Clear formatting */}
         <button
+          type="button"
           onClick={() => {
-            const quill = getQuillInstance()
+            const quill = quillRef?.current
             if (quill) {
-              const range = quill.getSelection()
-              if (range) quill.removeFormat(range.index, range.length)
+              const range = quill.getSelection(true)
+              if (range) quill.removeFormat(range.index, Math.max(range.length, 1))
+              quill.focus()
             }
           }}
           className="px-2 py-1 bg-card hover:bg-danger/10 hover:text-danger rounded text-[10px] font-bold text-muted cursor-pointer ml-auto"
@@ -952,7 +1148,11 @@ export default function Documents({
             }}
           >
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
-            <div ref={wrapperRef} className="flex-1 quill-editor-wrapper text-text p-8"></div>
+            <div
+              ref={mountElRef}
+              className="flex-1 quill-editor-wrapper min-h-[400px] text-text p-8 outline-none"
+              data-editor-ready={editorReady ? 'true' : 'false'}
+            />
           </div>
         </div>
 
@@ -961,10 +1161,7 @@ export default function Documents({
           <div className="w-72 border-l border-border bg-card flex flex-col shrink-0 text-xs">
             <div className="p-4 border-b border-border flex items-center justify-between font-bold text-[10px] text-muted uppercase tracking-wider bg-card-sunken/50 shrink-0">
               <span>Comments Threads</span>
-              <button
-                onClick={() => setActiveSidePanel(null)}
-                className="text-muted hover:text-text cursor-pointer"
-              >
+              <button onClick={() => setActiveSidePanel(null)} className="text-muted hover:text-text cursor-pointer">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -974,10 +1171,7 @@ export default function Documents({
                 <p className="italic text-muted text-center py-6">No comment threads in this document.</p>
               ) : (
                 ensureArray(comments).map((c) => (
-                  <div
-                    key={c.id}
-                    className="bg-card-sunken border border-border/80 rounded-xl p-3 relative"
-                  >
+                  <div key={c.id} className="bg-card-sunken border border-border/80 rounded-xl p-3 relative">
                     <button
                       onClick={() => handleDeleteComment(c.id)}
                       className="absolute top-2.5 right-2.5 p-1 hover:bg-danger/10 text-muted hover:text-danger rounded-md cursor-pointer"
@@ -1006,7 +1200,7 @@ export default function Documents({
               />
               <button
                 onClick={handleAddComment}
-                className="px-3 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-[10px] font-bold cursor-pointer"
+                className="px-3 py-2 bg-primary hover:bg-primary-hover text-on-primary rounded-xl text-[10px] font-bold cursor-pointer"
               >
                 Send
               </button>
@@ -1018,10 +1212,7 @@ export default function Documents({
           <div className="w-72 border-l border-border bg-card flex flex-col shrink-0 text-xs">
             <div className="p-4 border-b border-border flex items-center justify-between font-bold text-[10px] text-muted uppercase tracking-wider bg-card-sunken/50 shrink-0">
               <span>Version History</span>
-              <button
-                onClick={() => setActiveSidePanel(null)}
-                className="text-muted hover:text-text cursor-pointer"
-              >
+              <button onClick={() => setActiveSidePanel(null)} className="text-muted hover:text-text cursor-pointer">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -1031,10 +1222,7 @@ export default function Documents({
                 <p className="italic text-muted text-center py-6">No saved history drafts.</p>
               ) : (
                 ensureArray(versions).map((ver, i) => (
-                  <div
-                    key={ver.versionId}
-                    className="bg-card-sunken border border-border/80 rounded-xl p-3 space-y-2"
-                  >
+                  <div key={ver.versionId} className="bg-card-sunken border border-border/80 rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between text-[8px] font-bold text-muted">
                       <span>Draft #{ensureArray(versions).length - i}</span>
                       <span>{ver.timestamp}</span>

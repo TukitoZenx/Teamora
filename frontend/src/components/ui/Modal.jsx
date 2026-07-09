@@ -1,12 +1,16 @@
 import { motion } from 'framer-motion'
 import { useEffect, useRef } from 'react'
+import clsx from 'clsx'
 
-export default function Modal({ children, onClose }) {
+export default function Modal({ children, onClose, className, size = 'md' }) {
   const panelRef = useRef(null)
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onClose?.()
 
       if (event.key === 'Tab') {
         const focusableElements = panelRef.current?.querySelectorAll(
@@ -22,11 +26,9 @@ export default function Modal({ children, onClose }) {
             last.focus()
             event.preventDefault()
           }
-        } else {
-          if (document.activeElement === last) {
-            first.focus()
-            event.preventDefault()
-          }
+        } else if (document.activeElement === last) {
+          first.focus()
+          event.preventDefault()
         }
       }
     }
@@ -36,25 +38,33 @@ export default function Modal({ children, onClose }) {
     firstInput?.focus()
 
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [onClose])
+
+  const sizeClass = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : size === 'xl' ? 'max-w-4xl' : 'max-w-md'
 
   return (
     <motion.div
+      role="presentation"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.16 }}
-      className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/40 dark:bg-black/60 px-4 backdrop-blur-[10px]"
+      className="teamora-scrim fixed inset-0 z-modal flex items-center justify-center px-4"
       onMouseDown={onClose}
     >
       <motion.div
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
         onMouseDown={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-card border border-border bg-card p-6 shadow-modal"
+        className={clsx('w-full rounded-card border border-border bg-card p-6 shadow-modal', sizeClass, className)}
       >
         {children}
       </motion.div>

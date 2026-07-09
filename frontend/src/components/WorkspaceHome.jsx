@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Check,
   Copy,
@@ -33,6 +33,7 @@ import Button from './ui/Button'
 import Input from './ui/Input'
 import Textarea from './ui/Textarea'
 import { addWorkspaceNotification } from './utils/notifications'
+import { getWorkspaceContent, putWorkspaceContent } from '../services/workspaceContent'
 
 // Lazily loaded: each of these pulls in a heavy editor (Quill, xlsx, canvas
 // drawing, WebRTC) that only needs to load once a user actually opens that
@@ -123,7 +124,6 @@ export default function WorkspaceHome({
     const stored = readStoredJson(fileStoreKey(workspaceId), null)
     return stored || buildWorkspaceFileSeed(workspaceId)
   })
-  const [workspaceStateId, setWorkspaceStateId] = useState(workspaceId)
   const [openTabs, setOpenTabs] = useState(() => (workspaceId ? readStoredJson(tabsStoreKey(workspaceId), []) : []))
   const [activeTabId, setActiveTabId] = useState(() =>
     workspaceId ? localStorage.getItem(activeTabStoreKey(workspaceId)) || '' : ''
@@ -144,6 +144,37 @@ export default function WorkspaceHome({
     filesChannel.on('receive-files', handleReceiveFiles)
     return () => filesChannel.off('receive-files', handleReceiveFiles)
   }, [filesChannel, workspaceId])
+
+  // Multi-device file tree: hydrate from server when local list is only the seed.
+  useEffect(() => {
+    if (!workspaceId) return undefined
+    let cancelled = false
+
+    getWorkspaceContent(workspaceId, 'files')
+      .then((content) => {
+        if (cancelled) return
+        const remoteFiles = content?.data?.files
+        if (!Array.isArray(remoteFiles) || remoteFiles.length === 0) return
+
+        setWorkspaceFiles((current) => {
+          // Prefer remote when local is empty/seed-only (single default folder).
+          const onlySeed =
+            current.length <= 1 && current.every((item) => item.type === 'folder' || !item.kind)
+          if (onlySeed || current.length === 0) {
+            filesChannel.emit('update-files', { roomId: workspaceId, files: remoteFiles })
+            return remoteFiles
+          }
+          return current
+        })
+      })
+      .catch(() => {
+        // Offline — localStorage/channel remains authoritative.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId, filesChannel])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -179,18 +210,18 @@ export default function WorkspaceHome({
     (task) => task.completed || task.status === 'completed'
   ).length
 
-  if (workspaceId !== workspaceStateId) {
-    const stored = readStoredJson(fileStoreKey(workspaceId), null)
-    setWorkspaceStateId(workspaceId)
-    setWorkspaceFiles(stored || buildWorkspaceFileSeed(workspaceId))
-    setOpenTabs(readStoredJson(tabsStoreKey(workspaceId), []))
-    setActiveTabId(localStorage.getItem(activeTabStoreKey(workspaceId)) || '')
-    setChatMessages(readStoredJson(`teamora-workspace-chat:${workspaceId}`, []))
-  }
-
   useEffect(() => {
     if (!workspaceId) return
     writeStoredJson(fileStoreKey(workspaceId), workspaceFiles)
+  }, [workspaceFiles, workspaceId])
+
+  // Debounced multi-device file tree sync
+  useEffect(() => {
+    if (!workspaceId || !workspaceFiles?.length) return undefined
+    const timer = window.setTimeout(() => {
+      putWorkspaceContent(workspaceId, 'files', { files: workspaceFiles }).catch(() => {})
+    }, 900)
+    return () => window.clearTimeout(timer)
   }, [workspaceFiles, workspaceId])
 
   useEffect(() => {
@@ -209,17 +240,38 @@ export default function WorkspaceHome({
     writeStoredJson(`teamora-workspace-chat:${workspaceId}`, chatMessages)
   }, [chatMessages, workspaceId])
 
-  useEffect(() => {
-    if (!activeFile) return
-    const section = FILE_TYPES[activeFile.kind]?.section
-    if (section && activeItem !== section) {
-      onWorkspacePageChange?.(section)
-    }
-  }, [activeFile, activeItem, onWorkspacePageChange])
+  // Intentionally do NOT force the active section from the active file.
+  // Users must be free to switch Documents → Presentation (etc.) while open
+  // file tabs stay in the tab bar; clicking a tab re-opens that file's section.
 
-  const selectWorkspacePage = (item) => {
-    onWorkspacePageChange?.(item)
-  }
+  const selectWorkspacePage = useCallback(
+    (item) => {
+      // When leaving a section that doesn't own the active file, clear the
+      // active tab selection so the heavy editor unmounts and the sidebar
+      // navigation is never blocked by an overlay/stuck editor state.
+      // Open tabs remain so the user can return with one click.
+      const active = workspaceFiles.find((file) => file.id === activeTabId)
+      if (active && FILE_TYPES[active.kind]?.section !== item) {
+        setActiveTabId('')
+      }
+      onWorkspacePageChange?.(item)
+    },
+    [activeTabId, onWorkspacePageChange, workspaceFiles]
+  )
+
+  const markActiveFileUnsaved = useCallback(
+    (unsaved = true) => {
+      if (!activeTabId) return
+      setWorkspaceFiles((current) => {
+        const next = current.map((file) =>
+          file.id === activeTabId ? { ...file, unsaved, updatedAt: new Date().toISOString() } : file
+        )
+        filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+        return next
+      })
+    },
+    [activeTabId, filesChannel, workspaceId]
+  )
 
   const openWorkspaceFile = (file) => {
     if (!file || file.type === 'folder') return
@@ -232,7 +284,7 @@ export default function WorkspaceHome({
     if (section) selectWorkspacePage(section)
   }
 
-  const createWorkspaceFile = (kind, parentId = null) => {
+  const createWorkspaceFile = (kind, parentId = null, options = {}) => {
     const typeInfo = FILE_TYPES[kind]
     if (!typeInfo) return null
     const timestamp = new Date().toISOString()
@@ -241,7 +293,7 @@ export default function WorkspaceHome({
       id: `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type: 'file',
       kind,
-      name: `Untitled ${typeInfo.label} ${sameKindCount}.${typeInfo.extension}`,
+      name: options.name || `Untitled ${typeInfo.label} ${sameKindCount}.${typeInfo.extension}`,
       parentId,
       createdBy: getDisplayName(user),
       createdAt: timestamp,
@@ -251,20 +303,24 @@ export default function WorkspaceHome({
     const next = [...workspaceFiles, file]
     setWorkspaceFiles(next)
     filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+
+    // Seed document content for duplicates before the editor mounts.
+    if (kind === 'document' && typeof options.initialHtml === 'string') {
+      try {
+        const storageKey = `teamora:collab:${workspaceId}:documents:${file.id}::receive-doc-content-sync`
+        localStorage.setItem(storageKey, JSON.stringify(options.initialHtml))
+      } catch {
+        // Best-effort seed.
+      }
+    }
+
     setOpenTabs((current) => [...current, file.id])
     setActiveTabId(file.id)
     selectWorkspacePage(typeInfo.section)
-    toast.success(`${typeInfo.label} created`)
+    if (!options.silent) {
+      toast.success(options.successMessage || `${typeInfo.label} created`)
+    }
     return file
-  }
-
-  const markActiveFileUnsaved = (unsaved = true) => {
-    if (!activeTabId) return
-    const next = workspaceFiles.map((file) =>
-      file.id === activeTabId ? { ...file, unsaved, updatedAt: new Date().toISOString() } : file
-    )
-    setWorkspaceFiles(next)
-    filesChannel.emit('update-files', { roomId: workspaceId, files: next })
   }
 
   const renameWorkspaceFile = (fileId, nextName) => {
@@ -374,6 +430,14 @@ export default function WorkspaceHome({
           />
         ) : activeItem === 'settings' ? (
           <WorkspaceSettings
+            key={[
+              workspace?._id,
+              workspace?.name,
+              workspace?.description,
+              workspace?.icon,
+              workspace?.joinApproval,
+              workspace?.visibility
+            ].join('|')}
             workspace={workspace}
             isOwner={isOwner}
             onCopyInviteLink={copyInviteLink}
@@ -418,14 +482,14 @@ export default function WorkspaceHome({
             activeItem
           ) ? (
           <Suspense fallback={<WorkspaceContentSkeleton activeItem={activeItem} />}>
-            {activeItem === 'documents' && (
-              activeFile?.kind === 'document' ? (
+            {activeItem === 'documents' &&
+              (activeFile?.kind === 'document' ? (
                 <DocumentsSection
                   key={activeFile.id}
                   workspaceId={workspace?._id}
                   userName={getDisplayName(user)}
                   activeFile={activeFile}
-                  onCreateFile={() => createWorkspaceFile('document')}
+                  onCreateFile={(options) => createWorkspaceFile('document', null, options || {})}
                   onRenameFile={renameWorkspaceFile}
                   onDirtyChange={markActiveFileUnsaved}
                 />
@@ -438,10 +502,9 @@ export default function WorkspaceHome({
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
-              )
-            )}
-            {activeItem === 'whiteboard' && (
-              activeFile?.kind === 'whiteboard' ? (
+              ))}
+            {activeItem === 'whiteboard' &&
+              (activeFile?.kind === 'whiteboard' ? (
                 <WhiteboardSection
                   key={activeFile.id}
                   workspaceId={workspace?._id}
@@ -458,10 +521,9 @@ export default function WorkspaceHome({
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
-              )
-            )}
-            {activeItem === 'spreadsheet' && (
-              activeFile?.kind === 'spreadsheet' ? (
+              ))}
+            {activeItem === 'spreadsheet' &&
+              (activeFile?.kind === 'spreadsheet' ? (
                 <SpreadsheetSection
                   key={activeFile.id}
                   workspaceId={workspace?._id}
@@ -477,10 +539,9 @@ export default function WorkspaceHome({
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
-              )
-            )}
-            {activeItem === 'presentation' && (
-              activeFile?.kind === 'presentation' ? (
+              ))}
+            {activeItem === 'presentation' &&
+              (activeFile?.kind === 'presentation' ? (
                 <PresentationSection
                   key={activeFile.id}
                   workspaceId={workspace?._id}
@@ -496,8 +557,7 @@ export default function WorkspaceHome({
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
-              )
-            )}
+              ))}
             {activeItem === 'meetings' && (
               <MeetingsSection workspaceId={workspace?._id} userName={getDisplayName(user)} />
             )}
@@ -533,7 +593,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
     return (
       <section className="space-y-4">
         <SkeletonBlock className="h-8 w-48" />
-        <SkeletonBlock className="h-[520px] w-full rounded-[20px]" />
+        <SkeletonBlock className="h-[520px] w-full rounded-card" />
       </section>
     )
   }
@@ -542,7 +602,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
     return (
       <section className="space-y-4">
         <SkeletonBlock className="h-8 w-52" />
-        <div className="rounded-[20px] border border-[#E5E7EB] bg-white p-4">
+        <div className="rounded-card border border-border bg-card p-4">
           <div className="grid grid-cols-6 gap-2">
             {Array.from({ length: 36 }).map((_, index) => (
               <SkeletonBlock key={index} className="h-10 w-full" />
@@ -561,7 +621,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
             <SkeletonBlock key={index} className="h-28 w-full" />
           ))}
         </div>
-        <SkeletonBlock className="h-[460px] w-full rounded-[20px]" />
+        <SkeletonBlock className="h-[460px] w-full rounded-card" />
       </section>
     )
   }
@@ -570,7 +630,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
     return (
       <section className="space-y-4">
         <SkeletonBlock className="h-8 w-44" />
-        <div className="rounded-[20px] border border-[#E5E7EB] bg-white p-6">
+        <div className="rounded-card border border-border bg-card p-6">
           <SkeletonBlock className="h-7 w-2/3" />
           <SkeletonBlock className="mt-5 h-4 w-full" />
           <SkeletonBlock className="mt-3 h-4 w-11/12" />
@@ -589,7 +649,7 @@ function WorkspaceContentSkeleton({ activeItem }) {
       </div>
       <div className="grid gap-5 md:grid-cols-2">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="rounded-[20px] border border-[#E5E7EB] bg-white p-5">
+          <div key={index} className="rounded-card border border-border bg-card p-5">
             <SkeletonBlock className="h-5 w-40" />
             <SkeletonBlock className="mt-4 h-4 w-full" />
             <SkeletonBlock className="mt-3 h-4 w-3/4" />
@@ -627,7 +687,7 @@ function WorkspaceFileTabs({ files, tabs, activeTabId, activeFilePath, onSelectT
                   onReorderTab(event.dataTransfer.getData('text/plain'), file.id)
                 }}
                 onClick={() => onSelectTab(file.id)}
-                className={`group flex h-8 max-w-[220px] shrink-0 items-center gap-2 rounded-[10px] border px-2.5 text-xs font-semibold transition ${
+                className={`group flex h-8 max-w-[220px] shrink-0 items-center gap-2 rounded-sm border px-2.5 text-xs font-semibold transition ${
                   active
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-transparent bg-card-sunken text-text hover:border-border'
@@ -667,9 +727,7 @@ function WorkspaceFileTabs({ files, tabs, activeTabId, activeFilePath, onSelectT
           {activeFilePath.map((item) => (
             <span key={item.id}>
               <span className="px-1.5 text-border">&gt;</span>
-              <span className={item.type === 'folder' ? 'text-muted' : 'font-semibold text-text'}>
-                {item.name}
-              </span>
+              <span className={item.type === 'folder' ? 'text-muted' : 'font-semibold text-text'}>{item.name}</span>
             </span>
           ))}
         </div>
@@ -715,7 +773,7 @@ function WorkspaceOverview({
       <div className="rounded-card border border-border bg-card p-5 shadow-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-xl font-bold text-primary">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-input bg-primary/10 text-xl font-bold text-primary">
               {workspace?.icon || 'T'}
             </span>
             <div className="min-w-0">
@@ -733,11 +791,7 @@ function WorkspaceOverview({
               </div>
             </div>
           </div>
-          <Button
-            type="button"
-            onClick={onCopyInviteLink}
-            className="h-10 shrink-0"
-          >
+          <Button type="button" onClick={onCopyInviteLink} className="h-10 shrink-0">
             <UserPlus className="h-4 w-4" />
             Invite
           </Button>
@@ -841,7 +895,7 @@ function WorkspaceChat({ messages, userName, onSend }) {
   return (
     <section className="flex h-[calc(100vh-190px)] min-h-[560px] flex-col rounded-card border border-border bg-card shadow-card">
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-        <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
+        <span className="flex h-10 w-10 items-center justify-center rounded-button bg-primary/10 text-primary">
           <MessageSquare className="h-5 w-5" />
         </span>
         <div>
@@ -862,7 +916,7 @@ function WorkspaceChat({ messages, userName, onSend }) {
               <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[72%] rounded-card px-4 py-3 shadow-card ${
-                    mine ? 'bg-primary text-white' : 'border border-border bg-card text-text'
+                    mine ? 'bg-primary text-on-primary' : 'border border-border bg-card text-text'
                   }`}
                 >
                   <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold opacity-80">
@@ -890,11 +944,7 @@ function WorkspaceChat({ messages, userName, onSend }) {
           placeholder="Message the workspace..."
           className="flex-1"
         />
-        <Button
-          type="button"
-          onClick={send}
-          className="h-12"
-        >
+        <Button type="button" onClick={send} className="h-12">
           Send
         </Button>
       </div>
@@ -964,12 +1014,7 @@ function WorkspaceSettings({
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-text">Manage {workspace?.name}</h1>
         </div>
         {isOwner && (
-          <Button
-            type="button"
-            onClick={saveSettings}
-            disabled={saving}
-            className="h-11 shadow-sm"
-          >
+          <Button type="button" onClick={saveSettings} disabled={saving} className="h-11 shadow-sm">
             <Save className="h-4 w-4" />
             {saving ? 'Saving...' : 'Save Settings'}
           </Button>
@@ -1025,12 +1070,7 @@ function WorkspaceSettings({
               <div>
                 <p className="text-sm font-medium text-muted">Review members, roles, and invite access.</p>
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onCopyInviteLink}
-                className="h-10"
-              >
+              <Button type="button" variant="secondary" onClick={onCopyInviteLink} className="h-10">
                 <UserPlus className="h-4 w-4" />
                 Invite Member
               </Button>
@@ -1059,7 +1099,7 @@ function WorkspaceSettings({
                           type="button"
                           disabled={removingId === memberId}
                           onClick={() => removeMember(member)}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-danger/30 px-3 text-xs font-semibold text-danger transition hover:bg-danger/10 disabled:opacity-60"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-control border border-danger/30 px-3 text-xs font-semibold text-danger transition hover:bg-danger/10 disabled:opacity-60"
                         >
                           <X className="h-3.5 w-3.5" />
                           Remove
@@ -1097,18 +1137,31 @@ function WorkspaceSettings({
 
               <SettingToggle
                 label="Join approval"
-                description="New members require owner approval before entering."
+                description="When visibility is invite-only, new members need your approval before entering."
                 checked={joinApproval}
-                disabled={!isOwner}
+                disabled={!isOwner || visibility === 'private'}
                 onChange={() => setJoinApproval((value) => !value)}
               />
 
               <div>
-                <span className="text-sm font-semibold text-[#374151]">Workspace Visibility</span>
+                <span className="text-sm font-semibold text-text-secondary">Workspace Visibility</span>
+                <p className="mt-1 text-xs text-muted">
+                  Invite-only: people with the link can request or join. Private: invite links cannot add members.
+                </p>
                 <div className="mt-2 grid gap-2">
                   {[
-                    { value: 'invite_only', label: 'Invite-only', icon: Link2 },
-                    { value: 'private', label: 'Private', icon: Shield }
+                    {
+                      value: 'invite_only',
+                      label: 'Invite-only',
+                      description: 'Join via invite link',
+                      icon: Link2
+                    },
+                    {
+                      value: 'private',
+                      label: 'Private',
+                      description: 'Members only — invites blocked',
+                      icon: Shield
+                    }
                   ].map((option) => {
                     const OptionIcon = option.icon
                     return (
@@ -1117,19 +1170,29 @@ function WorkspaceSettings({
                         type="button"
                         disabled={!isOwner}
                         onClick={() => setVisibility(option.value)}
-                        className={`flex h-11 items-center gap-2 rounded-[14px] border px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${
+                        className={`flex h-auto min-h-11 flex-col items-start gap-0.5 rounded-button border px-3 py-2 text-left text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${
                           visibility === option.value
-                            ? 'border-[#7C3AED] bg-[#F5F3FF] text-[#7C3AED]'
-                            : 'border-[#E5E7EB] text-[#374151] hover:bg-[#F8FAFC]'
+                            ? 'border-primary bg-primary-subtle text-primary'
+                            : 'border-border text-text-secondary hover:bg-background'
                         }`}
                       >
-                        <OptionIcon className="h-4 w-4" />
-                        {option.label}
+                        <span className="inline-flex items-center gap-2">
+                          <OptionIcon className="h-4 w-4" />
+                          {option.label}
+                        </span>
+                        <span className="text-xs font-normal opacity-80">{option.description}</span>
                       </button>
                     )
                   })}
                 </div>
               </div>
+
+              {visibility === 'private' && (
+                <p className="rounded-button border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  Private mode is on. Sharing the invite link will not let new people join until you switch back to
+                  invite-only.
+                </p>
+              )}
             </div>
           </SettingsPanel>
 
@@ -1138,7 +1201,7 @@ function WorkspaceSettings({
               <button
                 type="button"
                 onClick={() => setConfirmAction('leave')}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[#FEE2E2] px-4 text-sm font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-button border border-danger/30 px-4 text-sm font-semibold text-danger transition hover:bg-danger-subtle"
               >
                 <DoorOpen className="h-4 w-4" />
                 Leave Workspace
@@ -1147,7 +1210,7 @@ function WorkspaceSettings({
                 <button
                   type="button"
                   onClick={() => setConfirmAction('delete')}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#DC2626] px-4 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-button bg-danger px-4 text-sm font-semibold text-on-primary transition hover:bg-danger-hover"
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete Workspace
@@ -1192,9 +1255,7 @@ function WorkspaceSettings({
 function SettingsPanel({ icon: Icon, title, danger = false, children }) {
   return (
     <section className="rounded-card border border-border bg-card p-5 shadow-card">
-      <h2
-        className={`mb-4 flex items-center gap-2 text-base font-semibold ${danger ? 'text-danger' : 'text-text'}`}
-      >
+      <h2 className={`mb-4 flex items-center gap-2 text-base font-semibold ${danger ? 'text-danger' : 'text-text'}`}>
         <Icon className={`h-4 w-4 ${danger ? 'text-danger' : 'text-primary'}`} />
         {title}
       </h2>
@@ -1229,12 +1290,7 @@ function MembersAndRequests({ workspace, isOwner, pendingRequests, onCopyInviteL
             <h2 className="text-base font-semibold text-text">Pending Requests</h2>
             <p className="mt-1 text-sm text-muted">Owners can accept or decline invite-link requests.</p>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onCopyInviteLink}
-            className="h-10"
-          >
+          <Button type="button" variant="secondary" onClick={onCopyInviteLink} className="h-10">
             <UserPlus className="h-4 w-4" />
             Invite
           </Button>
@@ -1252,15 +1308,11 @@ function MembersAndRequests({ workspace, isOwner, pendingRequests, onCopyInviteL
                 className="flex flex-col gap-3 rounded-card border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="text-sm font-semibold text-text">{getDisplayName(request.user)}</p>
-                  <p className="mt-1 text-xs text-muted">{request.user?.email || 'Request user'}</p>
+                  <p className="text-sm font-semibold text-text">{getDisplayName(request.requester)}</p>
+                  <p className="mt-1 text-xs text-muted">{request.requester?.email || 'Request user'}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => onResolveRequest(request._id, 'approve')}
-                    className="h-10"
-                  >
+                  <Button type="button" onClick={() => onResolveRequest(request._id, 'accept')} className="h-10">
                     <Check className="h-4 w-4" />
                     Approve
                   </Button>
@@ -1354,7 +1406,7 @@ function WorkspaceSectionFileList({ files, icon: Icon, kindLabel, onCreate, onOp
           <article
             key={file.id}
             onClick={() => onOpen(file)}
-            className="group relative cursor-pointer rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms] hover:border-primary"
+            className="group relative cursor-pointer rounded-card border border-border bg-card p-5 shadow-card transition duration-normal hover:border-primary"
           >
             <div className="mb-4 flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">

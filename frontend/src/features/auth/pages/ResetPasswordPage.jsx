@@ -31,6 +31,11 @@ export default function ResetPasswordPage() {
       return
     }
 
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+
     setSubmitting(true)
     try {
       await resetPassword({ token, password: form.password })
