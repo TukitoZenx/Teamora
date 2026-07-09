@@ -18,11 +18,13 @@ import {
   UserPlus,
   Users,
   Video,
-  X
+  X,
+  Plus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import WorkspaceLayout from '../features/workspace/components/WorkspaceLayout'
 import api from '../services/api'
+import useLocalCollabChannel from '../hooks/useLocalCollabChannel'
 import { useAuth } from '../hooks/useAuth'
 import Calendar from './Calendar'
 import ConfirmDialog from './ConfirmDialog'
@@ -129,6 +131,30 @@ export default function WorkspaceHome({
   const [chatMessages, setChatMessages] = useState(() =>
     workspaceId ? readStoredJson(`teamora-workspace-chat:${workspaceId}`, []) : []
   )
+  const filesChannel = useLocalCollabChannel(workspaceId, 'files')
+  const chatChannel = useLocalCollabChannel(workspaceId, 'chat')
+
+  useEffect(() => {
+    if (!workspaceId) return
+    const handleReceiveFiles = (files) => {
+      if (Array.isArray(files)) {
+        setWorkspaceFiles(files)
+      }
+    }
+    filesChannel.on('receive-files', handleReceiveFiles)
+    return () => filesChannel.off('receive-files', handleReceiveFiles)
+  }, [filesChannel, workspaceId])
+
+  useEffect(() => {
+    if (!workspaceId) return
+    const handleReceiveChat = (messages) => {
+      if (Array.isArray(messages)) {
+        setChatMessages(messages)
+      }
+    }
+    chatChannel.on('chat-messages', handleReceiveChat)
+    return () => chatChannel.off('chat-messages', handleReceiveChat)
+  }, [chatChannel, workspaceId])
   const pendingRequests = useMemo(
     () => (workspace?.joinRequests || []).filter((request) => request.status === 'pending'),
     [workspace]
@@ -222,7 +248,9 @@ export default function WorkspaceHome({
       updatedAt: timestamp,
       unsaved: false
     }
-    setWorkspaceFiles((current) => [...current, file])
+    const next = [...workspaceFiles, file]
+    setWorkspaceFiles(next)
+    filesChannel.emit('update-files', { roomId: workspaceId, files: next })
     setOpenTabs((current) => [...current, file.id])
     setActiveTabId(file.id)
     selectWorkspacePage(typeInfo.section)
@@ -232,19 +260,33 @@ export default function WorkspaceHome({
 
   const markActiveFileUnsaved = (unsaved = true) => {
     if (!activeTabId) return
-    setWorkspaceFiles((current) =>
-      current.map((file) =>
-        file.id === activeTabId ? { ...file, unsaved, updatedAt: new Date().toISOString() } : file
-      )
+    const next = workspaceFiles.map((file) =>
+      file.id === activeTabId ? { ...file, unsaved, updatedAt: new Date().toISOString() } : file
     )
+    setWorkspaceFiles(next)
+    filesChannel.emit('update-files', { roomId: workspaceId, files: next })
   }
 
   const renameWorkspaceFile = (fileId, nextName) => {
-    setWorkspaceFiles((current) =>
-      current.map((file) =>
-        file.id === fileId ? { ...file, name: nextName, updatedAt: new Date().toISOString(), unsaved: false } : file
-      )
+    const next = workspaceFiles.map((file) =>
+      file.id === fileId ? { ...file, name: nextName, updatedAt: new Date().toISOString(), unsaved: false } : file
     )
+    setWorkspaceFiles(next)
+    filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+  }
+
+  const deleteWorkspaceFile = (fileId) => {
+    const file = workspaceFiles.find((f) => f.id === fileId)
+    if (!file) return
+    if (!window.confirm(`Delete "${file.name}"?`)) return
+    const next = workspaceFiles.filter((f) => f.id !== fileId)
+    setWorkspaceFiles(next)
+    filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+    setOpenTabs((current) => current.filter((id) => id !== fileId))
+    if (activeTabId === fileId) {
+      setActiveTabId('')
+    }
+    toast.success(`"${file.name}" deleted.`)
   }
 
   const closeWorkspaceTab = (fileId) => {
@@ -344,17 +386,19 @@ export default function WorkspaceHome({
           <WorkspaceChat
             messages={chatMessages}
             userName={getDisplayName(user)}
-            onSend={(text) =>
-              setChatMessages((current) => [
-                ...current,
+            onSend={(text) => {
+              const next = [
+                ...chatMessages,
                 {
                   id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                   user: getDisplayName(user),
                   text,
                   createdAt: new Date().toISOString()
                 }
-              ])
-            }
+              ]
+              setChatMessages(next)
+              chatChannel.emit('chat-messages', next)
+            }}
           />
         ) : activeItem === 'calendar' ? (
           <Calendar
@@ -375,40 +419,84 @@ export default function WorkspaceHome({
           ) ? (
           <Suspense fallback={<WorkspaceContentSkeleton activeItem={activeItem} />}>
             {activeItem === 'documents' && (
-              <DocumentsSection
-                key={activeFile?.kind === 'document' ? activeFile.id : 'documents-empty'}
-                workspaceId={workspace?._id}
-                userName={getDisplayName(user)}
-                activeFile={activeFile?.kind === 'document' ? activeFile : null}
-                onCreateFile={() => createWorkspaceFile('document')}
-                onRenameFile={renameWorkspaceFile}
-                onDirtyChange={markActiveFileUnsaved}
-              />
+              activeFile?.kind === 'document' ? (
+                <DocumentsSection
+                  key={activeFile.id}
+                  workspaceId={workspace?._id}
+                  userName={getDisplayName(user)}
+                  activeFile={activeFile}
+                  onCreateFile={() => createWorkspaceFile('document')}
+                  onRenameFile={renameWorkspaceFile}
+                  onDirtyChange={markActiveFileUnsaved}
+                />
+              ) : (
+                <WorkspaceSectionFileList
+                  files={workspaceFiles.filter((f) => f.kind === 'document')}
+                  icon={FileText}
+                  kindLabel="Document"
+                  onCreate={() => createWorkspaceFile('document')}
+                  onOpen={openWorkspaceFile}
+                  onDelete={deleteWorkspaceFile}
+                />
+              )
             )}
             {activeItem === 'whiteboard' && (
-              <WhiteboardSection
-                key={activeFile?.kind === 'whiteboard' ? activeFile.id : 'whiteboard-empty'}
-                workspaceId={workspace?._id}
-                userName={getDisplayName(user)}
-                activeFile={activeFile?.kind === 'whiteboard' ? activeFile : null}
-                onDirtyChange={markActiveFileUnsaved}
-              />
+              activeFile?.kind === 'whiteboard' ? (
+                <WhiteboardSection
+                  key={activeFile.id}
+                  workspaceId={workspace?._id}
+                  userName={getDisplayName(user)}
+                  activeFile={activeFile}
+                  onDirtyChange={markActiveFileUnsaved}
+                />
+              ) : (
+                <WorkspaceSectionFileList
+                  files={workspaceFiles.filter((f) => f.kind === 'whiteboard')}
+                  icon={Paintbrush}
+                  kindLabel="Whiteboard"
+                  onCreate={() => createWorkspaceFile('whiteboard')}
+                  onOpen={openWorkspaceFile}
+                  onDelete={deleteWorkspaceFile}
+                />
+              )
             )}
             {activeItem === 'spreadsheet' && (
-              <SpreadsheetSection
-                key={activeFile?.kind === 'spreadsheet' ? activeFile.id : 'spreadsheet-empty'}
-                workspaceId={workspace?._id}
-                activeFile={activeFile?.kind === 'spreadsheet' ? activeFile : null}
-                onDirtyChange={markActiveFileUnsaved}
-              />
+              activeFile?.kind === 'spreadsheet' ? (
+                <SpreadsheetSection
+                  key={activeFile.id}
+                  workspaceId={workspace?._id}
+                  activeFile={activeFile}
+                  onDirtyChange={markActiveFileUnsaved}
+                />
+              ) : (
+                <WorkspaceSectionFileList
+                  files={workspaceFiles.filter((f) => f.kind === 'spreadsheet')}
+                  icon={TableProperties}
+                  kindLabel="Spreadsheet"
+                  onCreate={() => createWorkspaceFile('spreadsheet')}
+                  onOpen={openWorkspaceFile}
+                  onDelete={deleteWorkspaceFile}
+                />
+              )
             )}
             {activeItem === 'presentation' && (
-              <PresentationSection
-                key={activeFile?.kind === 'presentation' ? activeFile.id : 'presentation-empty'}
-                workspaceId={workspace?._id}
-                activeFile={activeFile?.kind === 'presentation' ? activeFile : null}
-                onDirtyChange={markActiveFileUnsaved}
-              />
+              activeFile?.kind === 'presentation' ? (
+                <PresentationSection
+                  key={activeFile.id}
+                  workspaceId={workspace?._id}
+                  activeFile={activeFile}
+                  onDirtyChange={markActiveFileUnsaved}
+                />
+              ) : (
+                <WorkspaceSectionFileList
+                  files={workspaceFiles.filter((f) => f.kind === 'presentation')}
+                  icon={Presentation}
+                  kindLabel="Presentation"
+                  onCreate={() => createWorkspaceFile('presentation')}
+                  onOpen={openWorkspaceFile}
+                  onDelete={deleteWorkspaceFile}
+                />
+              )
             )}
             {activeItem === 'meetings' && (
               <MeetingsSection workspaceId={workspace?._id} userName={getDisplayName(user)} />
@@ -1215,5 +1303,90 @@ function MembersAndRequests({ workspace, isOwner, pendingRequests, onCopyInviteL
         </div>
       </div>
     </section>
+  )
+}
+
+function WorkspaceSectionEmptyState({ icon: Icon, message, btnText, onClick }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border rounded-card bg-card/40 p-8">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
+        <Icon className="h-8 w-8" />
+      </div>
+      <h3 className="text-lg font-bold text-text mb-2">{message}</h3>
+      <p className="text-sm text-muted mb-6 max-w-sm">
+        Start by creating a new file to collaborate in real-time with your team.
+      </p>
+      <Button onClick={onClick} className="h-11 px-6">
+        <Plus className="h-4 w-4 mr-2" />
+        {btnText}
+      </Button>
+    </div>
+  )
+}
+
+function WorkspaceSectionFileList({ files, icon: Icon, kindLabel, onCreate, onOpen, onDelete }) {
+  if (files.length === 0) {
+    return (
+      <WorkspaceSectionEmptyState
+        icon={Icon}
+        message={`Create your first ${kindLabel.toLowerCase()}`}
+        btnText={`Create ${kindLabel}`}
+        onClick={onCreate}
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between border-b border-border pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-text">{kindLabel}s</h2>
+          <p className="text-sm text-muted">Manage and collaborate on your {kindLabel.toLowerCase()}s.</p>
+        </div>
+        <Button onClick={onCreate} className="h-10 px-4">
+          <Plus className="h-4 w-4 mr-2" />
+          Create {kindLabel}
+        </Button>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {files.map((file) => (
+          <article
+            key={file.id}
+            onClick={() => onOpen(file)}
+            className="group relative cursor-pointer rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms] hover:border-primary"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-semibold text-text group-hover:text-primary transition">
+                  {file.name}
+                </h3>
+                <p className="mt-0.5 text-xs text-muted">Created by {file.createdBy || 'Unknown'}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-muted border-t border-border pt-3">
+              <span>{new Date(file.createdAt).toLocaleDateString()}</span>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(file.id)
+                  }}
+                  className="rounded-lg p-1 text-muted hover:bg-danger/10 hover:text-danger transition"
+                  title="Delete file"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
   )
 }

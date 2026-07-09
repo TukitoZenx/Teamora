@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -13,6 +13,7 @@ import {
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import { ensureArray } from './utils/arrayUtils'
+import useLocalCollabChannel from '../hooks/useLocalCollabChannel'
 
 const priorities = ['Low', 'Medium', 'High', 'Urgent']
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -121,6 +122,7 @@ export default function Calendar({
   const [tasks, setTasks] = useState(() => ensureArray(calendarList))
   const [loading, setLoading] = useState(Boolean(workspaceId))
   const [error, setError] = useState('')
+  const tasksChannel = useLocalCollabChannel(workspaceId, 'tasks')
   const [activeDate, setActiveDate] = useState('')
   const [modalMode, setModalMode] = useState(null)
   const [editingTask, setEditingTask] = useState(null)
@@ -149,6 +151,18 @@ export default function Calendar({
     () => currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
     [currentDate]
   )
+
+  const fetchTasks = useCallback(() => {
+    if (!workspaceId) return
+    api
+      .get(`/api/v1/workspaces/${workspaceId}/tasks`)
+      .then(({ data }) => {
+        setTasks(data.tasks || [])
+      })
+      .catch((requestError) => {
+        setError(requestError.message)
+      })
+  }, [workspaceId])
 
   useEffect(() => {
     if (!workspaceId) {
@@ -186,6 +200,14 @@ export default function Calendar({
       cancelled = true
     }
   }, [calendarList, workspaceId])
+
+  useEffect(() => {
+    const handleTasksUpdate = () => {
+      fetchTasks()
+    }
+    tasksChannel.on('tasks-updated', handleTasksUpdate)
+    return () => tasksChannel.off('tasks-updated', handleTasksUpdate)
+  }, [tasksChannel, fetchTasks])
 
   useEffect(() => {
     const timers = tasks
@@ -309,6 +331,7 @@ export default function Calendar({
     setEditingTask(null)
     setSubmitted(false)
     setSaving(false)
+    setActiveDate('')
   }
 
   const openDatePicker = () => {
@@ -343,8 +366,11 @@ export default function Calendar({
         setTasks((current) => [...current, data.task])
         toast.success('Task created')
       }
-      setActiveDate(normalizedDate)
+      tasksChannel.emit('tasks-updated', {})
       closeModal()
+      if (onOpenTasksPage) {
+        onOpenTasksPage()
+      }
     } catch (requestError) {
       toast.error(requestError.message)
       setSaving(false)
@@ -357,6 +383,7 @@ export default function Calendar({
     try {
       await api.delete(`/api/v1/workspaces/${workspaceId}/tasks/${taskId}`)
       setTasks((current) => current.filter((item) => getTaskId(item) !== taskId))
+      tasksChannel.emit('tasks-updated', {})
       toast.success('Task deleted')
     } catch (requestError) {
       toast.error(requestError.message)
@@ -375,6 +402,7 @@ export default function Calendar({
         status: nextStatus
       })
       setTasks((current) => current.map((item) => (getTaskId(item) === taskId ? data.task : item)))
+      tasksChannel.emit('tasks-updated', {})
       toast.success('Task updated')
     } catch (requestError) {
       toast.error(requestError.message)

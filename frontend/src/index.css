@@ -207,3 +207,43 @@ html[data-density='compact'] .teamora-content-fade {
   }
 }
 
+/* Ensure consistent cursors for all interactive elements */
+button,
+a,
+select,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+a:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled,
+[role="button"]:disabled,
+.disabled {
+  cursor: not-allowed !important;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+textarea {
+  cursor: text;
+}
+
+/* Grab cursor for draggable elements */
+[draggable="true"] {
+  cursor: grab;
+}
+[draggable="true"]:active {
+  cursor: grabbing;
+}
+

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LogOut, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -16,7 +16,19 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const dropdownRef = useRef(null)
   const displayName = getDisplayName(user)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
 
   const runAction = async (action) => {
     setOpen(false)
@@ -40,7 +52,7 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -66,6 +78,15 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
             </div>
           </div>
           <div className="my-2 h-px bg-border" />
+          
+          <DropdownItem
+            icon={Settings}
+            onClick={() => runAction(() => navigate('/settings'))}
+            className="rounded-button py-2.5"
+          >
+            Dashboard Settings
+          </DropdownItem>
+
           {onWorkspaceSettings && (
             <DropdownItem
               icon={Settings}

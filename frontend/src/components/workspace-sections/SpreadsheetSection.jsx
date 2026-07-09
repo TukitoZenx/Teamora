@@ -24,7 +24,10 @@ const writeGridSnapshot = (workspaceId, fileId, grid) => {
 
 const setCell = (grid, row, col, value) => {
   const next = grid.slice()
-  const existingRow = next[row] ? next[row].slice() : []
+  let existingRow = next[row] ? next[row].slice() : null
+  if (!existingRow) {
+    existingRow = Array(50).fill('')
+  }
   existingRow[col] = value
   next[row] = existingRow
   return next

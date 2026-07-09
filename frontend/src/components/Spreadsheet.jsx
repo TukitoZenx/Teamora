@@ -164,7 +164,12 @@ export default function Spreadsheet({
   const visibleGridRows = useMemo(() => {
     const rows = []
     for (let r = 0; r < rowCount; r++) {
-      rows.push(grid[sheetOffset + r] || Array(columnCount).fill(''))
+      const rawRow = grid[sheetOffset + r] || []
+      const denseRow = []
+      for (let c = 0; c < columnCount; c++) {
+        denseRow.push(rawRow[c] !== undefined ? rawRow[c] : '')
+      }
+      rows.push(denseRow)
     }
     return rows
   }, [grid, sheetOffset, rowCount, columnCount])
