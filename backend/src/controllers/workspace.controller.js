@@ -49,7 +49,11 @@ const joinWorkspace = async (req, res, next) => {
   try {
     const { inviteCode } = req.body;
     const result = await workspaceService.requestWorkspaceAccess(req.user._id, inviteCode);
-    res.status(202).json({ success: true, ...result, message: 'Access request sent' });
+    res.status(result.joined ? 200 : 202).json({
+      success: true,
+      ...result,
+      message: result.joined ? 'Joined workspace' : 'Access request sent'
+    });
   } catch (error) {
     next(error);
   }
@@ -67,7 +71,11 @@ const getInvitePreview = async (req, res, next) => {
 const requestWorkspaceAccess = async (req, res, next) => {
   try {
     const result = await workspaceService.requestWorkspaceAccess(req.user._id, req.params.inviteCode);
-    res.status(202).json({ success: true, ...result, message: 'Access request sent' });
+    res.status(result.joined ? 200 : 202).json({
+      success: true,
+      ...result,
+      message: result.joined ? 'Joined workspace' : 'Access request sent'
+    });
   } catch (error) {
     next(error);
   }

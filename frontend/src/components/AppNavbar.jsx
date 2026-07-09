@@ -31,15 +31,12 @@ export default function AppNavbar({ onDashboard }) {
     try {
       const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null') || { theme: 'Light' }
       const currentTheme = preferences.theme || 'Light'
-      let nextTheme = 'Light'
-      if (currentTheme === 'Light') {
-        nextTheme = 'Dark'
-      } else if (currentTheme === 'Dark') {
-        nextTheme = 'Light'
-      } else {
-        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-        nextTheme = systemDark ? 'Light' : 'Dark'
-      }
+      // Simple Light ↔ Dark. System resolves to whichever is opposite of the
+      // current rendered mode so the toggle always flips the visible UI.
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      const currentlyDark =
+        currentTheme === 'Dark' || currentTheme === 'High Contrast' || (currentTheme === 'System' && systemDark)
+      const nextTheme = currentlyDark ? 'Light' : 'Dark'
       const nextPreferences = { ...preferences, theme: nextTheme }
       localStorage.setItem('teamora-appearance', JSON.stringify(nextPreferences))
       window.dispatchEvent(new CustomEvent('teamora-appearance-changed', { detail: nextPreferences }))
@@ -53,12 +50,12 @@ export default function AppNavbar({ onDashboard }) {
     theme === 'Dark' || (theme === 'System' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   return (
-    <header className="fixed inset-x-0 top-0 z-[1000] h-[72px] border-b border-border bg-card px-6">
+    <header className="fixed inset-x-0 top-0 z-navbar h-navbar border-b border-border bg-card px-6">
       <div className="flex h-full w-full items-center justify-between">
         <button
           type="button"
           onClick={onDashboard}
-          className="flex min-w-0 items-center gap-3 rounded-xl text-left transition duration-[180ms] hover:opacity-80"
+          className="flex min-w-0 items-center gap-3 rounded-xl text-left transition duration-normal hover:opacity-80"
           title="Dashboard"
         >
           <img src={teamoraLogo} alt="Teamora" className="h-9 w-9 shrink-0 rounded-xl object-contain" />
@@ -69,7 +66,7 @@ export default function AppNavbar({ onDashboard }) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition duration-[180ms] hover:bg-primary/10 hover:text-primary"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition duration-normal hover:bg-primary/10 hover:text-primary"
             aria-label="Toggle theme mode"
           >
             {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

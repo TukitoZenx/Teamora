@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   Building2,
@@ -211,25 +211,57 @@ export default function Dashboard({
   }
 
   const openWorkspace = (workspace) => {
-    if (!workspace.canOpen) return
+    const id = workspace.workspaceId || workspace._id
+    if (!id) {
+      toast.error('Workspace is unavailable.')
+      return
+    }
+
+    // Trashed / removed workspaces cannot be opened — prevent 404 spam.
+    if (workspace.status === 'trashed' || workspace.status === 'removed') {
+      toast.error(
+        workspace.status === 'trashed'
+          ? 'This workspace is in trash. Remove it from history or restore access first.'
+          : 'You no longer have access to this workspace.'
+      )
+      return
+    }
+
+    if (!workspace.canOpen && workspace.status !== 'active') {
+      toast.error('You do not have access to open this workspace yet.')
+      return
+    }
 
     const nextMap = {
       ...openedMap,
-      [workspace.workspaceId]:
-        openedMap[workspace.workspaceId] || workspace.lastOpenedAt || workspace.updatedAt || workspace.createdAt || 0
+      [id]:
+        openedMap[id] ||
+        workspace.lastOpenedAt ||
+        workspace.updatedAt ||
+        workspace.createdAt ||
+        new Date().toISOString()
     }
     setOpenedMap(nextMap)
     localStorage.setItem('teamora-opened-workspaces', JSON.stringify(nextMap))
-    onOpenWorkspace(workspace.workspaceId)
+    onOpenWorkspace(id)
   }
 
   const joinWorkspace = async (workspace) => {
+    if (workspace.status === 'trashed') {
+      toast.error('This workspace has been deleted and cannot be joined.')
+      return
+    }
+
+    const invite = workspace.inviteLink || workspace.inviteCode
+    if (!invite) {
+      toast.error('No invite code is available for this workspace.')
+      return
+    }
+
     try {
-      const joinedWorkspace = await onJoinWorkspace(
-        workspace.inviteLink || workspace.inviteCode || workspace.workspaceId
-      )
+      const joinedWorkspace = await onJoinWorkspace(invite)
       if (joinedWorkspace?._id) {
-        openWorkspace({ ...joinedWorkspace, workspaceId: joinedWorkspace._id, canOpen: true })
+        openWorkspace({ ...joinedWorkspace, workspaceId: joinedWorkspace._id, canOpen: true, status: 'active' })
       }
     } catch (error) {
       toast.error(error.message)
@@ -248,6 +280,18 @@ export default function Dashboard({
   }
 
   const deleteWorkspace = async (workspace) => {
+    // Already-archived (trash) workspaces cannot be deleted again via API —
+    // remove them from history instead so the dashboard stays clean.
+    if (workspace.status === 'trashed') {
+      try {
+        await onRemoveRecentWorkspace?.(workspace.workspaceId)
+        toast.success('Removed from history.')
+      } catch (error) {
+        toast.error(error.message)
+      }
+      return
+    }
+
     if (!window.confirm(`Delete "${workspace.name}"? This cannot be undone.`)) return
 
     try {
@@ -284,7 +328,7 @@ export default function Dashboard({
   const showSkeletons = loading && hasNoWorkspaces
 
   return (
-    <main className="mx-auto flex h-[calc(100vh-72px)] max-w-7xl flex-col px-5 py-6 overflow-hidden">
+    <main className="mx-auto flex h-[calc(100vh-var(--tw-navbar-height))] max-w-7xl flex-col px-5 py-6 overflow-hidden">
       {authNotice && (
         <div className="mb-5 shrink-0 rounded-card border border-warning/20 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
           {authNotice}
@@ -312,7 +356,7 @@ export default function Dashboard({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search workspaces..."
-              className="h-12 w-full rounded-2xl border border-border bg-card pl-11 pr-24 text-sm text-text outline-none transition duration-[180ms] placeholder:text-muted/65 hover:border-primary focus:border-primary focus:ring-4 focus:ring-primary/10"
+              className="h-12 w-full rounded-2xl border border-border bg-card pl-11 pr-24 text-sm text-text outline-none transition duration-normal placeholder:text-muted/65 hover:border-primary focus:border-primary focus:ring-4 focus:ring-primary/10"
             />
             {query && (
               <button
@@ -331,7 +375,7 @@ export default function Dashboard({
           <Button
             type="button"
             variant="secondary"
-            className="h-12 border-primary text-primary hover:bg-primary hover:text-white px-5"
+            className="h-12 border-primary text-primary hover:bg-primary hover:text-on-primary px-5"
             onClick={() => setModalMode('join')}
           >
             <UserPlus className="h-4 w-4" />
@@ -350,9 +394,9 @@ export default function Dashboard({
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`relative rounded-full px-4 py-2 text-sm font-semibold transition duration-[180ms] ${
+                className={`relative rounded-full px-4 py-2 text-sm font-semibold transition duration-normal ${
                   activeTab === tab
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-on-primary'
                     : 'bg-card text-muted ring-1 ring-border hover:bg-primary/10 hover:text-primary'
                 }`}
               >
@@ -364,7 +408,7 @@ export default function Dashboard({
             ))}
           </div>
 
-          <label className="flex h-10 w-full items-center justify-between rounded-[14px] border border-border bg-card px-3 text-sm font-semibold text-muted md:w-44">
+          <label className="flex h-10 w-full items-center justify-between rounded-button border border-border bg-card px-3 text-sm font-semibold text-muted md:w-44">
             <span>Sort</span>
             <select
               value={sortBy}
@@ -466,10 +510,32 @@ function WorkspaceLauncherCard({
   onRemove
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
   const status = statusStyles[workspace.status] || statusStyles.previously_joined
   const isActive = workspace.status === 'active'
   const isPending = workspace.status === 'pending'
+  const isTrashed = workspace.status === 'trashed'
   const canRemoveFromHistory = !isActive
+  const canRequestJoin =
+    !isActive &&
+    !isPending &&
+    !isTrashed &&
+    (workspace.canRequestAccess || workspace.inviteCode || workspace.inviteLink)
+
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const handleOutside = (event) => {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [menuOpen])
+
+  const handleCardActivate = () => {
+    if (isPending || isTrashed) return
+    if (isActive) onOpen()
+    else if (canRequestJoin) onJoin()
+  }
 
   const runMenuAction = (event, action) => {
     event.stopPropagation()
@@ -479,17 +545,20 @@ function WorkspaceLauncherCard({
 
   return (
     <article
-      role="button"
-      tabIndex={isPending ? undefined : 0}
-      onClick={isPending ? undefined : (isActive ? onOpen : onJoin)}
-      onKeyDown={isPending ? undefined : (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          if (isActive) onOpen()
-          else onJoin()
-        }
-      }}
-      className={`group relative rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms] ease-out hover:border-primary outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${isPending ? 'cursor-default' : 'cursor-pointer'}`}
+      role={isPending || isTrashed ? 'article' : 'button'}
+      tabIndex={isPending || isTrashed ? undefined : 0}
+      onClick={handleCardActivate}
+      onKeyDown={
+        isPending || isTrashed
+          ? undefined
+          : (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                handleCardActivate()
+              }
+            }
+      }
+      className={`group relative rounded-card border border-border bg-card p-5 shadow-card transition duration-normal ease-standard hover:border-primary outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${isPending || isTrashed ? 'cursor-default' : 'cursor-pointer'}`}
     >
       <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
@@ -523,7 +592,7 @@ function WorkspaceLauncherCard({
               event.stopPropagation()
               setMenuOpen((current) => !current)
             }}
-            className="rounded-xl p-2 text-muted transition duration-[180ms] hover:bg-primary/10 hover:text-primary"
+            className="rounded-xl p-2 text-muted transition duration-normal hover:bg-primary/10 hover:text-primary"
             aria-label="Workspace actions"
           >
             <MoreHorizontal className="h-4 w-4" />
@@ -569,39 +638,42 @@ function WorkspaceLauncherCard({
       </div>
 
       {menuOpen && (
-        <DropdownMenu className="right-5 top-14 z-20 w-56">
-          {isActive && (
-            <DropdownItem icon={ArrowRight} onClick={(event) => runMenuAction(event, onOpen)}>
-              Open
+        <div ref={menuRef}>
+          <DropdownMenu className="right-5 top-14 z-20 w-56">
+            {isActive && (
+              <DropdownItem icon={ArrowRight} onClick={(event) => runMenuAction(event, onOpen)}>
+                Open
+              </DropdownItem>
+            )}
+            {isOwner && isActive && (
+              <DropdownItem icon={Building2} onClick={(event) => runMenuAction(event, onRename)}>
+                Rename
+              </DropdownItem>
+            )}
+            <DropdownItem icon={pinned ? PinOff : Pin} onClick={(event) => runMenuAction(event, onPin)}>
+              {pinned ? 'Unpin' : 'Pin'}
             </DropdownItem>
-          )}
-          {isOwner && (
-            <DropdownItem icon={Building2} onClick={(event) => runMenuAction(event, onRename)}>
-              Rename
+            <DropdownItem icon={Star} onClick={(event) => runMenuAction(event, onFavorite)}>
+              {favorite ? 'Remove Favorite' : 'Favorite'}
             </DropdownItem>
-          )}
-          <DropdownItem icon={pinned ? PinOff : Pin} onClick={(event) => runMenuAction(event, onPin)}>
-            {pinned ? 'Unpin' : 'Pin'}
-          </DropdownItem>
-          <DropdownItem icon={Star} onClick={(event) => runMenuAction(event, onFavorite)}>
-            {favorite ? 'Remove Favorite' : 'Favorite'}
-          </DropdownItem>
-          {isActive && (
-            <DropdownItem icon={X} danger onClick={(event) => runMenuAction(event, onLeave)}>
-              Leave Workspace
-            </DropdownItem>
-          )}
-          {canRemoveFromHistory && (
-            <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onRemove)}>
-              Remove from History
-            </DropdownItem>
-          )}
-          {isOwner && (
-            <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onDelete)}>
-              Delete Workspace
-            </DropdownItem>
-          )}
-        </DropdownMenu>
+            {isActive && (
+              <DropdownItem icon={X} danger onClick={(event) => runMenuAction(event, onLeave)}>
+                Leave Workspace
+              </DropdownItem>
+            )}
+            {canRemoveFromHistory && (
+              <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onRemove)}>
+                Remove from History
+              </DropdownItem>
+            )}
+            {/* Permanent delete only for live workspaces — trash is already archived. */}
+            {isOwner && isActive && (
+              <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onDelete)}>
+                Delete Workspace
+              </DropdownItem>
+            )}
+          </DropdownMenu>
+        </div>
       )}
     </article>
   )
@@ -615,7 +687,7 @@ function IconAction({ active, label, onClick, children }) {
         event.stopPropagation()
         onClick()
       }}
-      className={`rounded-xl p-2 transition duration-[180ms] hover:bg-primary/10 ${active ? 'text-primary' : 'text-muted'}`}
+      className={`rounded-xl p-2 transition duration-normal hover:bg-primary/10 ${active ? 'text-primary' : 'text-muted'}`}
       aria-label={label}
     >
       {children}
@@ -626,7 +698,7 @@ function IconAction({ active, label, onClick, children }) {
 function DashboardEmptyState({ onCreate, onJoin }) {
   return (
     <section className="mx-auto flex min-h-[380px] max-w-xl flex-col items-center justify-center rounded-card border border-dashed border-border bg-card p-10 text-center shadow-card">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[20px] bg-primary/10 text-primary">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-card bg-primary/10 text-primary">
         <Building2 className="h-7 w-7" />
       </div>
       <h2 className="text-2xl font-semibold tracking-tight text-text">No Workspaces Found</h2>
@@ -640,7 +712,7 @@ function DashboardEmptyState({ onCreate, onJoin }) {
         <Button
           type="button"
           variant="secondary"
-          className="border-primary text-primary hover:bg-primary hover:text-white"
+          className="border-primary text-primary hover:bg-primary hover:text-on-primary"
           onClick={onJoin}
         >
           Join Workspace

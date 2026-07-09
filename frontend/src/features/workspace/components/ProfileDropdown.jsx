@@ -78,7 +78,7 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
             </div>
           </div>
           <div className="my-2 h-px bg-border" />
-          
+
           <DropdownItem
             icon={Settings}
             onClick={() => runAction(() => navigate('/settings'))}

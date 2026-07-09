@@ -68,7 +68,7 @@ export default function useAuthForm(mode) {
     event.preventDefault()
     setError('')
 
-    if (!validateCredentials()) return
+    if (!validateCredentials({ requireStrongPassword: true })) return
 
     setSubmitting(true)
     try {

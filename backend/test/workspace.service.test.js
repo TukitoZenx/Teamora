@@ -6,8 +6,6 @@ const User = require('../src/models/User');
 const workspaceService = require('../src/services/workspace.service');
 
 describe('Workspace Service - leaveWorkspace', () => {
-  let findByIdMock;
-
   beforeEach(() => {
     mock.method(User, 'updateOne', async () => ({ acknowledged: true }));
     mock.method(User, 'updateMany', async () => ({ acknowledged: true }));
@@ -34,7 +32,7 @@ describe('Workspace Service - leaveWorkspace', () => {
       }
     };
 
-    findByIdMock = mock.method(Workspace, 'findById', (id) => {
+    mock.method(Workspace, 'findById', () => {
       // Return query object supporting chainable populate calls
       const mockQuery = {
         populate: () => mockQuery,
@@ -71,7 +69,7 @@ describe('Workspace Service - leaveWorkspace', () => {
       }
     };
 
-    findByIdMock = mock.method(Workspace, 'findById', () => {
+    mock.method(Workspace, 'findById', () => {
       const mockQuery = {
         populate: () => mockQuery,
         then: (onResolve) => Promise.resolve(mockWorkspace).then(onResolve),
@@ -90,5 +88,205 @@ describe('Workspace Service - leaveWorkspace', () => {
     assert.equal(saveCalled, true);
     assert.ok(mockWorkspace.archivedAt instanceof Date);
     assert.equal(mockWorkspace.archivedBy.toString(), soleMemberId.toString());
+  });
+
+  test('should revoke approval when a non-owner leaves', async () => {
+    const ownerId = new mongoose.Types.ObjectId();
+    const memberId = new mongoose.Types.ObjectId();
+    const workspaceId = new mongoose.Types.ObjectId();
+
+    const mockWorkspace = {
+      _id: workspaceId,
+      name: 'Approval Workspace',
+      owner: ownerId,
+      members: [ownerId, memberId],
+      approvedMembers: [{ user: ownerId }, { user: memberId, revokedAt: null }],
+      active: true,
+      save: async function () {
+        return this;
+      }
+    };
+
+    mock.method(Workspace, 'findById', () => {
+      const mockQuery = {
+        populate: () => mockQuery,
+        then: (onResolve) => Promise.resolve(mockWorkspace).then(onResolve),
+        catch: (onReject) => Promise.resolve(mockWorkspace).catch(onReject)
+      };
+      return mockQuery;
+    });
+
+    const result = await workspaceService.leaveWorkspace(memberId, workspaceId.toString());
+    const approval = mockWorkspace.approvedMembers.find((item) => item.user.toString() === memberId.toString());
+
+    assert.equal(result.success, true);
+    assert.equal(result.ownershipTransferred, false);
+    assert.ok(approval.revokedAt instanceof Date);
+  });
+});
+
+describe('Workspace Service - createWorkspace', () => {
+  afterEach(() => {
+    mock.restoreAll();
+  });
+
+  test('should reject creating more than 6 owned workspaces', async () => {
+    const ownerId = new mongoose.Types.ObjectId();
+
+    mock.method(Workspace, 'countDocuments', async () => 6);
+
+    await assert.rejects(
+      () => workspaceService.createWorkspace(ownerId, { name: 'Overflow Workspace' }),
+      (error) => {
+        assert.equal(error.statusCode, 400);
+        assert.match(error.message, /Maximum 6 workspaces/i);
+        return true;
+      }
+    );
+  });
+});
+
+describe('Workspace Service - visibility', () => {
+  beforeEach(() => {
+    mock.method(User, 'updateOne', async () => ({ acknowledged: true }));
+  });
+
+  afterEach(() => {
+    mock.restoreAll();
+  });
+
+  test('should reject invite joins when workspace is private', async () => {
+    const ownerId = new mongoose.Types.ObjectId();
+    const userId = new mongoose.Types.ObjectId();
+    const workspaceId = new mongoose.Types.ObjectId();
+
+    const mockWorkspace = {
+      _id: workspaceId,
+      name: 'Private Workspace',
+      owner: ownerId,
+      members: [ownerId],
+      visibility: 'private',
+      joinApproval: true,
+      joinRequests: [],
+      approvedMembers: [],
+      notifications: [],
+      inviteCode: 'PRIVATE1',
+      save: async function () {
+        return this;
+      }
+    };
+
+    mock.method(Workspace, 'findOne', () => ({
+      populate: () => Promise.resolve(mockWorkspace)
+    }));
+
+    await assert.rejects(
+      () => workspaceService.requestWorkspaceAccess(userId, 'private1'),
+      (error) => {
+        assert.equal(error.statusCode, 403);
+        assert.match(error.message, /private/i);
+        return true;
+      }
+    );
+  });
+
+  test('invite preview marks private workspaces as not joinable', async () => {
+    const ownerId = new mongoose.Types.ObjectId();
+    const userId = new mongoose.Types.ObjectId();
+    const workspaceId = new mongoose.Types.ObjectId();
+
+    mock.method(Workspace, 'findOne', async () => ({
+      _id: workspaceId,
+      name: 'Private WS',
+      description: '',
+      owner: ownerId,
+      members: [ownerId],
+      visibility: 'private',
+      joinApproval: true,
+      joinRequests: [],
+      inviteCode: 'PRIVATE2'
+    }));
+
+    const preview = await workspaceService.getInvitePreview(userId, 'private2');
+    assert.equal(preview.allowsJoin, false);
+    assert.equal(preview.visibility, 'private');
+    assert.equal(preview.isMember, false);
+  });
+});
+
+describe('Workspace Service - requestWorkspaceAccess', () => {
+  beforeEach(() => {
+    mock.method(User, 'updateOne', async () => ({ acknowledged: true }));
+  });
+
+  afterEach(() => {
+    mock.restoreAll();
+  });
+
+  test('should immediately join invite holder when join approval is disabled', async () => {
+    const ownerId = new mongoose.Types.ObjectId();
+    const userId = new mongoose.Types.ObjectId();
+    const workspaceId = new mongoose.Types.ObjectId();
+    const pendingRequestId = new mongoose.Types.ObjectId();
+
+    const mockWorkspace = {
+      _id: workspaceId,
+      name: 'Auto Join Workspace',
+      description: '',
+      owner: ownerId,
+      members: [ownerId],
+      approvedMembers: [],
+      joinApproval: false,
+      joinRequests: [
+        {
+          _id: pendingRequestId,
+          requester: userId,
+          status: 'pending',
+          resolvedAt: null
+        }
+      ],
+      notifications: [],
+      tasks: [],
+      inviteCode: 'AUTOJOIN',
+      save: async function () {
+        return this;
+      },
+      toObject: function () {
+        return {
+          ...this,
+          members: [...this.members],
+          approvedMembers: this.approvedMembers.map((approval) => ({ ...approval })),
+          joinRequests: this.joinRequests.map((request) => ({ ...request })),
+          notifications: [...this.notifications],
+          tasks: [...this.tasks]
+        };
+      }
+    };
+
+    mock.method(Workspace, 'findOne', () => ({
+      populate: () => Promise.resolve(mockWorkspace)
+    }));
+
+    mock.method(Workspace, 'findById', () => {
+      const mockQuery = {
+        populate: () => mockQuery,
+        then: (onResolve) => Promise.resolve(mockWorkspace).then(onResolve),
+        catch: (onReject) => Promise.resolve(mockWorkspace).catch(onReject)
+      };
+      return mockQuery;
+    });
+
+    const result = await workspaceService.requestWorkspaceAccess(userId, 'autojoin');
+
+    assert.equal(result.joined, true);
+    assert.equal(result.workspace.workspaceId, workspaceId.toString());
+    assert.ok(mockWorkspace.members.some((memberId) => memberId.toString() === userId.toString()));
+    assert.ok(
+      mockWorkspace.approvedMembers.some(
+        (approval) => approval.user.toString() === userId.toString() && !approval.revokedAt
+      )
+    );
+    assert.equal(mockWorkspace.joinRequests[0].status, 'accepted');
+    assert.ok(mockWorkspace.joinRequests[0].resolvedAt instanceof Date);
   });
 });

@@ -182,6 +182,31 @@ const generateInviteCode = async () => {
   throw createError('Unable to generate invite code', 500);
 };
 
+/**
+ * Best-effort cleanup of the pre-migration Socket.IO `rooms` collection.
+ * Only runs when Mongo is actually connected — otherwise Mongoose buffers
+ * the op for ~10s and leave/delete endpoints (and tests) hang.
+ */
+const markLegacyRoomArchived = async (workspaceId, userId, archivedAt) => {
+  if (mongoose.connection.readyState !== 1) {
+    return;
+  }
+
+  try {
+    await mongoose.connection.collection('rooms').updateOne(
+      { _id: workspaceId.toString() },
+      {
+        $set: {
+          archivedAt,
+          archivedBy: userId.toString()
+        }
+      }
+    );
+  } catch {
+    // Workspace metadata is authoritative; room data may live in a separate legacy service.
+  }
+};
+
 const assertOwner = (workspace, userId) => {
   if (workspace.owner.toString() !== userId.toString()) {
     throw createError('Only the workspace owner can perform this action', 403);
@@ -298,7 +323,20 @@ const cleanRecentWorkspace = (entry, userId, activeWorkspaceIds = new Set()) => 
   };
 };
 
+const MAX_OWNED_WORKSPACES = 6;
+
 const createWorkspace = async (userId, payload) => {
+  // Mirror the product rule already enforced on the dashboard so direct API
+  // clients cannot create unlimited workspaces.
+  const ownedCount = await Workspace.countDocuments({
+    owner: userId,
+    archivedAt: null
+  });
+
+  if (ownedCount >= MAX_OWNED_WORKSPACES) {
+    throw createError(`Maximum ${MAX_OWNED_WORKSPACES} workspaces can be created.`, 400);
+  }
+
   const workspace = await Workspace.create({
     name: validateName(payload.name),
     description: validateDescription(payload.description),
@@ -443,19 +481,7 @@ const deleteWorkspace = async (userId, workspaceId) => {
     )
   );
 
-  try {
-    await mongoose.connection.collection('rooms').updateOne(
-      { _id: workspaceId.toString() },
-      {
-        $set: {
-          archivedAt: workspace.archivedAt,
-          archivedBy: userId.toString()
-        }
-      }
-    );
-  } catch {
-    // Workspace metadata is authoritative here; room data may live in a separate legacy service.
-  }
+  await markLegacyRoomArchived(workspaceId, userId, workspace.archivedAt);
 };
 
 const getInvitePreview = async (userId, inviteCode) => {
@@ -471,6 +497,11 @@ const getInvitePreview = async (userId, inviteCode) => {
     throw createError('Workspace not found', 404);
   }
 
+  const isMember = isWorkspaceMember(workspace, userId);
+  const visibility = workspace.visibility || 'invite_only';
+  // Private workspaces never accept new members via invite links.
+  const allowsJoin = visibility !== 'private' || isMember;
+
   const pendingRequest = workspace.joinRequests.find((request) => {
     const requesterId = getEntityId(request.requester);
     return requesterId.toString() === userId.toString() && request.status === 'pending';
@@ -483,9 +514,12 @@ const getInvitePreview = async (userId, inviteCode) => {
     description: workspace.description,
     owner: workspace.owner,
     memberCount: workspace.members.length,
-    inviteCode: workspace.inviteCode,
-    inviteLink: `${CLIENT_URL}/invite/${workspace.inviteCode}`,
-    isMember: isWorkspaceMember(workspace, userId),
+    inviteCode: allowsJoin || isMember ? workspace.inviteCode : null,
+    inviteLink: allowsJoin || isMember ? `${CLIENT_URL}/invite/${workspace.inviteCode}` : null,
+    visibility,
+    allowsJoin,
+    joinApproval: Boolean(workspace.joinApproval),
+    isMember,
     hasPendingRequest: Boolean(pendingRequest),
     pendingRequestId: pendingRequest?._id || null
   };
@@ -506,6 +540,12 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
 
   if (isWorkspaceMember(workspace, userId)) {
     throw createError('You are already a member of this workspace', 409);
+  }
+
+  // Private workspaces cannot be joined through an invite code. Owners must
+  // switch visibility to invite-only (or add members via a future add-user flow).
+  if ((workspace.visibility || 'invite_only') === 'private') {
+    throw createError('This workspace is private and does not accept invite joins.', 403);
   }
 
   const autoJoin = async () => {
@@ -618,7 +658,7 @@ const declineJoinRequest = async (ownerId, workspaceId, requestId) => {
 
   const workspace = await Workspace.findById(workspaceId).populate('joinRequests.requester', USER_SELECT);
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -860,19 +900,7 @@ const leaveWorkspace = async (userId, workspaceId) => {
       lastSeenAt: workspace.archivedAt
     });
 
-    try {
-      await mongoose.connection.collection('rooms').updateOne(
-        { _id: workspaceId.toString() },
-        {
-          $set: {
-            archivedAt: workspace.archivedAt,
-            archivedBy: userId.toString()
-          }
-        }
-      );
-    } catch {
-      // Workspace metadata is authoritative here; room data may live in a separate legacy service.
-    }
+    await markLegacyRoomArchived(workspaceId, userId, workspace.archivedAt);
 
     return {
       success: true,

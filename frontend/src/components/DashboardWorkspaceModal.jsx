@@ -59,7 +59,7 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
         <button
           type="button"
           onClick={onClose}
-          className="rounded-xl p-2 text-muted transition duration-[180ms] hover:bg-primary/10 hover:text-primary"
+          className="rounded-xl p-2 text-muted transition duration-normal hover:bg-primary/10 hover:text-primary"
           aria-label="Close modal"
         >
           <X className="h-5 w-5" />

@@ -7,7 +7,7 @@ export default function AuthShell({ children }) {
       <AuthBrandPanel />
 
       <section className="relative flex min-h-screen items-center justify-center bg-background px-6 py-12 md:px-10 lg:px-16">
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-auth">
           <div className="mb-12 flex flex-col items-center gap-4 text-center">
             <img src={teamoraLogo} alt="Teamora logo" className="h-10 w-10 rounded-xl" />
             <span className="text-lg font-medium text-text">Teamora</span>

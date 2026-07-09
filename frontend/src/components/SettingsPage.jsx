@@ -20,7 +20,7 @@ export default function SettingsPage({ user }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl px-5 py-6">
+    <main className="mx-auto flex min-h-[calc(100vh-var(--tw-navbar-height))] max-w-7xl px-5 py-6">
       <aside className="hidden w-60 shrink-0 pr-6 lg:block">
         <SettingsNav onNavigate={() => setDrawerOpen(false)} />
       </aside>
@@ -29,7 +29,7 @@ export default function SettingsPage({ user }) {
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="mb-5 inline-flex items-center gap-2 rounded-[14px] border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-semibold text-[#374151] shadow-sm transition duration-[180ms] hover:bg-[#F8F5FF] hover:text-[#7C3AED] lg:hidden"
+          className="mb-5 inline-flex items-center gap-2 rounded-button border border-border bg-card px-4 py-2 text-sm font-semibold text-text-secondary shadow-sm transition duration-normal hover:bg-primary-subtle hover:text-primary lg:hidden"
         >
           <Menu className="h-4 w-4" />
           Settings Menu
@@ -42,17 +42,17 @@ export default function SettingsPage({ user }) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-black/25 backdrop-blur-[10px]"
+            className="absolute inset-0 teamora-scrim"
             onClick={() => setDrawerOpen(false)}
             aria-label="Close settings menu"
           />
-          <div className="absolute left-0 top-0 h-full w-72 bg-white p-5 shadow-md">
+          <div className="absolute left-0 top-0 h-full w-72 bg-card p-5 shadow-md">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[#111827]">Settings</h2>
+              <h2 className="text-sm font-semibold text-text">Settings</h2>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="rounded-xl p-2 text-[#6B7280] transition duration-[180ms] hover:bg-[#F3F4F6] hover:text-[#111827]"
+                className="rounded-xl p-2 text-muted transition duration-normal hover:bg-card-sunken hover:text-text"
                 aria-label="Close settings menu"
               >
                 <X className="h-4 w-4" />
@@ -78,8 +78,8 @@ export function SettingsSection() {
   if (section !== activeSection) return <Navigate to="/settings/profile" replace />
 
   return (
-    <div className="rounded-[20px] border border-[#E5E7EB] bg-white p-6 shadow-sm">
-      {activeSection === 'profile' && <ProfileSection user={user} />}
+    <div className="rounded-card border border-border bg-card p-6 shadow-sm">
+      {activeSection === 'profile' && <ProfileSection key={user?._id || 'profile'} user={user} />}
       {activeSection === 'security' && <SecuritySection />}
       {activeSection === 'notifications' && <NotificationsSection />}
       {activeSection === 'appearance' && <AppearanceSection />}
@@ -89,7 +89,7 @@ export function SettingsSection() {
 
 function SettingsNav({ onNavigate }) {
   return (
-    <nav className="sticky top-24 rounded-[20px] border border-[#E5E7EB] bg-white p-3 shadow-sm">
+    <nav className="sticky top-24 rounded-card border border-border bg-card p-3 shadow-sm">
       <div className="space-y-1">
         {sections.map((item) => {
           const Icon = item.icon
@@ -99,8 +99,8 @@ function SettingsNav({ onNavigate }) {
               to={`/settings/${item.id}`}
               onClick={onNavigate}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-semibold transition duration-[180ms] ${
-                  isActive ? 'bg-[#7C3AED] text-white' : 'text-[#6B7280] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
+                `flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-semibold transition duration-normal ${
+                  isActive ? 'bg-primary text-on-primary' : 'text-muted hover:bg-primary-subtle hover:text-primary'
                 }`
               }
             >
@@ -111,12 +111,12 @@ function SettingsNav({ onNavigate }) {
         })}
       </div>
 
-      <div className="my-3 h-px bg-[#E5E7EB]" />
+      <div className="my-3 h-px bg-border" />
 
       <Link
         to="/dashboard"
         onClick={onNavigate}
-        className="flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-semibold text-[#6B7280] transition duration-[180ms] hover:bg-[#F8F5FF] hover:text-[#7C3AED]"
+        className="flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-semibold text-muted transition duration-normal hover:bg-primary-subtle hover:text-primary"
       >
         <ChevronLeft className="h-4 w-4" />
         Back to Dashboard
@@ -128,8 +128,8 @@ function SettingsNav({ onNavigate }) {
 function SectionHeader({ title, description }) {
   return (
     <div className="mb-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">{title}</h1>
-      <p className="mt-2 text-sm leading-6 text-[#6B7280]">{description}</p>
+      <h1 className="text-2xl font-semibold tracking-tight text-text">{title}</h1>
+      <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
     </div>
   )
 }
@@ -144,13 +144,7 @@ function ProfileSection({ user }) {
     username: user?.username || '',
     avatar: user?.avatar || ''
   })
-  const [userId, setUserId] = useState(user?._id)
   const [saving, setSaving] = useState(false)
-
-  if (user?._id && user._id !== userId) {
-    setUserId(user._id)
-    setForm({ fullName: user?.fullName || '', username: user?.username || '', avatar: user?.avatar || '' })
-  }
 
   const handlePictureChange = (event) => {
     const file = event.target.files?.[0]
@@ -159,14 +153,21 @@ function ProfileSection({ user }) {
       toast.error('Please choose an image file.')
       return
     }
-    if (file.size > 1024 * 1024) {
-      toast.error('Choose an image smaller than 1 MB.')
+    // Server stores avatars as data URLs capped at ~200k chars; base64 expands
+    // ~33%, so keep the raw file under ~140 KB to avoid a late 400/413.
+    if (file.size > 140 * 1024) {
+      toast.error('Choose an image smaller than 140 KB.')
       return
     }
 
     const reader = new FileReader()
     reader.onload = () => {
-      setForm((current) => ({ ...current, avatar: String(reader.result || '') }))
+      const dataUrl = String(reader.result || '')
+      if (dataUrl.length > 200_000) {
+        toast.error('Image is too large after encoding. Try a smaller file.')
+        return
+      }
+      setForm((current) => ({ ...current, avatar: dataUrl }))
       toast.success('Picture ready to save')
     }
     reader.readAsDataURL(file)
@@ -215,7 +216,7 @@ function ProfileSection({ user }) {
           onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
         />
         <SettingsInput label="Email" placeholder="you@example.com" type="email" value={user?.email || ''} readOnly />
-        <p className="-mt-2 text-xs text-[#9CA3AF]">Email changes aren't supported yet.</p>
+        <p className="-mt-2 text-xs text-muted">Email changes aren't supported yet.</p>
         <Button type="button" className="h-12 w-fit" onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
@@ -280,8 +281,8 @@ function SecuritySection() {
         <SettingsAction
           icon={Smartphone}
           title="Active Sessions"
-          description={`Current browser session for ${user?.email || 'this account'} started on ${new Date().toLocaleDateString()}.`}
-          action="Current"
+          description={`You are signed in on this browser as ${user?.email || 'this account'}. Multi-device session management is not available yet.`}
+          action="This browser"
           onClick={() => {}}
         />
       </div>
@@ -291,16 +292,26 @@ function SecuritySection() {
 
 function NotificationsSection() {
   const [preferences, setPreferences] = useState(() => {
-    const saved = window.localStorage.getItem('teamora-notifications')
-    return saved
-      ? JSON.parse(saved)
-      : {
-          emailNotifications: true,
-          workspaceInvitations: true,
-          meetingReminders: true,
-          documentActivity: true,
-          mentionNotifications: true
-        }
+    try {
+      const saved = window.localStorage.getItem('teamora-notifications')
+      return saved
+        ? JSON.parse(saved)
+        : {
+            emailNotifications: true,
+            workspaceInvitations: true,
+            meetingReminders: true,
+            documentActivity: true,
+            mentionNotifications: true
+          }
+    } catch {
+      return {
+        emailNotifications: true,
+        workspaceInvitations: true,
+        meetingReminders: true,
+        documentActivity: true,
+        mentionNotifications: true
+      }
+    }
   })
 
   useEffect(() => {
@@ -325,7 +336,10 @@ function NotificationsSection() {
 
   return (
     <>
-      <SectionHeader title="Notifications" description="Choose which Teamora updates should reach you." />
+      <SectionHeader
+        title="Notifications"
+        description="Preferences are stored on this device only. Email delivery from these toggles is not enabled yet."
+      />
       <div className="space-y-3">
         <ToggleRow
           label="Email notifications"
@@ -363,10 +377,14 @@ function NotificationsSection() {
 
 function AppearanceSection() {
   const [preferences, setPreferences] = useState(() => {
-    const saved = window.localStorage.getItem('teamora-appearance')
-    return saved
-      ? JSON.parse(saved)
-      : { theme: 'Light', density: 'Comfortable', language: 'English', timeZone: 'UTC', dateFormat: 'MM/DD/YYYY' }
+    try {
+      const saved = window.localStorage.getItem('teamora-appearance')
+      return saved
+        ? JSON.parse(saved)
+        : { theme: 'Light', density: 'Comfortable', language: 'English', timeZone: 'UTC', dateFormat: 'MM/DD/YYYY' }
+    } catch {
+      return { theme: 'Light', density: 'Comfortable', language: 'English', timeZone: 'UTC', dateFormat: 'MM/DD/YYYY' }
+    }
   })
 
   useEffect(() => {
@@ -419,7 +437,7 @@ function AppearanceSection() {
 function SettingsInput({ label, type = 'text', placeholder, value = '', onChange, readOnly = false }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-[#374151]">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-text-secondary">{label}</span>
       <Input type={type} value={value} onChange={onChange} placeholder={placeholder} readOnly={readOnly} />
     </label>
   )
@@ -427,20 +445,20 @@ function SettingsInput({ label, type = 'text', placeholder, value = '', onChange
 
 function SettingsAction({ icon: Icon = ShieldCheck, title, description, action, danger = false, onClick }) {
   return (
-    <div className="flex flex-col gap-4 rounded-[20px] border border-[#E5E7EB] p-4 transition duration-[180ms] hover:shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 rounded-card border border-border p-4 transition duration-normal hover:shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#F3F4F6] text-[#6B7280]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-button bg-card-sunken text-muted">
           <Icon className="h-4 w-4" />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-[#111827]">{title}</h3>
-          <p className="mt-1 text-sm text-[#6B7280]">{description}</p>
+          <h3 className="text-sm font-semibold text-text">{title}</h3>
+          <p className="mt-1 text-sm text-muted">{description}</p>
         </div>
       </div>
       <button
         type="button"
         onClick={onClick}
-        className={`h-10 rounded-[14px] px-4 text-sm font-semibold transition duration-[180ms] ${danger ? 'text-[#EF4444] hover:bg-red-50' : 'text-[#7C3AED] hover:bg-[#F8F5FF]'}`}
+        className={`h-10 rounded-button px-4 text-sm font-semibold transition duration-normal ${danger ? 'text-danger hover:bg-red-50' : 'text-primary hover:bg-primary-subtle'}`}
       >
         {action}
       </button>
@@ -450,14 +468,14 @@ function SettingsAction({ icon: Icon = ShieldCheck, title, description, action, 
 
 function ToggleRow({ label, active = false, onToggle, onTest }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#E5E7EB] p-4">
-      <span className="text-sm font-medium text-[#111827]">{label}</span>
+    <div className="flex items-center justify-between gap-3 rounded-card border border-border p-4">
+      <span className="text-sm font-medium text-text">{label}</span>
       <div className="flex items-center gap-2">
         {active && onTest && (
           <button
             type="button"
             onClick={onTest}
-            className="h-9 rounded-[12px] px-3 text-xs font-semibold text-[#7C3AED] transition hover:bg-[#F8F5FF]"
+            className="h-9 rounded-control px-3 text-xs font-semibold text-primary transition hover:bg-primary-subtle"
           >
             Test
           </button>
@@ -470,12 +488,12 @@ function ToggleRow({ label, active = false, onToggle, onTest }) {
 
 function SelectRow({ label, value, options, onChange }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#E5E7EB] p-4">
-      <span className="text-sm font-medium text-[#111827]">{label}</span>
+    <div className="flex items-center justify-between gap-3 rounded-card border border-border p-4">
+      <span className="text-sm font-medium text-text">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-[14px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] outline-none focus:border-[#7C3AED]"
+        className="rounded-button border border-border bg-card px-3 py-2 text-sm text-text-secondary outline-none focus:border-primary"
       >
         {options.map((option) => (
           <option key={option} value={option}>

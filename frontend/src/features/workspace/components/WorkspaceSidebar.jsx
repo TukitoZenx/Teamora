@@ -54,7 +54,7 @@ export default function WorkspaceSidebar({
 
   return (
     <aside
-      className={`flex h-full flex-col border-r border-border bg-card transition-[width] duration-220 ease-in-out ${collapsed ? 'w-[72px]' : 'w-[240px]'} ${className}`}
+      className={`flex h-full flex-col border-r border-border bg-card transition-[width] duration-slow ease-in-out ${collapsed ? 'w-sidebar-collapsed' : 'w-sidebar'} ${className}`}
     >
       <div className="flex h-16 items-center justify-between border-b border-border px-4">
         <div className="flex items-center gap-3 overflow-hidden">
@@ -66,14 +66,14 @@ export default function WorkspaceSidebar({
             onBlur={() => setShowExpandButton(false)}
           >
             <div
-              className={`flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm transition-all duration-180 ease-out ${collapsed && showExpandButton ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
+              className={`flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm transition-all duration-normal ease-standard ${collapsed && showExpandButton ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
             >
               <svg viewBox="0 0 48 48" className="h-5 w-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="4" y="4" width="40" height="40" rx="12" fill="#7C3AED" />
-                <path d="M16 14H32" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
-                <path d="M20 14V34" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
-                <path d="M28 14V34" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
-                <path d="M20 24H28" stroke="white" strokeWidth="2.6" strokeLinecap="round" />
+                <rect x="4" y="4" width="40" height="40" rx="12" fill="currentColor" />
+                <path d="M16 14H32" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
+                <path d="M20 14V34" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
+                <path d="M28 14V34" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
+                <path d="M20 24H28" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
               </svg>
             </div>
 
@@ -81,7 +81,7 @@ export default function WorkspaceSidebar({
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                className={`absolute inset-0 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-180 ease-out hover:scale-105 hover:bg-primary hover:text-white ${showExpandButton ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'}`}
+                className={`absolute inset-0 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary hover:text-on-primary ${showExpandButton ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'}`}
                 aria-label="Expand sidebar"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -95,7 +95,7 @@ export default function WorkspaceSidebar({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-180 ease-out hover:scale-105 hover:bg-primary/10 hover:text-primary"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary/10 hover:text-primary"
             aria-label="Collapse sidebar"
           >
             <ChevronLeft className="h-4 w-4" />

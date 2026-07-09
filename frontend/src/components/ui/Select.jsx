@@ -1,7 +1,17 @@
-export default function Select({ options = [], className = '', ...props }) {
+import clsx from 'clsx'
+
+export default function Select({ options = [], className = '', invalid, ...props }) {
   return (
     <select
-      className={`h-10 rounded-button border border-border bg-card px-3 text-sm font-medium text-text outline-none transition duration-[180ms] hover:border-primary focus:border-primary focus:ring-4 focus:ring-primary/10 ${className}`}
+      aria-invalid={invalid || undefined}
+      className={clsx(
+        'h-11 min-h-11 rounded-button border bg-card px-3 text-sm font-medium text-text outline-none',
+        'transition duration-normal ease-standard hover:border-primary',
+        'focus:border-primary focus:ring-4 focus:ring-primary/10',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        invalid ? 'border-danger' : 'border-border',
+        className
+      )}
       {...props}
     >
       {options.map((option) => (

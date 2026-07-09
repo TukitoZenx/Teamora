@@ -247,7 +247,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex-1 flex flex-col bg-card-sunken overflow-hidden h-full transition-all duration-200 ${
+      className={`flex-1 flex flex-col bg-card-sunken overflow-hidden h-full transition-all duration-normal ${
         isDragging ? 'bg-primary/5 border-2 border-dashed border-primary' : ''
       }`}
     >
@@ -284,7 +284,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                 <span>New Folder</span>
               </button>
 
-              <label className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer shadow-sm">
+              <label className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-on-primary rounded-xl font-semibold text-xs transition-colors cursor-pointer shadow-sm">
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload Files</span>
                 <input type="file" multiple onChange={handleFileUpload} className="hidden" />
@@ -338,9 +338,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
           <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-card rounded-2xl border border-border">
             <Folder className="w-12 h-12 text-muted mb-3 animate-pulse" />
             <span className="text-sm font-semibold text-text">Folder is empty</span>
-            <span className="text-xs text-muted mt-1">
-              Drag and drop or upload files to share them with your team.
-            </span>
+            <span className="text-xs text-muted mt-1">Drag and drop or upload files to share them with your team.</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -397,10 +395,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
 
                 {/* Name & Details */}
                 <div className="min-w-0">
-                  <h4
-                    className="text-xs font-semibold text-text truncate block mt-3"
-                    title={item.name}
-                  >
+                  <h4 className="text-xs font-semibold text-text truncate block mt-3" title={item.name}>
                     {item.name}
                   </h4>
                   <div className="flex items-center justify-between mt-1 text-[10px] text-muted">
@@ -435,7 +430,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
               </button>
               <button
                 onClick={handleCreateFolder}
-                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-on-primary rounded-xl text-xs font-semibold cursor-pointer transition-colors"
               >
                 Create
               </button>
@@ -464,7 +459,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
               </button>
               <button
                 onClick={handleRename}
-                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-on-primary rounded-xl text-xs font-semibold cursor-pointer transition-colors"
               >
                 Save
               </button>
@@ -520,7 +515,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                     <span className="text-sm font-semibold">No preview available for this file type.</span>
                     <button
                       onClick={() => handleDownload(previewFile)}
-                      className="mt-4 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold block mx-auto cursor-pointer"
+                      className="mt-4 px-4 py-2 bg-primary hover:bg-primary-hover text-on-primary rounded-xl text-xs font-semibold block mx-auto cursor-pointer"
                     >
                       Download File
                     </button>
@@ -551,9 +546,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                 <div className="h-px bg-border"></div>
 
                 <div>
-                  <h4 className="font-bold text-muted uppercase tracking-wider text-[10px] mb-2">
-                    Version History
-                  </h4>
+                  <h4 className="font-bold text-muted uppercase tracking-wider text-[10px] mb-2">Version History</h4>
                   <div className="space-y-3">
                     {previewFile.versionHistory ? (
                       previewFile.versionHistory.map((ver, idx) => (

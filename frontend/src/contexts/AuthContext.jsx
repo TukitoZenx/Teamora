@@ -35,12 +35,19 @@ const getInitialUser = () => {
 }
 
 export function AuthProvider({ children }) {
+  // Seed user from cache only for display after validation. Always start with
+  // `loading` true so ProtectedRoute never treats a stale localStorage user as
+  // an authenticated session before `/me` returns.
   const [user, setUser] = useState(() => readCachedUser())
-  const [loading, setLoading] = useState(() => !readCachedUser())
+  const [loading, setLoading] = useState(true)
   const cachedUserRef = useRef(null)
+  const sessionCheckedRef = useRef(false)
 
   const refreshUser = useCallback(async ({ useInitialCache = false } = {}) => {
-    if (!cachedUserRef.current) {
+    // Block protected routes only until the first session check finishes.
+    // Later refreshes (e.g. after saving profile) should not remount the app
+    // into the full-page auth loader.
+    if (!sessionCheckedRef.current) {
       setLoading(true)
     }
 
@@ -49,6 +56,7 @@ export function AuthProvider({ children }) {
       setUser(currentUser)
       cachedUserRef.current = currentUser
       cacheUser(currentUser)
+      sessionCheckedRef.current = true
       return currentUser
     } catch (error) {
       if (error.status === 401) {
@@ -56,6 +64,9 @@ export function AuthProvider({ children }) {
         cachedUserRef.current = null
         cacheUser(null)
       }
+      // Network errors keep the last known user so a brief outage does not
+      // hard-logout; ProtectedRoute still waited for the first attempt.
+      sessionCheckedRef.current = true
       return null
     } finally {
       setLoading(false)
@@ -76,6 +87,8 @@ export function AuthProvider({ children }) {
     setUser(authenticatedUser)
     cachedUserRef.current = authenticatedUser
     cacheUser(authenticatedUser)
+    sessionCheckedRef.current = true
+    setLoading(false)
     return authenticatedUser
   }
 
@@ -85,6 +98,8 @@ export function AuthProvider({ children }) {
     setUser(authenticatedUser)
     cachedUserRef.current = authenticatedUser
     cacheUser(authenticatedUser)
+    sessionCheckedRef.current = true
+    setLoading(false)
     return authenticatedUser
   }
 
@@ -94,6 +109,8 @@ export function AuthProvider({ children }) {
     setUser(null)
     cachedUserRef.current = null
     cacheUser(null)
+    sessionCheckedRef.current = true
+    setLoading(false)
   }
 
   const value = useMemo(

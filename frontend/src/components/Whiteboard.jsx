@@ -532,10 +532,7 @@ export default function Whiteboard({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full relative select-none"
-    >
+    <div ref={containerRef} className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full relative select-none">
       {/* Top Toolbar */}
       <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors z-20">
         <div className="flex items-center gap-3">
@@ -620,7 +617,9 @@ export default function Whiteboard({
             type="button"
             onClick={() => setActivePageId(page.id)}
             className={`h-7 rounded-lg px-3 text-xs font-semibold cursor-pointer border transition-all ${
-              activePageId === page.id ? 'bg-primary text-white border-primary shadow-sm' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'
+              activePageId === page.id
+                ? 'bg-primary text-white border-primary shadow-sm'
+                : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'
             }`}
           >
             {page.name}
@@ -665,9 +664,7 @@ export default function Whiteboard({
                 }
               }}
               className={`p-2 rounded-xl transition-all relative group cursor-pointer ${
-                isActive
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-muted hover:bg-primary/10 hover:text-primary'
+                isActive ? 'bg-primary text-white shadow-sm' : 'text-muted hover:bg-primary/10 hover:text-primary'
               }`}
               title={tool.label}
             >
@@ -683,9 +680,7 @@ export default function Whiteboard({
       {/* Floating Color & Size & Opacity Picker */}
       <div className="absolute right-4 top-16 bg-card/95 border border-border p-3.5 rounded-2xl shadow-card flex flex-col gap-3.5 z-20 backdrop-blur-md transition-colors mt-2">
         <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">
-            Color
-          </span>
+          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">Color</span>
           <div className="grid grid-cols-2 gap-2">
             {colors.map((color) => (
               <button
@@ -714,9 +709,7 @@ export default function Whiteboard({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">
-            Opacity
-          </span>
+          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">Opacity</span>
           <input
             type="range"
             min="0.1"

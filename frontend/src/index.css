@@ -1,49 +1,132 @@
+/**
+ * Teamora Design System — single source of truth
+ * ---------------------------------------------------------------------------
+ * All product UI must consume these tokens (via Tailwind theme utilities or
+ * CSS variables). Do not introduce one-off hex colors, radii, or durations.
+ *
+ * Themes: Light (:root), Dark (.dark), High Contrast (.high-contrast)
+ * Density: html[data-density="comfortable" | "compact"]
+ */
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant high-contrast (&:where(.high-contrast, .high-contrast *));
 
+/* =============================================================================
+   FOUNDATION TOKENS — Light (default)
+   ============================================================================= */
 :root {
-  /* Primary Violet Palette */
-  --tw-primary: #7c3aed; /* Violet 600 */
-  --tw-primary-hover: #6d28d9; /* Violet 700 */
+  /* Brand */
+  --tw-primary: #7c3aed;
+  --tw-primary-hover: #6d28d9;
+  --tw-primary-subtle: #f5f3ff;
+  --tw-primary-muted: #ddd6fe;
+  --tw-on-primary: #ffffff;
 
-  /* Neutral Surface Layering (Light Mode) */
-  --tw-background: #f8fafc; /* Slate 50 */
-  --tw-card: #ffffff; /* Card base surface */
-  --tw-card-elevated: #ffffff; /* Dropdowns, Popups, Modals */
-  --tw-card-sunken: #f1f5f9; /* Tabs backgrounds, Table heads */
+  /* Surfaces */
+  --tw-background: #f8fafc;
+  --tw-card: #ffffff;
+  --tw-card-elevated: #ffffff;
+  --tw-card-sunken: #f1f5f9;
+  --tw-overlay: rgba(15, 23, 42, 0.4);
 
-  /* Typography Colors & Borders (Light Mode) */
-  --tw-text: #0f172a; /* Slate 900 */
-  --tw-muted: #64748b; /* Slate 500 */
-  --tw-border: #e2e8f0; /* Slate 200 */
+  /* Text & borders */
+  --tw-text: #0f172a;
+  --tw-text-secondary: #334155;
+  --tw-muted: #64748b;
+  --tw-border: #e2e8f0;
+  --tw-border-strong: #cbd5e1;
+  --tw-ring: rgba(124, 58, 237, 0.18);
 
-  /* Semantic Feedback Tones */
-  --tw-danger: #ef4444; /* Red 500 */
-  --tw-success: #10b981; /* Emerald 500 */
-  --tw-warning: #f59e0b; /* Amber 500 */
-  --tw-info: #3b82f6; /* Blue 500 */
+  /* Semantic */
+  --tw-danger: #ef4444;
+  --tw-danger-hover: #dc2626;
+  --tw-danger-subtle: #fef2f2;
+  --tw-success: #10b981;
+  --tw-success-hover: #059669;
+  --tw-success-subtle: #ecfdf5;
+  --tw-warning: #f59e0b;
+  --tw-warning-subtle: #fffbeb;
+  --tw-info: #3b82f6;
+  --tw-info-subtle: #eff6ff;
 
-  /* Border Radii Scale */
-  --tw-radius-card: 20px;
+  /* Radii */
+  --tw-radius-xs: 8px;
+  --tw-radius-sm: 10px;
+  --tw-radius-control: 12px;
   --tw-radius-button: 14px;
-  --tw-radius-avatar: 16px;
   --tw-radius-input: 16px;
+  --tw-radius-avatar: 16px;
+  --tw-radius-lg: 18px;
+  --tw-radius-card: 20px;
+  --tw-radius-xl: 24px;
+  --tw-radius-full: 9999px;
 
-  /* Shadows Scale (Light Mode) */
+  /* Elevation */
   --tw-shadow-card: 0 1px 2px rgba(17, 24, 39, 0.06);
   --tw-shadow-hover: 0 8px 24px rgba(17, 24, 39, 0.08);
   --tw-shadow-dropdown: 0 12px 32px rgba(17, 24, 39, 0.1);
   --tw-shadow-modal: 0 18px 48px rgba(17, 24, 39, 0.14);
 
-  /* Font Scale & Settings */
-  --tw-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Layout */
+  --tw-navbar-height: 72px;
+  --tw-sidebar-width: 240px;
+  --tw-sidebar-collapsed: 72px;
+  --tw-container-sm: 420px;
+  --tw-container-md: 768px;
+  --tw-container-lg: 1024px;
+  --tw-container-xl: 1280px;
+  --tw-container-2xl: 1440px;
+
+  /* Motion */
+  --tw-duration-fast: 120ms;
+  --tw-duration-normal: 180ms;
+  --tw-duration-slow: 220ms;
+  --tw-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --tw-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Z-index scale */
+  --tw-z-base: 0;
+  --tw-z-dropdown: 50;
+  --tw-z-sticky: 100;
+  --tw-z-navbar: 1000;
+  --tw-z-sidebar: 1100;
+  --tw-z-modal: 1200;
+  --tw-z-toast: 1300;
+  --tw-z-tooltip: 1400;
+
+  /* Overlay effects */
+  --tw-blur-overlay: 10px;
+  --tw-opacity-disabled: 0.6;
+  --tw-opacity-muted: 0.5;
+
+  /* Icon sizes */
+  --tw-icon-xs: 14px;
+  --tw-icon-sm: 16px;
+  --tw-icon-md: 20px;
+  --tw-icon-lg: 24px;
+
+  /* Touch targets (WCAG 2.2) */
+  --tw-touch-min: 44px;
+
+  /* Typography */
+  --tw-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --tw-font-weight-regular: 400;
   --tw-font-weight-medium: 500;
   --tw-font-weight-semibold: 600;
   --tw-font-weight-bold: 700;
+  --tw-leading-tight: 1.25;
+  --tw-leading-normal: 1.5;
+  --tw-leading-relaxed: 1.7;
 
+  /* Skeleton */
+  --tw-skeleton-from: #f1f5f9;
+  --tw-skeleton-via: #e2e8f0;
+  --tw-skeleton-to: #f1f5f9;
+
+  color-scheme: light;
   font-family: var(--tw-font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -51,54 +134,147 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* =============================================================================
+   DARK THEME
+   ============================================================================= */
 .dark {
-  /* Primary Violet Palette (Softer for dark context) */
-  --tw-primary: #a78bfa; /* Violet 400 */
-  --tw-primary-hover: #c4b5fd; /* Violet 300 */
+  --tw-primary: #a78bfa;
+  --tw-primary-hover: #c4b5fd;
+  --tw-primary-subtle: #2e1065;
+  --tw-primary-muted: #5b21b6;
+  --tw-on-primary: #0f172a;
 
-  /* Neutral Surface Layering (Dark Mode) */
-  --tw-background: #0f172a; /* Slate 900 (surface-0) */
-  --tw-card: #1e293b; /* Slate 800 (surface-1) */
-  --tw-card-elevated: #334155; /* Slate 700 (surface-2) */
-  --tw-card-sunken: #0b0f19; /* Ultra-dark (surface-3) */
+  --tw-background: #0f172a;
+  --tw-card: #1e293b;
+  --tw-card-elevated: #334155;
+  --tw-card-sunken: #0b1220;
+  --tw-overlay: rgba(0, 0, 0, 0.6);
 
-  /* Typography Colors & Borders (Dark Mode) */
-  --tw-text: #f8fafc; /* Slate 50 */
-  --tw-muted: #94a3b8; /* Slate 400 */
-  --tw-border: #334155; /* Slate 700 */
+  --tw-text: #f8fafc;
+  --tw-text-secondary: #e2e8f0;
+  --tw-muted: #94a3b8;
+  --tw-border: #334155;
+  --tw-border-strong: #475569;
+  --tw-ring: rgba(167, 139, 250, 0.28);
 
-  /* Semantic Feedback Tones */
-  --tw-danger: #f87171; /* Red 400 */
-  --tw-success: #34d399; /* Emerald 400 */
-  --tw-warning: #fbbf24; /* Amber 400 */
-  --tw-info: #60a5fa; /* Blue 400 */
+  --tw-danger: #f87171;
+  --tw-danger-hover: #fca5a5;
+  --tw-danger-subtle: #450a0a;
+  --tw-success: #34d399;
+  --tw-success-hover: #6ee7b7;
+  --tw-success-subtle: #064e3b;
+  --tw-warning: #fbbf24;
+  --tw-warning-subtle: #451a03;
+  --tw-info: #60a5fa;
+  --tw-info-subtle: #1e3a8a;
 
-  /* Shadows Scale (Dark Mode) */
   --tw-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   --tw-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.4);
   --tw-shadow-dropdown: 0 12px 32px rgba(0, 0, 0, 0.5);
   --tw-shadow-modal: 0 18px 48px rgba(0, 0, 0, 0.6);
+
+  --tw-skeleton-from: #1e293b;
+  --tw-skeleton-via: #334155;
+  --tw-skeleton-to: #1e293b;
+
+  color-scheme: dark;
 }
 
+/* =============================================================================
+   HIGH CONTRAST (additive — works with light or dark base)
+   ============================================================================= */
+.high-contrast {
+  --tw-primary: #5b21b6;
+  --tw-primary-hover: #4c1d95;
+  --tw-primary-subtle: #ede9fe;
+  --tw-on-primary: #ffffff;
+  --tw-text: #000000;
+  --tw-text-secondary: #111111;
+  --tw-muted: #333333;
+  --tw-border: #000000;
+  --tw-border-strong: #000000;
+  --tw-background: #ffffff;
+  --tw-card: #ffffff;
+  --tw-card-elevated: #ffffff;
+  --tw-card-sunken: #f5f5f5;
+  --tw-danger: #b91c1c;
+  --tw-success: #047857;
+  --tw-warning: #b45309;
+  --tw-info: #1d4ed8;
+  --tw-ring: rgba(0, 0, 0, 0.45);
+  --tw-shadow-card: 0 0 0 2px #000000;
+  --tw-shadow-hover: 0 0 0 2px #000000;
+  --tw-shadow-dropdown: 0 0 0 2px #000000;
+  --tw-shadow-modal: 0 0 0 3px #000000;
+  color-scheme: light;
+}
+
+.dark.high-contrast,
+.high-contrast.dark {
+  --tw-primary: #ddd6fe;
+  --tw-primary-hover: #f5f3ff;
+  --tw-primary-subtle: #1e1b4b;
+  --tw-on-primary: #000000;
+  --tw-text: #ffffff;
+  --tw-text-secondary: #ffffff;
+  --tw-muted: #e5e5e5;
+  --tw-border: #ffffff;
+  --tw-border-strong: #ffffff;
+  --tw-background: #000000;
+  --tw-card: #0a0a0a;
+  --tw-card-elevated: #171717;
+  --tw-card-sunken: #000000;
+  --tw-danger: #fca5a5;
+  --tw-success: #6ee7b7;
+  --tw-warning: #fcd34d;
+  --tw-info: #93c5fd;
+  --tw-ring: rgba(255, 255, 255, 0.55);
+  color-scheme: dark;
+}
+
+/* =============================================================================
+   TAILWIND v4 THEME BRIDGE
+   ============================================================================= */
 @theme {
   --color-primary: var(--tw-primary);
   --color-primary-hover: var(--tw-primary-hover);
+  --color-primary-subtle: var(--tw-primary-subtle);
+  --color-primary-muted: var(--tw-primary-muted);
+  --color-on-primary: var(--tw-on-primary);
+
   --color-background: var(--tw-background);
   --color-card: var(--tw-card);
   --color-card-elevated: var(--tw-card-elevated);
   --color-card-sunken: var(--tw-card-sunken);
+  --color-overlay: var(--tw-overlay);
+
   --color-text: var(--tw-text);
+  --color-text-secondary: var(--tw-text-secondary);
   --color-muted: var(--tw-muted);
   --color-border: var(--tw-border);
-  --color-danger: var(--tw-danger);
-  --color-success: var(--tw-success);
-  --color-warning: var(--tw-warning);
-  --color-info: var(--tw-info);
+  --color-border-strong: var(--tw-border-strong);
+  --color-ring: var(--tw-ring);
 
-  --radius-card: var(--tw-radius-card);
+  --color-danger: var(--tw-danger);
+  --color-danger-hover: var(--tw-danger-hover);
+  --color-danger-subtle: var(--tw-danger-subtle);
+  --color-success: var(--tw-success);
+  --color-success-hover: var(--tw-success-hover);
+  --color-success-subtle: var(--tw-success-subtle);
+  --color-warning: var(--tw-warning);
+  --color-warning-subtle: var(--tw-warning-subtle);
+  --color-info: var(--tw-info);
+  --color-info-subtle: var(--tw-info-subtle);
+
+  --radius-xs: var(--tw-radius-xs);
+  --radius-sm: var(--tw-radius-sm);
+  --radius-control: var(--tw-radius-control);
   --radius-button: var(--tw-radius-button);
-  --radius-avatar: var(--tw-radius-avatar);
   --radius-input: var(--tw-radius-input);
+  --radius-avatar: var(--tw-radius-avatar);
+  --radius-lg: var(--tw-radius-lg);
+  --radius-card: var(--tw-radius-card);
+  --radius-xl: var(--tw-radius-xl);
 
   --shadow-card: var(--tw-shadow-card);
   --shadow-hover: var(--tw-shadow-hover);
@@ -110,12 +286,74 @@
   --font-weight-medium: var(--tw-font-weight-medium);
   --font-weight-semibold: var(--tw-font-weight-semibold);
   --font-weight-bold: var(--tw-font-weight-bold);
+
+  --spacing-navbar: var(--tw-navbar-height);
+  --spacing-sidebar: var(--tw-sidebar-width);
+  --spacing-sidebar-collapsed: var(--tw-sidebar-collapsed);
+
+  --container-auth: var(--tw-container-sm);
+  --container-content: var(--tw-container-xl);
+
+  --duration-fast: var(--tw-duration-fast);
+  --duration-normal: var(--tw-duration-normal);
+  --duration-slow: var(--tw-duration-slow);
+
+  --ease-standard: var(--tw-ease-standard);
+  --ease-emphasized: var(--tw-ease-emphasized);
+
+  --blur-overlay: var(--tw-blur-overlay);
+
+  --height-navbar: var(--tw-navbar-height);
+  --width-sidebar: var(--tw-sidebar-width);
+  --width-sidebar-collapsed: var(--tw-sidebar-collapsed);
+  --width-auth: var(--tw-container-sm);
+
+  --z-index-dropdown: var(--tw-z-dropdown);
+  --z-index-sticky: var(--tw-z-sticky);
+  --z-index-navbar: var(--tw-z-navbar);
+  --z-index-sidebar: var(--tw-z-sidebar);
+  --z-index-modal: var(--tw-z-modal);
+  --z-index-toast: var(--tw-z-toast);
+  --z-index-tooltip: var(--tw-z-tooltip);
 }
 
-/* Global accessibility focus styling for keyboard navigation */
+/* =============================================================================
+   BASE
+   ============================================================================= */
 *:focus-visible {
-  outline: 2px solid var(--tw-primary) !important;
-  outline-offset: 2px !important;
+  outline: 2px solid var(--tw-primary);
+  outline-offset: 2px;
+}
+
+/* Text fields use their own border/ring styles — avoid a second outer box */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+/* Quill document editor — continuous typing, no snow toolbar chrome */
+.quill-editor-wrapper.ql-container {
+  border: none !important;
+  font-family: inherit;
+}
+.quill-editor-wrapper .ql-editor {
+  min-height: 420px;
+  outline: none;
+  cursor: text;
+}
+.quill-editor-wrapper .ql-editor:focus {
+  outline: none;
+}
+.quill-editor-wrapper .ql-editor.ql-blank::before {
+  color: var(--tw-muted);
+  font-style: normal;
+  left: 0;
+  right: 0;
 }
 
 body {
@@ -125,18 +363,11 @@ body {
   background: var(--tw-background);
   color: var(--tw-text);
   font-family: var(--tw-font-sans);
-  line-height: 1.5;
+  line-height: var(--tw-leading-normal);
 }
 
 html[data-density='compact'] body {
   line-height: 1.35;
-}
-
-html[data-density='compact'] button,
-html[data-density='compact'] input,
-html[data-density='compact'] select,
-html[data-density='compact'] textarea {
-  min-height: unset;
 }
 
 html[data-density='compact'] .teamora-content-fade {
@@ -146,12 +377,15 @@ html[data-density='compact'] .teamora-content-fade {
 #root {
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
-/* Custom scrollbar hiding utility */
+/* =============================================================================
+   SHARED UTILITIES
+   ============================================================================= */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -160,11 +394,27 @@ html[data-density='compact'] .teamora-content-fade {
   scrollbar-width: none;
 }
 
+/* Prefer custom thin scrollbars that match the theme */
+.teamora-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tw-border-strong) transparent;
+}
+.teamora-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.teamora-scroll::-webkit-scrollbar-thumb {
+  background: var(--tw-border-strong);
+  border-radius: var(--tw-radius-full);
+}
+.teamora-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 @keyframes teamora-skeleton-shimmer {
   0% {
     background-position: -200% 0;
   }
-
   100% {
     background-position: 200% 0;
   }
@@ -174,29 +424,66 @@ html[data-density='compact'] .teamora-content-fade {
   from {
     opacity: 0;
   }
-
   to {
     opacity: 1;
   }
 }
 
 .skeleton-shimmer {
-  background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
+  background: linear-gradient(
+    90deg,
+    var(--tw-skeleton-from) 0%,
+    var(--tw-skeleton-via) 50%,
+    var(--tw-skeleton-to) 100%
+  );
   background-size: 200% 100%;
-  animation: teamora-skeleton-shimmer 1.2s ease-in-out infinite;
-  border-radius: 12px;
+  animation: teamora-skeleton-shimmer 1.2s var(--tw-ease-standard) infinite;
+  border-radius: var(--tw-radius-control);
 }
 
 .teamora-content-fade {
-  animation: teamora-content-fade 150ms ease-out both;
+  animation: teamora-content-fade var(--tw-duration-fast) var(--tw-ease-standard) both;
 }
 
-/* Reduced Motion overrides for accessibility */
+/* Page shell: standard app frame under fixed navbar */
+.teamora-page {
+  min-height: calc(100vh - var(--tw-navbar-height));
+  min-height: calc(100dvh - var(--tw-navbar-height));
+  padding-top: var(--tw-navbar-height);
+  background: var(--tw-background);
+  color: var(--tw-text);
+}
+
+.teamora-page-inner {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--tw-container-xl);
+  padding: 1.5rem 1.25rem;
+}
+
+/* Overlay scrim for drawers/modals */
+.teamora-scrim {
+  background: var(--tw-overlay);
+  backdrop-filter: blur(var(--tw-blur-overlay));
+}
+
+/* Interactive control baseline */
+.teamora-control {
+  min-height: var(--tw-touch-min);
+  border-radius: var(--tw-radius-button);
+  transition:
+    background-color var(--tw-duration-normal) var(--tw-ease-standard),
+    border-color var(--tw-duration-normal) var(--tw-ease-standard),
+    color var(--tw-duration-normal) var(--tw-ease-standard),
+    box-shadow var(--tw-duration-normal) var(--tw-ease-standard),
+    opacity var(--tw-duration-normal) var(--tw-ease-standard);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto !important;
   }
-  
+
   *,
   *::before,
   *::after {
@@ -205,16 +492,20 @@ html[data-density='compact'] .teamora-content-fade {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  .teamora-content-fade,
+  .skeleton-shimmer {
+    animation: none !important;
+  }
 }
 
-/* Ensure consistent cursors for all interactive elements */
 button,
 a,
 select,
-input[type="button"],
-input[type="submit"],
-input[type="reset"],
-[role="button"] {
+input[type='button'],
+input[type='submit'],
+input[type='reset'],
+[role='button'] {
   cursor: pointer;
 }
 
@@ -223,27 +514,33 @@ a:disabled,
 select:disabled,
 input:disabled,
 textarea:disabled,
-[role="button"]:disabled,
-.disabled {
+[role='button']:disabled,
+.disabled,
+[aria-disabled='true'] {
   cursor: not-allowed !important;
+  opacity: var(--tw-opacity-disabled);
 }
 
-input[type="text"],
-input[type="password"],
-input[type="email"],
-input[type="number"],
-input[type="search"],
-input[type="tel"],
-input[type="url"],
+input[type='text'],
+input[type='password'],
+input[type='email'],
+input[type='number'],
+input[type='search'],
+input[type='tel'],
+input[type='url'],
 textarea {
   cursor: text;
 }
 
-/* Grab cursor for draggable elements */
-[draggable="true"] {
+[draggable='true'] {
   cursor: grab;
 }
-[draggable="true"]:active {
+[draggable='true']:active {
   cursor: grabbing;
 }
 
+/* Selection colors match brand */
+::selection {
+  background: color-mix(in srgb, var(--tw-primary) 28%, transparent);
+  color: var(--tw-text);
+}

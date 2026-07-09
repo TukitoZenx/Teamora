@@ -1,9 +1,10 @@
-# Teamora — Full Codebase Audit Report
+# Teamora — Full Codebase Audit Report (Re-audit)
 
-**Date:** 2026-07-09  
+**Date:** 2026-07-10  
 **Branch:** `teamora-v2`  
 **Scope:** Entire monorepo (`backend/`, `frontend/`, root, CI)  
-**Method:** Source inspection only (no assumptions about undeployed services)
+**Method:** Source inspection + `npm test` / `npm run lint` / `npm run build` / `npm audit`  
+**Note:** Supersedes the 2026-07-09 report for *open* findings. Items marked **RESOLVED** were fixed in prior commits and verified still present.
 
 ---
 
@@ -13,219 +14,244 @@
 |-------|--------|------|
 | **Backend** | Express 5, Mongoose 9, Passport Google OAuth, express-session + connect-mongo, Helmet, CORS, rate-limit | Auth, workspaces, invites, join requests, notifications, tasks |
 | **Frontend** | React 19, Vite 8, React Router 7, Tailwind 4, Axios | SPA: landing, auth, dashboard, workspace tools |
-| **Data** | MongoDB (User, Workspace embeds: tasks, joinRequests, notifications, approvedMembers) | No separate Task/Document collections |
+| **Data** | MongoDB (`User`, `Workspace` embeds: tasks, joinRequests, notifications, approvedMembers) | No separate Task/Document collections |
 | **Realtime** | Browser-only `BroadcastChannel` + `localStorage` (`localCollabChannel`) | Cross-tab sync for docs/whiteboard/spreadsheet/slides/files/meetings |
-| **Deploy** | Frontend → Vercel (`vercel.json` SPA rewrites); Backend → Render (hardcoded prod API URL fallback) | Cross-origin cookies (`sameSite: 'none'`) |
+| **Deploy** | Frontend → Vercel; Backend → Render | Cross-origin cookies (`sameSite: 'none'` in production) |
 
-**Request flow (auth):** Browser → session cookie → `requireAuth` → controller → service → Mongoose.
+**Auth flow:** Browser session cookie → `requireAuth` → controller → service → Mongoose.
 
-**Workspace tools:** Lazy-loaded sections wrap heavy editors (`Documents`, `Whiteboard`, …) with `useLocalCollabChannel`. Content is **not** persisted server-side (except Calendar/Tasks via REST).
+**Workspace tools:** Lazy-loaded sections + `useLocalCollabChannel`. Collaboration content is **not** server-persisted (except Calendar/Tasks via REST).
 
----
-
-## 2. Mental Model — Component Dependencies
-
-```
-main.jsx → AuthProvider → App.jsx (routes)
-  ├─ Auth pages → features/auth/services/auth → services/api → /api/auth/*
-  ├─ Dashboard → workspace CRUD via /api/v1/workspaces
-  └─ WorkspaceHome
-       ├─ Calendar (tasks REST)
-       ├─ *Section (lazy) → localCollabChannel → feature components
-       ├─ Members / Settings / Chat (localStorage chat)
-       └─ NotificationButton → /api/v1/workspaces/notifications
-```
-
-**Backend modules:** `server.js` → `app.js` → `auth.routes` / `workspace.routes` → controllers → services → models.
+**Conventions:** CommonJS backend; ESM React frontend; Tailwind utility classes (mix of design tokens + hex literals); toast errors; axios interceptor normalizes API errors; Node native `node:test` on backend; ESLint + Prettier both sides.
 
 ---
 
-## 3. Critical Issues
+## 2. Previously Critical / High — Status Check
 
-### C1 — `joinApproval` setting is ignored
-| | |
-|--|--|
-| **Files** | `backend/src/services/workspace.service.js` (`requestWorkspaceAccess`); UI in `WorkspaceHome.jsx` |
-| **Root cause** | Setting is stored and editable, but join path always creates a pending request (unless already approved). |
-| **Impact** | Owners who turn off “Join approval” still force every invitee through request/accept. Feature is non-functional. |
-| **Fix** | When `workspace.joinApproval === false`, auto-add member, approval row, accept pending requests, return `joined: true`. |
-
-### C2 — Protected routes flash unauthenticated content
-| | |
-|--|--|
-| **Files** | `frontend/src/components/ProtectedRoute.jsx` |
-| **Root cause** | While `loading === true`, children render without auth check. |
-| **Impact** | Brief leak of dashboard/workspace chrome; possible flash of private UI before redirect. |
-| **Fix** | Render a neutral full-page loader until session resolves. |
-
-### C3 — Meetings host / chat partially broken
-| | |
-|--|--|
-| **Files** | `frontend/src/components/Meetings.jsx`, `localCollabChannel.js`, `MeetingsSection.jsx` |
-| **Root cause** | `activeUsers` always `[]` → `isHost` always false (host controls never work). `send-message` not in relay map → chat only updates local state. Recording claims “saved to Files” but does not save. |
-| **Impact** | Waiting room, mute/kick/admit unusable; multi-tab chat incomplete; misleading recording UX. |
-| **Fix** | First participant becomes host; relay meeting chat; honest recording UX (timer only / local download). |
+| ID | Issue | Status |
+|----|--------|--------|
+| C1 | `joinApproval` ignored | **RESOLVED** — auto-join when `joinApproval === false` |
+| C2 | ProtectedRoute flash while loading | **RESOLVED** — `AuthLoadingShell` while `loading` |
+| C3 | Meetings host / chat broken | **RESOLVED** — host claim + `send-message` relay + local download recording |
+| H1 | Unused Socket.IO packages | **RESOLVED** — removed from both package.json files |
+| H2 | Leave does not revoke approval | **RESOLVED** — `revokedAt` on leave |
+| H3 | Unbounded avatar payload | **RESOLVED** — 200KB avatar + `express.json({ limit: '300kb' })` |
+| H4 | Orphan Tasks/FileExplorer | **RESOLVED** — removed; ErrorBoundary at root |
+| H6 | Notification recipient filter fragile | **RESOLVED** — `getEntityId` |
 
 ---
 
-## 4. High-Priority Issues
+## 3. Open Findings (Prioritized)
 
-### H1 — Unused Socket.IO dependencies still installed
-| | |
-|--|--|
-| **Files** | `frontend/package.json` (`socket.io-client`), `backend/package.json` (`socket.io`) |
-| **Root cause** | Legacy realtime server removed; local collab channel replaced it. |
-| **Impact** | Dead weight, larger install surface, confusion. |
-| **Fix** | Remove packages and reinstall lockfiles. |
+### Critical
 
-### H2 — Leave workspace does not revoke membership approval
-| | |
-|--|--|
-| **Files** | `backend/src/services/workspace.service.js` (`leaveWorkspace`) |
-| **Root cause** | Member list updated; `approvedMembers` not revoked. |
-| **Impact** | Leaving user can re-join via invite without approval (`hasActiveApproval` path). |
-| **Fix** | Set `revokedAt` on leave (same as `removeMember`). |
-
-### H3 — Avatar stored as unrestricted base64 on user document
-| | |
-|--|--|
-| **Files** | `SettingsPage.jsx` (1MB client cap); `auth.service.js` / User model (no server cap) |
-| **Root cause** | Profile accepts arbitrary string avatar; `express.json()` default may still allow large payloads. |
-| **Impact** | Document bloat, DoS via large profile updates, Mongo size pressure. |
-| **Fix** | Server-side max length (~200KB data URL), `express.json({ limit: '300kb' })`. |
-
-### H4 — Orphaned / dead frontend modules
-| | |
-|--|--|
-| **Files** | `Tasks.jsx`, `FileExplorer.jsx`, `frontend/UserAvatar.jsx`, design tokens under `styles/` (mostly unused), `ErrorBoundary` unused |
-| **Root cause** | Tasks UI replaced by Calendar; FileExplorer never wired; leftover re-exports. |
-| **Impact** | Maintenance cost; `Tasks.jsx` still emits `update-tasks` which has no channel rule. |
-| **Fix** | Wire ErrorBoundary at root; remove or clearly quarantine dead modules; prefer delete confirmed-orphan files. |
-
-### H5 — Google OAuth silently upgrades local accounts
-| | |
-|--|--|
-| **Files** | `auth.service.js` `findOrCreateGoogleUser` |
-| **Root cause** | Existing email → `provider = 'google'` without additional linking step. |
-| **Impact** | Google-verified email ownership makes this common and usually OK; still changes auth method without user intent in Settings “Connect”. Document as accepted risk; do not wipe password. |
-| **Fix** | Keep password hash; set provider to google only when linking intentionally; avoid wiping local password. |
-
-### H6 — Notification recipient filter fragile when populated
-| | |
-|--|--|
-| **Files** | `workspace.service.js` `getNotifications` |
-| **Root cause** | Compares `notification.recipient.toString()`; if populated object, wrong comparison. |
-| **Impact** | Notifications may disappear for users if population changes. |
-| **Fix** | Use `getEntityId(notification.recipient)`. |
+*None remaining after prior fix pass.* Residual product limits (local-only collab, same-browser WebRTC) are architectural, not silent functional failures.
 
 ---
 
-## 5. Medium-Priority Issues
+### High
 
-| ID | Issue | Files | Impact | Fix |
-|----|--------|-------|--------|-----|
-| M1 | setState during render when switching workspace | `WorkspaceHome.jsx` | React anti-pattern; subtle bugs | Use `useEffect` / key remount |
-| M2 | Frontend signup does not enforce min password length (8) | `useAuthForm.js` | Server rejects; poor UX | Client-side min length |
-| M3 | Meeting WebRTC only same-browser tabs | design limitation | No cross-device meetings | Document; future signaling server |
-| M4 | Workspace docs/files only localStorage | collab channel | No multi-device persistence | Future workspace content API |
-| M5 | Chat is local-only | `WorkspaceHome` | No multi-user chat | Future chat API / channel |
-| M6 | CI only on `main`/`master` | `.github/workflows/ci.yml` | `teamora-v2` PRs skip CI | Add branch |
-| M7 | Quill XSS advisory (low, unpatched 2.x) | `quill@2.0.3` | XSS if malicious HTML exported | Track upstream; sanitize exports |
-| M8 | Large JS chunks (Documents ~1.1MB, Spreadsheet ~500KB) | build | Slow first open of sections | Already lazy-loaded; further split optional |
-| M9 | Hardcoded production API URL | `api.js` | Wrong backend if Render URL changes | Prefer env only; document |
-| M10 | `removeRecentWorkspaceForEveryone` dead | `workspace.service.js` | Dead code | Remove or use on hard delete |
-| M11 | Recording “saved to Files” lie | `Meetings.jsx` | False UX | Fix copy / implement download |
-| M12 | Noise suppression / blur mostly cosmetic | `Meetings.jsx` | Blur works on video CSS; noise does nothing | Wire or label experimental |
-| M13 | Rate limit disabled outside production for auth | `auth.routes.js` | Fine for dev; intentional | Keep |
-| M14 | Uncommitted git mess (staged root deletes, node_modules noise) | repo | Hard reviews | Clean commit; never commit node_modules |
+#### H1 — Workspace creation limit only enforced on the client
+| | |
+|--|--|
+| **Severity** | High |
+| **Location** | `frontend/src/App.jsx` (`createWorkspace`); `backend/src/services/workspace.service.js` (`createWorkspace`) |
+| **Why it matters** | Cap of 6 is trivial to bypass via direct API calls; product rule is not real. |
+| **Fix direction** | Enforce max owned non-archived workspaces server-side; keep client check as UX. |
 
----
+#### H2 — Auth cache marks session ready before `/me` revalidation
+| | |
+|--|--|
+| **Severity** | High |
+| **Location** | `frontend/src/contexts/AuthContext.jsx` (`loading` init from cache) |
+| **Why it matters** | With a stale `teamora-auth-user` cache, `loading` starts `false` and `ProtectedRoute` renders private UI before the session cookie is verified. Expired sessions flash dashboard/workspace chrome and fire authenticated API calls that 401. |
+| **Fix direction** | Always keep `loading === true` until the first `/me` attempt completes; still seed `user` from cache for post-validation display if desired. |
 
-## 6. Low-Priority / Improvements
-
-- Design tokens in `styles/` unused; UI uses Tailwind literals.
-- Duplicate ProfileDropdown (app vs workspace) — intentional.
-- No integration tests / e2e; only unit tests for email + leaveWorkspace.
-- `morgan('dev')` in production noisy; consider `combined` in prod.
-- No Docker / health monitoring beyond `/health`.
-- Settings “Devices” / security actions are display-only.
-- Favicon fixed to `/teamora.png` (good).
-- Content-Type CSRF mitigation present for mutating routes (good).
-- Session regenerate on login (good).
-- Password reset token hashed at rest (good).
+#### H3 — Legacy `rooms` collection update blocks leave/delete for ~10s when Mongo is buffering
+| | |
+|--|--|
+| **Severity** | High |
+| **Location** | `backend/src/services/workspace.service.js` (`leaveWorkspace`, `deleteWorkspace`) |
+| **Why it matters** | `mongoose.connection.collection('rooms').updateOne(...)` waits on buffer timeout (observed **10s**) when the connection is not ready. Sole-owner leave tests hang; production degrades if Mongo is reconnecting. |
+| **Fix direction** | Only touch `rooms` when `mongoose.connection.readyState === 1`; keep try/catch. |
 
 ---
 
-## 7. Security Findings
+### Medium
 
-| Severity | Finding | Status |
+#### M1 — Failed workspace list fetch wipes UI + local cache
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `frontend/src/App.jsx` (`loadWorkspaces` catch) |
+| **Why it matters** | A transient network blip empties the dashboard and clears cache, looking like “all workspaces deleted.” |
+| **Fix direction** | On error, set notice only; retain previous `workspaces` / `recentWorkspaces` and cache. |
+
+#### M2 — Avatar client cap (1 MB file) vs server (~200k chars / 300kb JSON)
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `frontend/src/components/SettingsPage.jsx`; `backend/src/services/auth.service.js` |
+| **Why it matters** | Users pick a valid client image that fails only after upload with a confusing server error (or 413). Base64 expands ~33%. |
+| **Fix direction** | Client-side max ~140 KB file (or compress before data URL); align copy with server. |
+
+#### M3 — Workspace settings form state does not re-sync from props
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `frontend/src/components/WorkspaceHome.jsx` (`WorkspaceSettings`) |
+| **Why it matters** | After refresh/accept flows, toggles like `joinApproval` can show stale local state until remount. |
+| **Fix direction** | `useEffect` syncing from `workspace` when ids/settings change. |
+
+#### M4 — `declineJoinRequest` ignores archived workspaces
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `backend/src/services/workspace.service.js` |
+| **Why it matters** | Accept path rejects archived workspaces; decline still mutates them — inconsistent. |
+| **Fix direction** | Mirror accept: 404 if `archivedAt` set. |
+
+#### M5 — “Export as Word” is HTML with a fake DOCX MIME type
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `frontend/src/components/Documents.jsx` (`exportDocx`) |
+| **Why it matters** | Misleading product behavior; files often fail to open correctly in Word. |
+| **Fix direction** | Honest “Export HTML” download (or real DOCX later). |
+
+#### M6 — Noise suppression toggle is cosmetic only
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `frontend/src/components/Meetings.jsx` |
+| **Why it matters** | Control implies audio processing that never applies. |
+| **Fix direction** | Label as experimental / unavailable, or apply `getUserMedia` constraints when re-acquiring audio. |
+
+#### M7 — CI does not run on active development branch
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `.github/workflows/ci.yml` |
+| **Why it matters** | Work on `teamora-v2` skips automated checks until merge to main. |
+| **Fix direction** | Add `teamora-v2` (and optionally all PRs) to `on.push` / `on.pull_request`. |
+
+#### M8 — Waiting-room signal with missing host target is not targeted
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `frontend/src/components/Meetings.jsx` (`handleJoinMeeting`) |
+| **Why it matters** | Empty `targetSocketId` causes non-targeted broadcast semantics in the local channel. |
+| **Fix direction** | If no host, claim host or block join with clear toast. |
+
+#### M9 — Settings “notification preferences” and “active sessions” are mostly cosmetic
+| | |
+|--|--|
+| **Severity** | Medium |
+| **Location** | `frontend/src/components/SettingsPage.jsx` |
+| **Why it matters** | Email notification toggles do not hit the backend; “session started today” is fabricated. |
+| **Fix direction** | Honest copy (“stored on this device only” / “current browser session”) — no fake session inventory. |
+
+---
+
+### Low / Tech debt
+
+| ID | Issue | Location | Fix direction |
+|----|--------|----------|---------------|
+| L1 | `requireAuth` omits `success: false` | `auth.middleware.js` | Align response shape |
+| L2 | `morgan('dev')` in production | `app.js` | `combined` when prod |
+| L3 | Quill 2.0.3 XSS advisory (export path) | `package.json` | Monitor upstream; sanitize exports |
+| L4 | Hardcoded Render API fallback | `api.js` | Prefer env-only; document |
+| L5 | Leftover `VITE_CLERK_*` in local env example surface | `frontend/.env` | Remove dead Clerk key if unused |
+| L6 | Print path embeds `docTitle` unsanitized | `Documents.jsx` | Escape HTML in title |
+| L7 | `visibility` private vs invite_only not enforced on join | workspace service | Document or enforce |
+| L8 | Large lazy chunks (Documents ~1.2MB) | build output | Acceptable for now; optional further splits |
+| L9 | Notifications poll every 5s | `NotificationButton.jsx` | Acceptable at current scale |
+| L10 | Embedded tasks/notifications on Workspace | models | Architecture debt for large orgs |
+
+---
+
+## 4. Security Snapshot
+
+| Severity | Finding | Action |
 |----------|---------|--------|
-| High | joinApproval bypass of owner intent | Fix in this pass |
-| High | Unbounded profile avatar payload | Fix in this pass |
-| Medium | Protected route content flash | Fix in this pass |
-| Medium | Quill HTML export XSS (upstream) | Accepted / monitor |
-| Medium | Cross-origin session cookies without classic CSRF tokens | Mitigated via JSON Content-Type + CORS |
-| Low | Weak default `SESSION_SECRET` in non-prod | Acceptable; prod requires secret |
-| Low | Email enumeration mitigated on forgot-password | Good |
-| Info | `.env` gitignored | Good |
-| Info | Backend npm audit clean | Good |
+| High | Client-only workspace limit | Fix this pass |
+| High | Stale auth cache gates protected UI | Fix this pass |
+| Medium | Cross-origin sessions without classic CSRF tokens | **Mitigated** (JSON Content-Type + CORS) |
+| Medium | Avatar client/server size drift | Fix this pass |
+| Low | Quill HTML export XSS (upstream) | Monitor |
+| Info | Rate limit scoped to auth (not `/me`) | Good |
+| Info | Session regenerate on login; reset tokens hashed | Good |
+| Info | Backend npm audit clean; frontend 1 low (Quill) | OK |
 
 ---
 
-## 8. Performance Findings
+## 5. Performance Snapshot
 
-- Main bundle ~624KB / 184KB gzip — acceptable for SPA shell.
-- Documents section pulls Quill + html2pdf (~1.1MB) — lazy-loaded, still heavy first paint.
-- Notifications polled every 5s — simple but chatty; OK for scale of current product.
-- Workspace embeds all tasks/notifications in one document — will not scale to large orgs (architecture debt).
-
----
-
-## 9. Architecture Concerns & Technical Debt
-
-1. **Dual persistence models:** Auth/workspaces/tasks on Mongo; collaboration content on `localStorage` only.
-2. **Embedded arrays on Workspace** for tasks/notifications — eventual N+1-like document growth.
-3. **No real multi-device realtime** — product marketed as collab; channel is same-browser only.
-4. **Monolithic feature components** (800–1300 LOC) hard to test.
-5. **Incomplete migration** from Socket.IO monolith still visible in package deps and orphan files.
-6. **Git worktree dirty** with staged deletions of root legacy files and untracked new structure.
+- Main shell ~638 KB / ~188 KB gzip — acceptable.
+- Documents ~1.17 MB, Spreadsheet ~507 KB — lazy-loaded (first open cost).
+- Leave/delete can stall 10s if Mongo buffering hits legacy `rooms` write — **fix**.
+- Notification poll 5s — fine for current product scale.
+- Workspace document growth (tasks + notifications arrays) — long-term risk.
 
 ---
 
-## 10. Unfinished / Missing Functionality
-
-| Feature | Reality |
-|---------|---------|
-| Multi-device live docs/whiteboard | Local tab sync only |
-| Cross-device video meetings | Same-browser WebRTC only |
-| Workspace chat | Local per-browser |
-| Kanban `Tasks.jsx` | Dead; Calendar/API used instead |
-| FileExplorer dual file system | Dead |
-| Meeting recording to Files | Fake |
-| Email change | Explicitly unsupported |
-| Dark mode | Removed / forced light |
-| Realtime notifications | 5s poll |
-
----
-
-## 11. Testing & DevOps
+## 6. Testing / Tooling Baseline (this re-audit)
 
 | Check | Result |
 |-------|--------|
-| `backend npm test` | 5/5 pass |
+| `backend npm test` | 7/7 pass (sole-owner leave ~10s due to H3) |
 | `frontend npm run lint` | Pass |
 | `frontend npm run build` | Pass |
 | Backend audit | 0 vulns |
 | Frontend audit | 1 low (Quill) |
-| CI | Exists; limited branch filters |
+| CI | Exists; branch filter incomplete (M7) |
 
 ---
 
-## 12. Fix Plan (Phase 4)
+## 7. Product Reality (not bugs — do not fake)
 
-1. Enforce `joinApproval` auto-join; revoke approval on leave; harden notifications + avatars + JSON limit.
-2. ProtectedRoute loader; meeting host + chat relay; recording honesty; password min length; ErrorBoundary.
-3. Remove `socket.io` / `socket.io-client`; remove dead `removeRecentWorkspaceForEveryone` if unused; quarantine or delete `FileExplorer`/`Tasks` only if safe (prefer keep if plan referenced them — delete confirmed zero-import).
-4. Expand CI branches; re-run tests/lint/build.
+| Marketed capability | Current reality |
+|---------------------|-----------------|
+| Multi-device live docs/whiteboard | Same-browser tab sync only |
+| Cross-device video meetings | Same-browser WebRTC mesh only |
+| Workspace chat | Local + BroadcastChannel per browser |
+| Cloud file storage | `localStorage` + channel |
+| Email notification prefs | Local preferences only |
 
-**Out of scope for this pass (documented, not silently faked):** full multi-device collab server, object storage for files/avatars, e2e suite rewrite.
+These remain **documented product limits**, not silent fake implementations.
+
+---
+
+## 8. Ordered Action Plan (Phase 3) → Phase 4 Status
+
+| Step | Finding | Status |
+|------|---------|--------|
+| 1 | H3 rooms readyState guard | **Done** — sole-owner leave test ~0.5ms (was ~10s) |
+| 2 | H1 server max 6 workspaces | **Done** + unit test |
+| 3 | H2 auth session revalidation gate | **Done** |
+| 4 | M1 preserve workspace list on error | **Done** |
+| 5 | M2 avatar client/server size align | **Done** (140 KB file + encoded cap) |
+| 6 | M3 settings form re-sync | **Done** (keyed remount) |
+| 7 | M4 decline archived workspace | **Done** |
+| 8 | M5/M6/M8/M9 UX honesty | **Done** |
+| 9 | M7 CI + L1 requireAuth + L2 morgan | **Done** |
+| 10 | Re-run tests/lint/build | **Done** — 8/8 tests, lint clean, build OK |
+
+### Follow-up pass status (2026-07-10)
+
+| Item | Status |
+|------|--------|
+| Visibility private vs invite_only | **Done** — private blocks invite joins (403); UI copy + invite page |
+| Multi-device collab content | **Partial** — `WorkspaceContent` API + docs/files server sync (LWW); still no live OT/WebRTC mesh across devices |
+| Notification prefs wired | **Done** — prefs filter in-app + browser task reminders; still device-local |
+| Rate limits join/create/content | **Done** — production-only limiters on workspace routes |
+| Orphan file deletions | **Pending commit** — already deleted on disk; review before push |
+| Object storage for avatars | **Not started** — still data-URL with caps |
+| Full e2e suite | **Not started** — expanded unit tests instead |
+
+### Explicitly deferred
+
+- Full realtime multi-user OT/CRDT server (WebSocket).
+- Object storage (S3) for avatars/files.
+- Playwright/Cypress e2e suite.
+- Architectural rewrite of embedded Workspace arrays.
