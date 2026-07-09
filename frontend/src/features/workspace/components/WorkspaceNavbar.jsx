@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Menu, Search, Users, Calendar, X, UserPlus, Sun, Moon, ChevronLeft } from 'lucide-react'
+import { Menu, Search, Users, Calendar, X, UserPlus, Sun, Moon, ChevronLeft, ChevronDown, Copy } from 'lucide-react'
+import toast from 'react-hot-toast'
 import NotificationButton from './NotificationButton'
 import ProfileDropdown from './ProfileDropdown'
 
@@ -15,6 +16,20 @@ export default function WorkspaceNavbar({
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const searchRef = useRef(null)
   const inputRef = useRef(null)
+  
+  const [inviteMenuOpen, setInviteMenuOpen] = useState(false)
+  const inviteRef = useRef(null)
+
+  useEffect(() => {
+    if (!inviteMenuOpen) return
+    const handleClickOutside = (event) => {
+      if (inviteRef.current && !inviteRef.current.contains(event.target)) {
+        setInviteMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [inviteMenuOpen])
 
   const [theme, setTheme] = useState(() => {
     try {
@@ -231,7 +246,7 @@ export default function WorkspaceNavbar({
 
   return (
     <header className="fixed inset-x-0 top-0 z-[1000] h-[72px] border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6">
-      <div className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,520px)_minmax(0,1fr)]">
+      <div className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
@@ -250,38 +265,82 @@ export default function WorkspaceNavbar({
           </span>
         </div>
 
-        <div className="relative hidden md:block" ref={searchRef}>
-          <div className="flex items-center rounded-[18px] border border-border bg-card px-4 transition duration-200 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">
-            <Search className="h-4 w-4 text-muted shrink-0" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                setIsOpen(true)
-              }}
-              onFocus={() => setIsOpen(true)}
-              className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm text-text outline-none placeholder:text-muted/50"
-              placeholder="Search members or tasks... Ctrl+K"
-              aria-label={`Search inside ${workspace?.name || 'current workspace'}`}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery('')
-                  setIsOpen(false)
+        <div className="hidden sm:flex items-center gap-3" ref={searchRef}>
+          <div className="relative hidden md:block w-[280px]">
+            <div className="flex h-11 items-center rounded-[18px] border border-border bg-card px-4 transition duration-200 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10">
+              <Search className="h-4 w-4 text-muted shrink-0" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setIsOpen(true)
                 }}
-                className="text-muted hover:text-text p-1 rounded-full"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
+                onFocus={() => setIsOpen(true)}
+                className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-text outline-none placeholder:text-muted/50"
+                placeholder="Search members or tasks... Ctrl+K"
+                aria-label={`Search inside ${workspace?.name || 'current workspace'}`}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setIsOpen(false)
+                  }}
+                  className="text-muted hover:text-text p-1 rounded-full"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {searchDropdown}
           </div>
 
-          {/* Results Dropdown */}
-          {searchDropdown}
+          <div className="relative" ref={inviteRef}>
+            <button
+              type="button"
+              onClick={() => setInviteMenuOpen((prev) => !prev)}
+              className="inline-flex h-11 items-center gap-2 rounded-[14px] bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover focus:outline-none focus:ring-4 focus:ring-primary/20"
+            >
+              <UserPlus className="h-4 w-4" />
+              Invite
+              <ChevronDown className="h-4 w-4 opacity-80" />
+            </button>
+            {inviteMenuOpen && (
+              <div className="absolute right-0 mt-2 z-[1100] w-52 rounded-card border border-border bg-card-elevated p-2 shadow-dropdown animate-[teamora-content-fade_180ms_ease-out_both]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInviteMenuOpen(false)
+                    onSelectSection?.('members')
+                  }}
+                  className="flex w-full items-center gap-2 rounded-button px-3 py-2.5 text-left text-sm font-semibold text-text hover:bg-primary/10 hover:text-primary transition"
+                >
+                  <Users className="h-4 w-4" />
+                  Manage Members
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setInviteMenuOpen(false)
+                    try {
+                      const link = workspace?.inviteLink || `${window.location.origin}/invite/${workspace?.inviteCode}`
+                      await navigator.clipboard.writeText(link)
+                      toast.success('Invite link copied successfully.')
+                    } catch {
+                      toast.error('Failed to copy invite link')
+                    }
+                  }}
+                  className="flex w-full items-center gap-2 rounded-button px-3 py-2.5 text-left text-sm font-semibold text-text hover:bg-primary/10 hover:text-primary transition"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy Invite Link
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-3">
@@ -292,14 +351,6 @@ export default function WorkspaceNavbar({
             aria-label="Open search"
           >
             <Search className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onSelectSection?.('members')}
-            className="hidden h-10 items-center gap-2 rounded-[14px] bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover sm:inline-flex"
-          >
-            <UserPlus className="h-4 w-4" />
-            Invite
           </button>
           <button
             type="button"

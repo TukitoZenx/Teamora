@@ -263,6 +263,10 @@ export default function App() {
   }, [user, profileComplete, loadWorkspaces, replaceRecentWorkspaces, replaceWorkspaces])
 
   const createWorkspace = async (payload) => {
+    if (workspaces.length >= 6) {
+      toast.error('Maximum 6 workspaces can be created.')
+      return
+    }
     const { data } = await api.post('/api/v1/workspaces', payload)
 
     replaceWorkspaces((current) => [data.workspace, ...current])
@@ -336,35 +340,19 @@ export default function App() {
   }
 
   const deleteWorkspace = async (workspaceId) => {
-    const workspaceToArchive =
-      activeWorkspace?._id === workspaceId
-        ? activeWorkspace
-        : workspaces.find((workspace) => workspace._id === workspaceId)
     await api.delete(`/api/v1/workspaces/${workspaceId}`)
 
     replaceWorkspaces((current) => current.filter((workspace) => workspace._id !== workspaceId))
-    replaceRecentWorkspaces((current) => [
-      {
-        ...(workspaceToArchive || {}),
-        _id: workspaceId,
-        workspaceId,
-        name: workspaceToArchive?.name || 'Deleted workspace',
-        status: 'trashed',
-        statusLabel: 'Workspace Trash',
-        canOpen: false,
-        canRequestAccess: false,
-        lastSeenAt: new Date().toISOString(),
-        leftAt: new Date().toISOString()
-      },
-      ...current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
-    ])
+    replaceRecentWorkspaces((current) =>
+      current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
+    )
     setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
     removeWorkspaceCache(workspaceId)
     if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
       localStorage.removeItem(LAST_WORKSPACE_KEY)
     }
     navigate('/dashboard', { replace: true })
-    toast.success('Workspace moved to history.')
+    toast.success('Workspace deleted successfully.')
   }
 
   const leaveWorkspace = useCallback(

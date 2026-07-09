@@ -176,7 +176,7 @@ export default function Dashboard({
   const visibleWorkspaces = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
 
-    return workspaceItems
+    const items = workspaceItems
       .filter((workspace) => {
         if (activeTab === 'Pinned' && !pinnedIds.includes(workspace.workspaceId)) return false
         if (activeTab === 'Favorites' && !favoriteIds.includes(workspace.workspaceId)) return false
@@ -195,6 +195,11 @@ export default function Dashboard({
         if (sortBy === 'newest') return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
         return new Date(b.lastOpenedAt || 0) - new Date(a.lastOpenedAt || 0)
       })
+
+    if (activeTab === 'Recent') {
+      return items.slice(0, 6)
+    }
+    return items
   }, [activeTab, favoriteIds, pinnedIds, query, sortBy, workspaceItems])
 
   const toggleStoredId = (id, key, setter) => {
@@ -279,14 +284,14 @@ export default function Dashboard({
   const showSkeletons = loading && hasNoWorkspaces
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-6">
+    <main className="mx-auto flex h-[calc(100vh-72px)] max-w-7xl flex-col px-5 py-6 overflow-hidden">
       {authNotice && (
-        <div className="mb-5 rounded-card border border-warning/20 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
+        <div className="mb-5 shrink-0 rounded-card border border-warning/20 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
           {authNotice}
         </div>
       )}
 
-      <section className="mb-6 flex flex-col gap-3 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
+      <section className="shrink-0 mb-6 flex flex-col gap-3 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-text">
             {getGreeting()}, {firstName} 👋
@@ -299,7 +304,7 @@ export default function Dashboard({
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="shrink-0 space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="group relative min-w-0 lg:basis-[60%]">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted transition group-focus-within:text-primary" />
@@ -376,7 +381,7 @@ export default function Dashboard({
         </div>
       </section>
 
-      <section className="teamora-content-fade mt-6">
+      <section className="teamora-content-fade mt-6 flex-1 overflow-y-auto min-h-0 pb-6 pr-1 -mr-1">
         {showSkeletons ? (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -473,7 +478,19 @@ function WorkspaceLauncherCard({
   }
 
   return (
-    <article className="group relative rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms] ease-out hover:-translate-y-1 hover:border-primary hover:shadow-card">
+    <article
+      role="button"
+      tabIndex={isPending ? undefined : 0}
+      onClick={isPending ? undefined : (isActive ? onOpen : onJoin)}
+      onKeyDown={isPending ? undefined : (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          if (isActive) onOpen()
+          else onJoin()
+        }
+      }}
+      className={`group relative rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms] ease-out hover:border-primary outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${isPending ? 'cursor-default' : 'cursor-pointer'}`}
+    >
       <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -533,7 +550,14 @@ function WorkspaceLauncherCard({
         </span>
 
         {isActive ? (
-          <Button type="button" className="h-10 px-4" onClick={onOpen}>
+          <Button
+            type="button"
+            className="h-10 px-4"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
+          >
             Open
             <ArrowRight className="h-4 w-4" />
           </Button>
@@ -541,11 +565,7 @@ function WorkspaceLauncherCard({
           <Button type="button" variant="secondary" className="h-10 px-4" disabled>
             Pending Approval
           </Button>
-        ) : (
-          <Button type="button" variant="secondary" className="h-10 px-4" onClick={onJoin}>
-            {workspace.status === 'removed' ? 'Request Access' : 'Join Again'}
-          </Button>
-        )}
+        ) : null}
       </div>
 
       {menuOpen && (
