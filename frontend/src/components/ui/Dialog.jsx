@@ -5,8 +5,8 @@ export default function Dialog({ title, description, children, onClose }) {
     <Modal onClose={onClose}>
       {(title || description) && (
         <div className="mb-5">
-          {title && <h2 className="text-xl font-semibold tracking-tight text-[#111827]">{title}</h2>}
-          {description && <p className="mt-1 text-sm text-[#6B7280]">{description}</p>}
+          {title && <h2 className="text-xl font-semibold tracking-tight text-text">{title}</h2>}
+          {description && <p className="mt-1 text-sm text-muted">{description}</p>}
         </div>
       )}
       {children}

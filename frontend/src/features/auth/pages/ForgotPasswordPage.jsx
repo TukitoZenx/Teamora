@@ -37,25 +37,25 @@ export default function ForgotPasswordPage() {
     <AuthShell>
       <Link
         to="/signin"
-        className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-[#7C3AED] hover:underline"
+        className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Sign In
       </Link>
 
       <div className="mb-10 text-center">
-        <h2 className="text-4xl font-medium tracking-tight text-[#111111]">Forgot your password?</h2>
-        <p className="mt-4 text-base text-[#6B7280]">Enter your email and we'll send you a password reset link.</p>
+        <h2 className="text-4xl font-medium tracking-tight text-text">Forgot your password?</h2>
+        <p className="mt-4 text-base text-muted">Enter your email and we'll send you a password reset link.</p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-card border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 rounded-[14px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div className="mb-4 rounded-card border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
           {success}
         </div>
       )}

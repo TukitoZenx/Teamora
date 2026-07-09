@@ -78,28 +78,71 @@ export default function App() {
   }, [user])
 
   useEffect(() => {
-    document.documentElement.classList.remove('dark')
-    localStorage.removeItem('collabspace-dark-mode')
-  }, [])
-
-  useEffect(() => {
     const applyAppearance = () => {
       try {
         const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')
-        if (!preferences) return
-        document.documentElement.dataset.density = String(preferences.density || 'Comfortable').toLowerCase()
+        
+        // Handle density, language, etc.
+        const density = preferences?.density || 'Comfortable'
+        document.documentElement.dataset.density = String(density).toLowerCase()
+        
+        const language = preferences?.language || 'English'
         document.documentElement.lang =
-          preferences.language === 'Español' ? 'es' : preferences.language === 'Français' ? 'fr' : 'en'
-        document.documentElement.dataset.timeZone = preferences.timeZone || 'UTC'
-        document.documentElement.dataset.dateFormat = preferences.dateFormat || 'MM/DD/YYYY'
+          language === 'Español' ? 'es' : language === 'Français' ? 'fr' : 'en'
+          
+        document.documentElement.dataset.timeZone = preferences?.timeZone || 'UTC'
+        document.documentElement.dataset.dateFormat = preferences?.dateFormat || 'MM/DD/YYYY'
+
+        // Theme Engine
+        const theme = preferences?.theme || 'Light'
+        if (theme === 'Dark') {
+          document.documentElement.classList.add('dark')
+        } else if (theme === 'Light') {
+          document.documentElement.classList.remove('dark')
+        } else if (theme === 'System') {
+          const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          if (systemDark) {
+            document.documentElement.classList.add('dark')
+          } else {
+            document.documentElement.classList.remove('dark')
+          }
+        }
       } catch {
         // Appearance preferences are optional local UI state.
       }
     }
 
     applyAppearance()
+
+    // Listen for storage changes (tab-to-tab sync)
     window.addEventListener('storage', applyAppearance)
-    return () => window.removeEventListener('storage', applyAppearance)
+    
+    // Listen for custom appearance updates from Settings Page
+    window.addEventListener('teamora-appearance-changed', applyAppearance)
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleSystemThemeChange = () => {
+      try {
+        const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')
+        if (preferences?.theme === 'System') {
+          if (mediaQuery.matches) {
+            document.documentElement.classList.add('dark')
+          } else {
+            document.documentElement.classList.remove('dark')
+          }
+        }
+      } catch {
+        // Ignore errors in system theme detection.
+      }
+    }
+    mediaQuery.addEventListener('change', handleSystemThemeChange)
+
+    return () => {
+      window.removeEventListener('storage', applyAppearance)
+      window.removeEventListener('teamora-appearance-changed', applyAppearance)
+      mediaQuery.removeEventListener('change', handleSystemThemeChange)
+    }
   }, [])
 
   useEffect(() => {

@@ -8,8 +8,8 @@ export default function Tabs({ options, active, onChange }) {
           onClick={() => onChange(option)}
           className={`rounded-full px-4 py-2 text-sm font-semibold transition duration-[180ms] ease-out ${
             active === option
-              ? 'bg-[#7C3AED] text-white'
-              : 'bg-white text-[#6B7280] ring-1 ring-[#E5E7EB] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
+              ? 'bg-primary text-white'
+              : 'bg-card text-muted ring-1 ring-border hover:bg-primary/10 hover:text-primary'
           }`}
         >
           {option}

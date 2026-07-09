@@ -680,21 +680,21 @@ export default function Meetings({ socket, roomId, userName }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row bg-slate-900 overflow-hidden h-full relative text-white select-none">
+    <div className="flex-1 flex flex-col lg:flex-row bg-card-sunken overflow-hidden h-full relative text-text select-none">
       {/* Video Call Viewport */}
       <div className="flex-1 flex flex-col justify-between p-6 overflow-hidden relative">
         {/* Header Indicator overlays */}
         {inMeeting && (
           <div className="absolute top-4 left-6 right-6 flex justify-between items-center z-25 pointer-events-none">
             {isRecording && (
-              <div className="flex items-center gap-1.5 bg-rose-600/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto border border-rose-500 animate-pulse">
+              <div className="flex items-center gap-1.5 bg-danger/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto border border-danger animate-pulse">
                 <Disc className="w-3.5 h-3.5 fill-current" />
                 <span>REC {formatTimer(recordingSeconds)}</span>
               </div>
             )}
 
             {waitingRoomActive && (
-              <div className="flex items-center gap-1.5 bg-indigo-600/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto border border-indigo-500 ml-auto">
+              <div className="flex items-center gap-1.5 bg-primary/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto border border-primary ml-auto">
                 <Shield className="w-3.5 h-3.5" />
                 <span>Waiting Room Active</span>
               </div>
@@ -704,32 +704,32 @@ export default function Meetings({ socket, roomId, userName }) {
 
         {inMeeting && !admitted ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
-            <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-400 mb-6 border border-amber-500/20 animate-pulse">
+            <div className="w-16 h-16 bg-warning/10 rounded-2xl flex items-center justify-center text-warning mb-6 border border-warning/20 animate-pulse">
               <Shield className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-slate-100 mb-2">Teamora Call Lobby</h2>
-            <p className="text-sm text-slate-400 mb-8 font-medium">
+            <h2 className="text-xl font-bold text-text mb-2">Teamora Call Lobby</h2>
+            <p className="text-sm text-muted mb-8 font-medium">
               Please wait. The host has enabled the waiting room for this call.
             </p>
             <button
               onClick={handleLeaveMeeting}
-              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-2xl cursor-pointer border border-white/10"
+              className="px-5 py-3 bg-card hover:bg-primary/10 text-text font-bold rounded-2xl cursor-pointer border border-border"
             >
               Leave Lobby
             </button>
           </div>
         ) : !inMeeting ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
-            <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6 border border-indigo-500/20">
+            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 border border-primary/20">
               <Video className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-bold text-slate-100 mb-2">Teamora Call Lobby</h2>
-            <p className="text-sm text-slate-400 mb-8 font-medium">
+            <h2 className="text-xl font-bold text-text mb-2">Teamora Call Lobby</h2>
+            <p className="text-sm text-muted mb-8 font-medium">
               Verify your camera and microphone setup before entering the call grid.
             </p>
             <button
               onClick={handleJoinMeeting}
-              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-2xl shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 bg-primary hover:bg-primary-hover text-white font-semibold rounded-2xl shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2"
             >
               <Video className="w-5 h-5" />
               <span>Join Meeting Lobby</span>
@@ -743,7 +743,7 @@ export default function Meetings({ socket, roomId, userName }) {
               return (
                 <div
                   key={socketId}
-                  className="bg-slate-950 rounded-2xl border border-slate-800/80 overflow-hidden relative h-48 md:h-56 group flex items-center justify-center shadow-lg transition-transform"
+                  className="bg-card rounded-2xl border border-border overflow-hidden relative h-48 md:h-56 group flex items-center justify-center shadow-card transition-transform"
                 >
                   {isMe ? (
                     <video
@@ -770,25 +770,25 @@ export default function Meetings({ socket, roomId, userName }) {
 
                   {/* Fallback avatar if not me and camera is disabled or stream not connected yet */}
                   {!isMe && (!part.camActive || !remoteStreams[socketId]?.stream) && (
-                    <div className="w-full h-full bg-gradient-to-tr from-indigo-950 to-slate-900 flex items-center justify-center absolute inset-0">
-                      <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-lg font-bold text-indigo-400 shadow-md">
+                    <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
+                      <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-lg font-bold text-primary shadow-md">
                         {(part.user || 'U').substring(0, 2).toUpperCase()}
                       </div>
                     </div>
                   )}
 
                   <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
-                    <span className="text-[10px] font-bold bg-slate-950/85 px-2.5 py-1.5 rounded-full border border-white/10 text-white">
+                    <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text">
                       {part.user} {isMe && '(You)'}
                     </span>
                     <div className="flex gap-1.5">
                       {!part.micActive && (
-                        <div className="p-1.5 bg-rose-500/90 text-white rounded-full border border-rose-600">
+                        <div className="p-1.5 bg-danger/90 text-white rounded-full border border-danger">
                           <MicOff className="w-3.5 h-3.5" />
                         </div>
                       )}
                       {part.handRaised && (
-                        <div className="p-1.5 bg-amber-500/90 text-white rounded-full border border-amber-600 animate-bounce">
+                        <div className="p-1.5 bg-warning/90 text-white rounded-full border border-warning animate-bounce">
                           <Hand className="w-3.5 h-3.5" />
                         </div>
                       )}
@@ -802,11 +802,11 @@ export default function Meetings({ socket, roomId, userName }) {
 
         {/* Toolbar panel */}
         {inMeeting && admitted && (
-          <div className="h-16 bg-slate-950/90 border border-white/10 px-6 py-2.5 rounded-full flex items-center justify-between shrink-0 max-w-2xl mx-auto w-full shadow-2xl mt-4 select-none">
+          <div className="h-16 bg-card/90 border border-border px-6 py-2.5 rounded-full flex items-center justify-between shrink-0 max-w-2xl mx-auto w-full shadow-card mt-4 select-none">
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleMic}
-                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${micActive ? 'bg-slate-800 text-slate-300 border-white/10' : 'bg-rose-600 text-white border-rose-500'}`}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${micActive ? 'bg-card border border-border text-text hover:bg-primary/10' : 'bg-danger text-white border-danger'}`}
                 title={micActive ? 'Mute Microphone' : 'Unmute Microphone'}
               >
                 {micActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
@@ -814,7 +814,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
               <button
                 onClick={toggleCam}
-                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${camActive ? 'bg-slate-800 text-slate-300 border-white/10' : 'bg-rose-600 text-white border-rose-500'}`}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${camActive ? 'bg-card border border-border text-text hover:bg-primary/10' : 'bg-danger text-white border-danger'}`}
                 title={camActive ? 'Disable Camera' : 'Enable Camera'}
               >
                 {camActive ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
@@ -822,7 +822,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
               <button
                 onClick={toggleScreenShare}
-                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${screenSharingActive ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-350 border-white/10'}`}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${screenSharingActive ? 'bg-success text-white border-success' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title={screenSharingActive ? 'Stop Sharing Screen' : 'Share Screen'}
               >
                 <Tv className="w-4 h-4" />
@@ -832,7 +832,7 @@ export default function Meetings({ socket, roomId, userName }) {
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleHand}
-                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${handRaised ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-800 text-slate-350 border-white/10'}`}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${handRaised ? 'bg-warning text-white border-warning' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title="Raise Hand"
               >
                 <Hand className="w-4 h-4" />
@@ -840,7 +840,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
               <button
                 onClick={() => setBlurActive(!blurActive)}
-                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${blurActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-350 border-white/10'}`}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${blurActive ? 'bg-primary text-white border-primary' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title="Background Blur"
               >
                 <Sparkles className="w-4 h-4" />
@@ -848,7 +848,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
               <button
                 onClick={() => setNoiseSuppression(!noiseSuppression)}
-                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${noiseSuppression ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 text-slate-350 border-white/10'}`}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${noiseSuppression ? 'bg-primary text-white border-primary' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title="Noise Suppression"
               >
                 <VolumeX className="w-4 h-4" />
@@ -856,7 +856,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
               <button
                 onClick={toggleRecording}
-                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${isRecording ? 'bg-rose-600 text-white border-rose-500 animate-pulse' : 'bg-slate-800 text-slate-350 border-white/10'}`}
+                className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${isRecording ? 'bg-danger text-white border-danger animate-pulse' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title="Record Call"
               >
                 <Disc className="w-4 h-4" />
@@ -865,7 +865,7 @@ export default function Meetings({ socket, roomId, userName }) {
               {isHost && (
                 <button
                   onClick={() => setWaitingRoomActive(!waitingRoomActive)}
-                  className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${waitingRoomActive ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-350 border-white/10'}`}
+                  className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${waitingRoomActive ? 'bg-primary text-white border-primary' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                   title="Toggle Waiting Room"
                 >
                   <Shield className="w-4 h-4" />
@@ -876,7 +876,7 @@ export default function Meetings({ socket, roomId, userName }) {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveSidePanel(activeSidePanel === 'chat' ? null : 'chat')}
-                className={`p-2.5 rounded-xl cursor-pointer border ${activeSidePanel === 'chat' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 border-white/10 text-slate-300'}`}
+                className={`p-2.5 rounded-xl cursor-pointer border ${activeSidePanel === 'chat' ? 'bg-primary text-white border-primary' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title="Meeting Chat"
               >
                 <MessageSquare className="w-4 h-4" />
@@ -884,7 +884,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
               <button
                 onClick={() => setActiveSidePanel(activeSidePanel === 'participants' ? null : 'participants')}
-                className={`p-2.5 rounded-xl cursor-pointer border ${activeSidePanel === 'participants' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-800 border-white/10 text-slate-300'}`}
+                className={`p-2.5 rounded-xl cursor-pointer border ${activeSidePanel === 'participants' ? 'bg-primary text-white border-primary' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title="Participants & Host Panel"
               >
                 <Users className="w-4 h-4" />
@@ -892,7 +892,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
               <button
                 onClick={handleLeaveMeeting}
-                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold cursor-pointer border border-rose-500"
+                className="px-4 py-2.5 bg-danger hover:bg-danger-hover text-white rounded-xl text-xs font-semibold cursor-pointer border border-danger shadow-sm"
               >
                 Leave
               </button>
@@ -903,12 +903,12 @@ export default function Meetings({ socket, roomId, userName }) {
 
       {/* Slide-out Sidebar Panel */}
       {inMeeting && activeSidePanel && (
-        <div className="w-80 border-l border-white/10 bg-slate-950 flex flex-col shrink-0">
-          <div className="p-4 border-b border-white/10 flex items-center justify-between shrink-0">
-            <span className="font-bold text-xs uppercase tracking-wider text-slate-400">
+        <div className="w-80 border-l border-border bg-card flex flex-col shrink-0">
+          <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+            <span className="font-bold text-xs uppercase tracking-wider text-muted">
               {activeSidePanel === 'chat' ? 'Meeting Chat Feed' : 'Participants & Host controls'}
             </span>
-            <button onClick={() => setActiveSidePanel(null)} className="text-slate-400 hover:text-white cursor-pointer">
+            <button onClick={() => setActiveSidePanel(null)} className="text-muted hover:text-primary cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -918,39 +918,39 @@ export default function Meetings({ socket, roomId, userName }) {
             <>
               <div className="flex-1 overflow-y-auto p-4 space-y-3.5 no-scrollbar">
                 {meetingChat.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic text-center py-6">
+                  <p className="text-xs text-muted italic text-center py-6">
                     Messages will sync to workspace chat.
                   </p>
                 ) : (
                   meetingChat.map((m, idx) => (
                     <div key={idx} className="flex gap-2 items-start text-xs">
-                      <div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center font-bold text-[9px] text-slate-300 shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-card-sunken border border-border flex items-center justify-center font-bold text-[9px] text-text shrink-0">
                         {(m.user || 'U').substring(0, 2).toUpperCase()}
                       </div>
-                      <div className="flex-1 bg-slate-900 border border-white/5 rounded-xl p-2.5">
-                        <div className="flex items-center justify-between text-[8px] text-slate-550 font-bold mb-1">
+                      <div className="flex-1 bg-card-sunken border border-border rounded-xl p-2.5">
+                        <div className="flex items-center justify-between text-[8px] text-muted font-bold mb-1">
                           <span>{m.user}</span>
                           <span>{m.timestamp}</span>
                         </div>
-                        <p className="text-slate-200">{m.text}</p>
+                        <p className="text-text">{m.text}</p>
                       </div>
                     </div>
                   ))
                 )}
               </div>
-              <div className="p-3 border-t border-white/10 flex gap-2">
+              <div className="p-3 border-t border-border flex gap-2">
                 <input
                   type="text"
                   placeholder="Type message..."
                   value={meetingChatInput}
                   onChange={(e) => setMeetingChatInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSendMeetingChat()}
-                  className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  className="flex-1 bg-card-sunken border border-border rounded-xl px-3 py-2 text-xs text-text placeholder-muted/65 focus:outline-none focus:border-primary"
                 />
                 <button
                   disabled={!meetingChatInput.trim()}
                   onClick={handleSendMeetingChat}
-                  className="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold"
+                  className="px-3 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Send
                 </button>
@@ -961,26 +961,26 @@ export default function Meetings({ socket, roomId, userName }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar text-xs">
               {/* Waiting Room Queue for Host */}
               {isHost && waitingUsers.length > 0 && (
-                <div className="space-y-2 border-b border-white/10 pb-4 mb-4">
-                  <span className="font-bold text-[10px] uppercase text-amber-400 tracking-wider block">
+                <div className="space-y-2 border-b border-border pb-4 mb-4">
+                  <span className="font-bold text-[10px] uppercase text-warning tracking-wider block">
                     Waiting List ({waitingUsers.length})
                   </span>
                   {waitingUsers.map((user) => (
                     <div
                       key={user.socketId}
-                      className="flex items-center justify-between bg-slate-900 border border-amber-500/20 rounded-xl p-2.5"
+                      className="flex items-center justify-between bg-card-sunken border border-warning/20 rounded-xl p-2.5"
                     >
-                      <span className="font-semibold text-slate-200 truncate flex-1">{user.user}</span>
+                      <span className="font-semibold text-text truncate flex-1">{user.user}</span>
                       <div className="flex gap-2">
                         <button
                           onClick={() => hostAdmitParticipant(user.socketId, user.user)}
-                          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                          className="px-2.5 py-1 bg-success hover:bg-success-hover text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
                         >
                           Admit
                         </button>
                         <button
                           onClick={() => hostDenyParticipant(user.socketId, user.user)}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-500 rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                          className="px-2.5 py-1 bg-card border border-border text-muted hover:bg-danger/10 hover:text-danger rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
                         >
                           Deny
                         </button>
@@ -994,15 +994,15 @@ export default function Meetings({ socket, roomId, userName }) {
                 return (
                   <div
                     key={socketId}
-                    className="flex items-center justify-between border-b border-white/5 pb-2.5 text-xs"
+                    className="flex items-center justify-between border-b border-border/50 pb-2.5 text-xs"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-[9px]">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center font-bold text-[9px] text-primary">
                         {(part.user || 'U').substring(0, 2).toUpperCase()}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-semibold text-slate-250">{part.user}</span>
-                        <span className="text-[8px] text-slate-500">{isUserHost ? '👑 Host' : 'Participant'}</span>
+                        <span className="font-semibold text-text">{part.user}</span>
+                        <span className="text-[8px] text-muted">{isUserHost ? '👑 Host' : 'Participant'}</span>
                       </div>
                     </div>
 
@@ -1011,7 +1011,7 @@ export default function Meetings({ socket, roomId, userName }) {
                       {part.handRaised && isHost && (
                         <button
                           onClick={() => hostLowerHand(socketId)}
-                          className="p-1 hover:bg-white/5 rounded text-amber-500"
+                          className="p-1 hover:bg-primary/10 rounded text-warning cursor-pointer"
                           title="Lower Hand"
                         >
                           <Hand className="w-3.5 h-3.5 fill-current" />
@@ -1022,14 +1022,14 @@ export default function Meetings({ socket, roomId, userName }) {
                         <>
                           <button
                             onClick={() => hostMuteParticipant(socketId)}
-                            className="p-1 hover:bg-white/5 rounded text-slate-400 hover:text-rose-500"
+                            className="p-1 hover:bg-primary/10 rounded text-muted hover:text-danger cursor-pointer"
                             title="Mute Participant"
                           >
                             <VolumeX className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => hostKickParticipant(socketId)}
-                            className="p-1 hover:bg-white/5 rounded text-slate-400 hover:text-rose-550"
+                            className="p-1 hover:bg-primary/10 rounded text-muted hover:text-danger cursor-pointer"
                             title="Kick Participant"
                           >
                             <Ban className="w-3.5 h-3.5" />

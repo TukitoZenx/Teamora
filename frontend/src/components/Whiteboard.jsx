@@ -534,21 +534,21 @@ export default function Whiteboard({
   return (
     <div
       ref={containerRef}
-      className="flex-1 flex flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden h-full relative select-none"
+      className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full relative select-none"
     >
       {/* Top Toolbar */}
-      <div className="h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0 transition-colors z-20">
+      <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors z-20">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 bg-rose-500/10 rounded-lg flex items-center justify-center text-rose-500 shrink-0">
+          <div className="w-7 h-7 bg-danger/10 rounded-lg flex items-center justify-center text-danger shrink-0">
             <Paintbrush className="w-4 h-4" />
           </div>
-          <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">Whiteboard</span>
+          <span className="font-semibold text-sm text-text">Whiteboard</span>
         </div>
 
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowGrid(!showGrid)}
-            className={`p-2 rounded-lg transition-all cursor-pointer ${showGrid ? 'bg-indigo-500/10 text-indigo-500' : 'text-slate-500'}`}
+            className={`p-2 rounded-lg transition-all cursor-pointer ${showGrid ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-primary/10 hover:text-primary'}`}
             title="Toggle Grid"
           >
             <Grid3X3 className="w-4 h-4" />
@@ -556,7 +556,7 @@ export default function Whiteboard({
           <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
-            className="p-2 text-slate-500 disabled:opacity-40"
+            className="p-2 text-muted disabled:opacity-40 hover:bg-primary/10 hover:text-primary rounded-lg"
             title="Undo"
           >
             <Undo2 className="w-4 h-4" />
@@ -564,30 +564,30 @@ export default function Whiteboard({
           <button
             onClick={handleRedo}
             disabled={redoStack.length === 0}
-            className="p-2 text-slate-500 disabled:opacity-40"
+            className="p-2 text-muted disabled:opacity-40 hover:bg-primary/10 hover:text-primary rounded-lg"
             title="Redo"
           >
             <Redo2 className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5" />
+          <div className="w-px h-5 bg-border mx-0.5" />
 
           {/* Templates Menu */}
           <div className="relative group">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-all cursor-pointer">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border text-text rounded-xl text-xs font-semibold hover:bg-primary/10 hover:text-primary transition-all cursor-pointer">
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Templates</span>
             </button>
-            <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl py-1.5 min-w-[150px] hidden group-hover:block z-50">
+            <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-card py-1.5 min-w-[150px] hidden group-hover:block z-50">
               <button
                 onClick={() => applyTemplate('retro')}
-                className="w-full text-left px-4 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="w-full text-left px-4 py-2 text-xs hover:bg-primary/10 hover:text-primary text-text cursor-pointer"
               >
                 Retro Board
               </button>
               <button
                 onClick={() => applyTemplate('brainstorm')}
-                className="w-full text-left px-4 py-2 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="w-full text-left px-4 py-2 text-xs hover:bg-primary/10 hover:text-primary text-text cursor-pointer"
               >
                 Brainstorm Grid
               </button>
@@ -596,7 +596,7 @@ export default function Whiteboard({
 
           <button
             onClick={handleClear}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-600 hover:text-white text-rose-500 text-xs font-semibold rounded-xl transition-all cursor-pointer border border-rose-500/20"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-danger/10 hover:bg-danger hover:text-white text-danger text-xs font-semibold rounded-xl transition-all cursor-pointer border border-danger/20"
             title="Clear Board"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -604,7 +604,7 @@ export default function Whiteboard({
           </button>
           <button
             onClick={addPage}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
             title="Add Page"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -613,14 +613,14 @@ export default function Whiteboard({
         </div>
       </div>
 
-      <div className="h-10 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center gap-2 overflow-x-auto">
+      <div className="h-10 border-b border-border bg-card px-4 flex items-center gap-2 overflow-x-auto">
         {pages.map((page) => (
           <button
             key={page.id}
             type="button"
             onClick={() => setActivePageId(page.id)}
-            className={`h-7 rounded-lg px-3 text-xs font-semibold ${
-              activePageId === page.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
+            className={`h-7 rounded-lg px-3 text-xs font-semibold cursor-pointer border transition-all ${
+              activePageId === page.id ? 'bg-primary text-white border-primary shadow-sm' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'
             }`}
           >
             {page.name}
@@ -629,7 +629,7 @@ export default function Whiteboard({
       </div>
 
       {/* Floating Drawing Tools Panel */}
-      <div className="absolute left-4 top-16 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl shadow-xl flex flex-col gap-1.5 z-20 backdrop-blur-md transition-colors mt-2">
+      <div className="absolute left-4 top-16 bg-card/95 border border-border p-2 rounded-2xl shadow-card flex flex-col gap-1.5 z-20 backdrop-blur-md transition-colors mt-2">
         {[
           { id: 'select', icon: Hand, label: 'Select' },
           { id: 'pen', icon: PenTool, label: 'Pen' },
@@ -666,13 +666,13 @@ export default function Whiteboard({
               }}
               className={`p-2 rounded-xl transition-all relative group cursor-pointer ${
                 isActive
-                  ? 'bg-rose-500 text-white shadow-md shadow-rose-500/25'
-                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-muted hover:bg-primary/10 hover:text-primary'
               }`}
               title={tool.label}
             >
               <tool.icon className="w-4 h-4" />
-              <span className="absolute left-12 bg-slate-900 text-white text-[10px] px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-30 shadow-md">
+              <span className="absolute left-12 bg-card border border-border text-text text-[10px] px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-30 shadow-card">
                 {tool.label}
               </span>
             </button>
@@ -681,9 +681,9 @@ export default function Whiteboard({
       </div>
 
       {/* Floating Color & Size & Opacity Picker */}
-      <div className="absolute right-4 top-16 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 p-3.5 rounded-2xl shadow-xl flex flex-col gap-3.5 z-20 backdrop-blur-md transition-colors mt-2">
+      <div className="absolute right-4 top-16 bg-card/95 border border-border p-3.5 rounded-2xl shadow-card flex flex-col gap-3.5 z-20 backdrop-blur-md transition-colors mt-2">
         <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">
             Color
           </span>
           <div className="grid grid-cols-2 gap-2">
@@ -693,28 +693,28 @@ export default function Whiteboard({
                 onClick={() => setMyColor(color)}
                 style={{ backgroundColor: color }}
                 className={`w-5 h-5 rounded-full border cursor-pointer transition-transform hover:scale-110 relative ${
-                  color === '#ffffff' ? 'border-slate-300' : 'border-white'
-                } ${myColor === color ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}`}
+                  color === '#ffffff' ? 'border-border' : 'border-card'
+                }  ${myColor === color ? 'ring-2 ring-primary ring-offset-2' : ''}`}
               />
             ))}
           </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Size</span>
+          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">Size</span>
           <input
             type="range"
             min="1"
             max="40"
             value={whiteboardSize}
             onChange={(e) => setWhiteboardSize(parseInt(e.target.value))}
-            className="w-12 accent-indigo-600 cursor-pointer h-1"
+            className="w-12 accent-primary cursor-pointer h-1"
           />
-          <span className="text-[9px] font-mono text-center text-slate-400">{whiteboardSize}px</span>
+          <span className="text-[9px] font-mono text-center text-muted">{whiteboardSize}px</span>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">
             Opacity
           </span>
           <input
@@ -724,20 +724,20 @@ export default function Whiteboard({
             step="0.05"
             value={brushOpacity}
             onChange={(e) => setBrushOpacity(parseFloat(e.target.value))}
-            className="w-12 accent-indigo-600 cursor-pointer h-1"
+            className="w-12 accent-primary cursor-pointer h-1"
           />
-          <span className="text-[9px] font-mono text-center text-slate-400">{Math.round(brushOpacity * 100)}%</span>
+          <span className="text-[9px] font-mono text-center text-muted">{Math.round(brushOpacity * 100)}%</span>
         </div>
       </div>
 
       {/* Infinite Canvas Container */}
-      <div className="flex-1 overflow-hidden flex items-center justify-center relative bg-white dark:bg-slate-950 transition-colors">
+      <div className="flex-1 overflow-hidden flex items-center justify-center relative bg-card-sunken transition-colors">
         {showGrid && (
           <div
             className="absolute inset-0 pointer-events-none z-10 opacity-20"
             style={{
               backgroundImage:
-                'linear-gradient(to right, #94a3b8 1px, transparent 1px), linear-gradient(to bottom, #94a3b8 1px, transparent 1px)',
+                'linear-gradient(to right, var(--tw-color-border) 1px, transparent 1px), linear-gradient(to bottom, var(--tw-color-border) 1px, transparent 1px)',
               backgroundSize: '40px 40px',
               transform: `translate(${pan.x}px, ${pan.y}px)`
             }}
@@ -746,7 +746,7 @@ export default function Whiteboard({
 
         {/* Scaled Canvas Container (Huge 3000x2000 size for Infinite Canvas feel) */}
         <div
-          className="relative border border-slate-200/50 dark:border-slate-800/80 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+          className="relative border border-border rounded-2xl bg-card shadow-card overflow-hidden"
           style={{
             transform: `scale(${zoom / 100}) translate(${pan.x}px, ${pan.y}px)`,
             width: 3000,
@@ -788,7 +788,7 @@ export default function Whiteboard({
                     height: elem.height,
                     backgroundColor: isSticky ? elem.color : 'transparent',
                     color: isSticky ? '#1e293b' : 'inherit',
-                    borderColor: isSelected ? '#6366f1' : isSticky ? elem.borderColor : elem.color,
+                    borderColor: isSelected ? 'var(--tw-color-primary)' : isSticky ? elem.borderColor : elem.color,
                     borderWidth: isSelected ? '2px' : isSticky || isText || isImage ? '1px' : '2px',
                     borderRadius: elem.type === 'circle' ? '50%' : isSticky ? '12px' : '4px',
                     cursor: elem.locked ? 'not-allowed' : 'move',
@@ -800,13 +800,13 @@ export default function Whiteboard({
                 >
                   {/* Drag Control Overlay for Selected Element */}
                   {isSelected && !elem.locked && (
-                    <div className="absolute -top-10 left-0 bg-slate-900 text-white rounded-lg flex items-center p-1.5 gap-1.5 shadow-xl pointer-events-auto">
+                    <div className="absolute -top-10 left-0 bg-card border border-border text-text rounded-lg flex items-center p-1.5 gap-1.5 shadow-card pointer-events-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           toggleLockElement(elem.id)
                         }}
-                        className="hover:text-indigo-400 p-0.5"
+                        className="hover:text-primary p-0.5"
                       >
                         <Lock className="w-3.5 h-3.5" />
                       </button>
@@ -815,7 +815,7 @@ export default function Whiteboard({
                           e.stopPropagation()
                           duplicateElement(elem)
                         }}
-                        className="hover:text-indigo-400 p-0.5"
+                        className="hover:text-primary p-0.5"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
@@ -824,7 +824,7 @@ export default function Whiteboard({
                           e.stopPropagation()
                           moveLayer(elem.id, 'front')
                         }}
-                        className="hover:text-indigo-400 p-0.5"
+                        className="hover:text-primary p-0.5"
                         title="Bring to Front"
                       >
                         <ArrowUp className="w-3.5 h-3.5" />
@@ -834,7 +834,7 @@ export default function Whiteboard({
                           e.stopPropagation()
                           moveLayer(elem.id, 'back')
                         }}
-                        className="hover:text-indigo-400 p-0.5"
+                        className="hover:text-primary p-0.5"
                         title="Send to Back"
                       >
                         <ArrowDown className="w-3.5 h-3.5" />
@@ -844,7 +844,7 @@ export default function Whiteboard({
                           e.stopPropagation()
                           deleteElement(elem.id)
                         }}
-                        className="hover:text-rose-400 p-0.5"
+                        className="hover:text-danger p-0.5"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -852,13 +852,13 @@ export default function Whiteboard({
                   )}
 
                   {isSelected && elem.locked && (
-                    <div className="absolute -top-10 left-0 bg-slate-900 text-white rounded-lg flex items-center p-1.5 gap-1 shadow-xl pointer-events-auto">
+                    <div className="absolute -top-10 left-0 bg-card border border-border text-text rounded-lg flex items-center p-1.5 gap-1 shadow-card pointer-events-auto">
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           toggleLockElement(elem.id)
                         }}
-                        className="text-rose-400 hover:text-white p-0.5"
+                        className="text-danger hover:text-danger-hover p-0.5"
                       >
                         <Unlock className="w-3.5 h-3.5" />
                       </button>
@@ -870,7 +870,7 @@ export default function Whiteboard({
                   {isSelected && !elem.locked && (
                     <div
                       onMouseDown={(e) => handleResizeMouseDown(e, elem)}
-                      className="absolute bottom-0 right-0 w-3 h-3 bg-indigo-600 rounded-bl cursor-se-resize z-50 border border-white"
+                      className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-bl cursor-se-resize z-50 border border-card"
                     />
                   )}
 
@@ -879,7 +879,7 @@ export default function Whiteboard({
                       value={elem.text}
                       disabled={elem.locked}
                       onChange={(e) => handleElementTextChange(elem.id, e.target.value)}
-                      className="w-full h-full bg-transparent border-none outline-none resize-none text-xs text-center font-bold text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-0 no-scrollbar"
+                      className="w-full h-full bg-transparent border-none outline-none resize-none text-xs text-center font-bold text-text placeholder-muted/65 focus:ring-0 no-scrollbar"
                       placeholder="Type..."
                     />
                   ) : isImage ? (
@@ -889,19 +889,19 @@ export default function Whiteboard({
                       alt="board-insert"
                     />
                   ) : elem.type === 'rect' || elem.type === 'square' ? (
-                    <div className="w-full h-full rounded border-2 border-indigo-500 bg-indigo-500/10 pointer-events-none" />
+                    <div className="w-full h-full rounded border-2 border-primary bg-primary/10 pointer-events-none" />
                   ) : elem.type === 'circle' ? (
-                    <div className="w-full h-full rounded-full border-2 border-emerald-500 bg-emerald-500/10 pointer-events-none" />
+                    <div className="w-full h-full rounded-full border-2 border-success bg-success/10 pointer-events-none" />
                   ) : elem.type === 'triangle' ? (
-                    <div className="w-0 h-0 border-l-[40px] border-r-[40px] border-b-[80px] border-l-transparent border-r-transparent border-b-indigo-500/30 relative pointer-events-none">
-                      <div className="absolute -bottom-[-2px] -left-[38px] w-0 h-0 border-l-[38px] border-r-[38px] border-b-[76px] border-l-transparent border-r-transparent border-b-indigo-600" />
+                    <div className="w-0 h-0 border-l-[40px] border-r-[40px] border-b-[80px] border-l-transparent border-r-transparent border-b-primary/30 relative pointer-events-none">
+                      <div className="absolute -bottom-[-2px] -left-[38px] w-0 h-0 border-l-[38px] border-r-[38px] border-b-[76px] border-l-transparent border-r-transparent border-b-primary" />
                     </div>
                   ) : elem.type === 'arrow' ? (
-                    <div className="w-full h-2 bg-indigo-500 relative pointer-events-none">
-                      <div className="absolute -right-1.5 -top-1 border-l-8 border-l-indigo-600 border-t-4 border-t-transparent border-b-4 border-b-transparent" />
+                    <div className="w-full h-2 bg-primary relative pointer-events-none">
+                      <div className="absolute -right-1.5 -top-1 border-l-8 border-l-primary border-t-4 border-t-transparent border-b-4 border-b-transparent" />
                     </div>
                   ) : (
-                    <div className="w-full h-0.5 bg-slate-400 pointer-events-none" />
+                    <div className="w-full h-0.5 bg-border pointer-events-none" />
                   )}
                 </div>
               )
@@ -930,17 +930,17 @@ export default function Whiteboard({
         </div>
 
         {/* Zoom Controls */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-full shadow-xl flex items-center gap-3.5 z-20 backdrop-blur-md">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/95 border border-border px-4 py-2 rounded-full shadow-card flex items-center gap-3.5 z-20 backdrop-blur-md">
           <button
             onClick={() => setZoom((prev) => Math.max(prev - 25, 50))}
-            className="text-slate-500 hover:text-indigo-500 p-1 cursor-pointer"
+            className="text-muted hover:text-primary p-1 cursor-pointer"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
-          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 w-10 text-center">{zoom}%</span>
+          <span className="text-xs font-semibold text-text w-10 text-center">{zoom}%</span>
           <button
             onClick={() => setZoom((prev) => Math.min(prev + 25, 200))}
-            className="text-slate-500 hover:text-indigo-500 p-1 cursor-pointer"
+            className="text-muted hover:text-primary p-1 cursor-pointer"
           >
             <ZoomIn className="w-4 h-4" />
           </button>

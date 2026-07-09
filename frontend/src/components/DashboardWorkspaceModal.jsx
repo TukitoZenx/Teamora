@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from './ui/Button'
 import Input from './ui/Input'
+import Textarea from './ui/Textarea'
 import Modal from './ui/Modal'
 
 export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspace, onJoinWorkspace }) {
@@ -46,10 +47,10 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
     <Modal onClose={onClose}>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-[#111827]">
+          <h2 className="text-xl font-semibold tracking-tight text-text">
             {isCreate ? 'New Workspace' : 'Request Access'}
           </h2>
-          <p className="mt-1 text-sm text-[#6B7280]">
+          <p className="mt-1 text-sm text-muted">
             {isCreate
               ? 'Create a focused invite-only place for your team.'
               : 'Enter an invite link or code to request access.'}
@@ -58,7 +59,7 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
         <button
           type="button"
           onClick={onClose}
-          className="rounded-xl p-2 text-[#9CA3AF] transition duration-[180ms] hover:bg-[#F3F4F6] hover:text-[#111827]"
+          className="rounded-xl p-2 text-muted transition duration-[180ms] hover:bg-primary/10 hover:text-primary"
           aria-label="Close modal"
         >
           <X className="h-5 w-5" />
@@ -69,7 +70,7 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
         {isCreate ? (
           <>
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#374151]">Name</span>
+              <span className="mb-2 block text-sm font-medium text-text">Name</span>
               <Input
                 value={form.name}
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
@@ -78,19 +79,18 @@ export default function DashboardWorkspaceModal({ mode, onClose, onCreateWorkspa
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#374151]">Description</span>
-              <textarea
+              <span className="mb-2 block text-sm font-medium text-text">Description</span>
+              <Textarea
                 value={form.description}
                 onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
                 rows={3}
-                className="w-full resize-none rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-sm text-[#111827] outline-none transition duration-[180ms] placeholder:text-[#9CA3AF] hover:border-[#7C3AED] focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
                 placeholder="Optional"
               />
             </label>
           </>
         ) : (
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-[#374151]">Invite link or code</span>
+            <span className="mb-2 block text-sm font-medium text-text">Invite link or code</span>
             <Input
               value={inviteCode}
               onChange={(event) => setInviteCode(event.target.value)}

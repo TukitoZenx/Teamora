@@ -72,7 +72,7 @@ export default function WorkspaceLayout({
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#F8FAFC] text-[#111827]">
+    <div className="h-screen overflow-hidden bg-background text-text">
       <WorkspaceNavbar
         workspace={workspace}
         onOpenSidebar={() => setSidebarOpen(true)}

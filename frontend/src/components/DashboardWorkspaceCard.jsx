@@ -53,16 +53,16 @@ export default function DashboardWorkspaceCard({
       onKeyDown={(event) => {
         if (event.key === 'Enter') onOpen(workspace)
       }}
-      className="group relative rounded-[20px] border border-[#E5E7EB] bg-white p-5 shadow-sm transition duration-[180ms] ease-out hover:-translate-y-0.5 hover:border-[#7C3AED] hover:shadow-md"
+      className="group relative rounded-card border border-border bg-card p-5 shadow-card transition duration-[180ms] ease-out hover:-translate-y-0.5 hover:border-primary hover:shadow-hover"
     >
       <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#F5F3FF] text-[#7C3AED]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary">
             <Building2 className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold tracking-tight text-[#111827]">{workspace.name}</h3>
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-xs font-medium text-[#6B7280]">
+            <h3 className="truncate text-base font-semibold tracking-tight text-text">{workspace.name}</h3>
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-muted/10 px-2.5 py-1 text-xs font-medium text-muted">
               Invite-only
             </div>
           </div>
@@ -72,8 +72,8 @@ export default function DashboardWorkspaceCard({
           <button
             type="button"
             onClick={(event) => handleMenuAction(event, () => onToggleFavorite(workspace._id))}
-            className={`rounded-xl p-2 transition duration-[180ms] hover:bg-[#F5F3FF] ${
-              favorite ? 'text-[#7C3AED]' : 'text-[#9CA3AF]'
+            className={`rounded-xl p-2 transition duration-[180ms] hover:bg-primary/10 ${
+              favorite ? 'text-primary' : 'text-muted/65'
             }`}
             aria-label={favorite ? 'Remove favorite' : 'Favorite workspace'}
           >
@@ -82,8 +82,8 @@ export default function DashboardWorkspaceCard({
           <button
             type="button"
             onClick={(event) => handleMenuAction(event, () => onTogglePin(workspace._id))}
-            className={`rounded-xl p-2 transition duration-[180ms] hover:bg-[#F5F3FF] ${
-              pinned ? 'text-[#7C3AED]' : 'text-[#9CA3AF]'
+            className={`rounded-xl p-2 transition duration-[180ms] hover:bg-primary/10 ${
+              pinned ? 'text-primary' : 'text-muted/65'
             }`}
             aria-label={pinned ? 'Unpin workspace' : 'Pin workspace'}
           >
@@ -95,7 +95,7 @@ export default function DashboardWorkspaceCard({
               event.stopPropagation()
               setMenuOpen((current) => !current)
             }}
-            className="rounded-xl p-2 text-[#9CA3AF] transition duration-[180ms] hover:bg-[#F5F3FF] hover:text-[#7C3AED]"
+            className="rounded-xl p-2 text-muted/65 transition duration-[180ms] hover:bg-primary/10 hover:text-primary"
             aria-label="Workspace actions"
           >
             <MoreHorizontal className="h-4 w-4" />
@@ -103,11 +103,11 @@ export default function DashboardWorkspaceCard({
         </div>
       </div>
 
-      <p className="mb-5 line-clamp-2 min-h-10 text-sm leading-6 text-[#6B7280]">
+      <p className="mb-5 line-clamp-2 min-h-10 text-sm leading-6 text-muted">
         {workspace.description || 'No description yet.'}
       </p>
 
-      <div className="flex items-center justify-between gap-4 border-t border-[#F3F4F6] pt-4 text-xs font-medium text-[#6B7280]">
+      <div className="flex items-center justify-between gap-4 border-t border-border pt-4 text-xs font-medium text-muted">
         <span className="inline-flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5" />
           {(workspace.members || []).length} members

@@ -44,44 +44,48 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="cursor-pointer rounded-full focus:outline-none focus:ring-4 focus:ring-[#7C3AED]/15"
+        className="cursor-pointer rounded-avatar focus:outline-none focus:ring-4 focus:ring-primary/20"
         title={displayName}
       >
         <Avatar
           label={displayName.charAt(0).toUpperCase()}
           src={user?.avatar}
-          className="h-11 w-11 text-sm shadow-[0_10px_24px_rgba(124,58,237,0.16)]"
+          className="h-11 w-11 text-sm shadow-card"
         />
       </button>
 
       {open && (
-        <DropdownMenu className="w-72 rounded-[20px] p-3 shadow-[0_24px_70px_rgba(15,23,42,0.16)] animate-[teamora-content-fade_180ms_ease-out_both]">
+        <DropdownMenu className="w-72 rounded-card p-3 shadow-dropdown bg-card-elevated border border-border animate-[teamora-content-fade_180ms_ease-out_both]">
           <div className="flex items-center gap-3 px-2 pb-3 pt-1">
             <Avatar label={displayName.charAt(0).toUpperCase()} src={user?.avatar} className="h-14 w-14 text-lg" />
             <div className="min-w-0">
-              <p className="truncate text-base font-bold text-[#111827]">{displayName}</p>
-              <p className="mt-0.5 truncate text-xs font-medium text-[#6B7280]">
+              <p className="truncate text-base font-bold text-text">{displayName}</p>
+              <p className="mt-0.5 truncate text-xs font-medium text-muted">
                 {user?.email || 'teamora.user@example.com'}
               </p>
             </div>
           </div>
-          <div className="my-2 h-px bg-[#E5E7EB]" />
-          <DropdownItem
-            icon={Settings}
-            onClick={() => runAction(onWorkspaceSettings)}
-            className="rounded-[14px] py-2.5"
-          >
-            Workspace Settings
-          </DropdownItem>
-          <DropdownItem
-            icon={LogOut}
-            danger
-            onClick={() => runAction(onLeaveWorkspace)}
-            className="rounded-[14px] py-2.5"
-          >
-            Leave Workspace
-          </DropdownItem>
-          <DropdownItem icon={LogOut} danger onClick={handleLogout} className="rounded-[14px] py-2.5">
+          <div className="my-2 h-px bg-border" />
+          {onWorkspaceSettings && (
+            <DropdownItem
+              icon={Settings}
+              onClick={() => runAction(onWorkspaceSettings)}
+              className="rounded-button py-2.5"
+            >
+              Workspace Settings
+            </DropdownItem>
+          )}
+          {onLeaveWorkspace && (
+            <DropdownItem
+              icon={LogOut}
+              danger
+              onClick={() => runAction(onLeaveWorkspace)}
+              className="rounded-button py-2.5"
+            >
+              Leave Workspace
+            </DropdownItem>
+          )}
+          <DropdownItem icon={LogOut} danger onClick={handleLogout} className="rounded-button py-2.5">
             Logout
           </DropdownItem>
         </DropdownMenu>

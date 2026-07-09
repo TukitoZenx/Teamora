@@ -47,18 +47,18 @@ export default function ResetPasswordPage() {
   return (
     <AuthShell>
       <div className="mb-10 text-center">
-        <h2 className="text-4xl font-medium tracking-tight text-[#111111]">Reset your password</h2>
-        <p className="mt-4 text-base text-[#6B7280]">Choose a new password for your Teamora account.</p>
+        <h2 className="text-4xl font-medium tracking-tight text-text">Reset your password</h2>
+        <p className="mt-4 text-base text-muted">Choose a new password for your Teamora account.</p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-[14px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-card border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 rounded-[14px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div className="mb-4 rounded-card border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
           {success}
         </div>
       )}

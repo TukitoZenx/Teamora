@@ -54,9 +54,9 @@ export default function WorkspaceSidebar({
 
   return (
     <aside
-      className={`flex h-full flex-col border-r border-[#E5E7EB] bg-white transition-[width] duration-220 ease-in-out ${collapsed ? 'w-[72px]' : 'w-[240px]'} ${className}`}
+      className={`flex h-full flex-col border-r border-border bg-card transition-[width] duration-220 ease-in-out ${collapsed ? 'w-[72px]' : 'w-[240px]'} ${className}`}
     >
-      <div className="flex h-16 items-center justify-between border-b border-[#E5E7EB] px-4">
+      <div className="flex h-16 items-center justify-between border-b border-border px-4">
         <div className="flex items-center gap-3 overflow-hidden">
           <div
             className="relative flex h-9 w-9 items-center justify-center"
@@ -66,7 +66,7 @@ export default function WorkspaceSidebar({
             onBlur={() => setShowExpandButton(false)}
           >
             <div
-              className={`flex h-9 w-9 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED] shadow-sm transition-all duration-180 ease-out ${collapsed && showExpandButton ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
+              className={`flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm transition-all duration-180 ease-out ${collapsed && showExpandButton ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
             >
               <svg viewBox="0 0 48 48" className="h-5 w-5" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="4" y="4" width="40" height="40" rx="12" fill="#7C3AED" />
@@ -81,21 +81,21 @@ export default function WorkspaceSidebar({
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                className={`absolute inset-0 flex h-8 w-8 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#6B7280] shadow-sm transition-all duration-180 ease-out hover:scale-105 hover:bg-[#7C3AED] hover:text-white ${showExpandButton ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'}`}
+                className={`absolute inset-0 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-180 ease-out hover:scale-105 hover:bg-primary hover:text-white ${showExpandButton ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'}`}
                 aria-label="Expand sidebar"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
             )}
           </div>
-          {!collapsed && <span className="text-[15px] font-semibold text-[#111827]">Teamora</span>}
+          {!collapsed && <span className="text-[15px] font-semibold text-text">Teamora</span>}
         </div>
 
         {!collapsed && (
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#6B7280] shadow-sm transition-all duration-180 ease-out hover:scale-105 hover:bg-[#F5F3FF] hover:text-[#7C3AED]"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-180 ease-out hover:scale-105 hover:bg-primary/10 hover:text-primary"
             aria-label="Collapse sidebar"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -107,7 +107,7 @@ export default function WorkspaceSidebar({
         <nav className="space-y-3">
           {groups.map((group, groupIndex) => (
             <div key={groupIndex} className="space-y-1">
-              {groupIndex > 0 && !collapsed && <div className="my-3 h-px bg-[#E5E7EB]" />}
+              {groupIndex > 0 && !collapsed && <div className="my-3 h-px bg-border" />}
               {group.map((item) => (
                 <SidebarItem
                   key={item.key}
@@ -123,7 +123,7 @@ export default function WorkspaceSidebar({
         </nav>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[#E5E7EB] bg-white p-2">
+      <div className="sticky bottom-0 border-t border-border bg-card p-2">
         {isOwner ? (
           <div className="space-y-1">
             <SidebarItem

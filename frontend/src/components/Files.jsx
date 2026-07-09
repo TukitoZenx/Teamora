@@ -247,30 +247,30 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden h-full transition-all duration-200 ${
-        isDragging ? 'bg-indigo-500/5 dark:bg-indigo-950/10 border-2 border-dashed border-indigo-500' : ''
+      className={`flex-1 flex flex-col bg-card-sunken overflow-hidden h-full transition-all duration-200 ${
+        isDragging ? 'bg-primary/5 border-2 border-dashed border-primary' : ''
       }`}
     >
       {/* File Manager Header */}
-      <div className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 flex items-center justify-between shrink-0 transition-colors z-20">
+      <div className="h-14 border-b border-border bg-card px-6 flex items-center justify-between shrink-0 transition-colors z-20">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-500 shrink-0">
+          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary shrink-0">
             <Folder className="w-4 h-4" />
           </div>
-          <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">Shared Files</span>
+          <span className="font-semibold text-sm text-text">Shared Files</span>
         </div>
 
         {/* Toolbar Actions */}
         <div className="flex items-center gap-3">
           {/* Search */}
-          <div className="relative flex items-center bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-3 py-1">
-            <Search className="w-3.5 h-3.5 text-slate-400 mr-2" />
+          <div className="relative flex items-center bg-card-sunken border border-border rounded-xl px-3 py-1">
+            <Search className="w-3.5 h-3.5 text-muted mr-2" />
             <input
               type="text"
               placeholder="Search shared files..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 w-44"
+              className="bg-transparent border-none outline-none text-xs text-text placeholder-muted/65 w-44"
             />
           </div>
 
@@ -278,13 +278,13 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
             <>
               <button
                 onClick={() => setShowFolderModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border text-text rounded-xl font-semibold text-xs hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
               >
                 <FolderPlus className="w-3.5 h-3.5" />
                 <span>New Folder</span>
               </button>
 
-              <label className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer shadow-md shadow-indigo-500/10">
+              <label className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-semibold text-xs transition-colors cursor-pointer shadow-sm">
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload Files</span>
                 <input type="file" multiple onChange={handleFileUpload} className="hidden" />
@@ -295,21 +295,21 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
       </div>
 
       {/* Breadcrumb Path Bar */}
-      <div className="h-10 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 px-6 flex items-center justify-between shrink-0 transition-colors text-xs font-medium">
-        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+      <div className="h-10 border-b border-border bg-card-sunken/40 px-6 flex items-center justify-between shrink-0 transition-colors text-xs font-medium">
+        <div className="flex items-center gap-1.5 text-muted">
           <button
             onClick={() => setCurrentFolderId(null)}
-            className="hover:text-indigo-500 transition-colors cursor-pointer"
+            className="hover:text-primary transition-colors cursor-pointer"
           >
             Drive
           </button>
           {breadcrumbs.map((folder, index) => (
             <React.Fragment key={folder.id}>
-              <span className="text-slate-300 dark:text-slate-600">/</span>
+              <span className="text-border">/</span>
               <button
                 onClick={() => setCurrentFolderId(folder.id)}
-                className={`hover:text-indigo-500 transition-colors cursor-pointer truncate max-w-[120px] ${
-                  index === breadcrumbs.length - 1 ? 'text-slate-700 dark:text-slate-200 font-semibold' : ''
+                className={`hover:text-primary transition-colors cursor-pointer truncate max-w-[120px] ${
+                  index === breadcrumbs.length - 1 ? 'text-text font-semibold' : ''
                 }`}
               >
                 {folder.name}
@@ -324,7 +324,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
               const currentFolder = filesList.find((f) => f.id === currentFolderId)
               setCurrentFolderId(currentFolder ? currentFolder.folderId : null)
             }}
-            className="flex items-center gap-1 text-[11px] font-bold text-indigo-500 hover:text-indigo-600 cursor-pointer"
+            className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover cursor-pointer"
           >
             <ArrowLeft className="w-3 h-3" />
             Back
@@ -335,10 +335,10 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
       {/* Grid / List of Items */}
       <div className="flex-1 overflow-y-auto p-6">
         {currentItems.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/50 dark:border-slate-800/80">
-            <Folder className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3 animate-pulse" />
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Folder is empty</span>
-            <span className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-card rounded-2xl border border-border">
+            <Folder className="w-12 h-12 text-muted mb-3 animate-pulse" />
+            <span className="text-sm font-semibold text-text">Folder is empty</span>
+            <span className="text-xs text-muted mt-1">
               Drag and drop or upload files to share them with your team.
             </span>
           </div>
@@ -354,18 +354,18 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                     setPreviewFile(item)
                   }
                 }}
-                className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 hover:border-indigo-500/50 rounded-xl p-4 flex flex-col justify-between h-36 hover:shadow-lg transition-all relative group cursor-pointer"
+                className="bg-card border border-border hover:border-primary/50 rounded-xl p-4 flex flex-col justify-between h-36 hover:shadow-card transition-all relative group cursor-pointer"
               >
                 {/* Icons & Actions */}
                 <div className="flex items-start justify-between">
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg shrink-0">{getFileIcon(item)}</div>
+                  <div className="p-2 bg-card-sunken rounded-lg shrink-0">{getFileIcon(item)}</div>
 
                   {/* Item Menu Overlay */}
                   <div className="opacity-0 group-hover:opacity-100 flex gap-1 z-10 transition-opacity">
                     {item.type !== 'folder' && (
                       <button
                         onClick={() => handleDownload(item)}
-                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
+                        className="p-1 hover:bg-primary/10 text-muted hover:text-primary rounded-md transition-colors cursor-pointer"
                         title="Download"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -378,14 +378,14 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                             setEditingFile(item)
                             setNewFileName(item.name)
                           }}
-                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
+                          className="p-1 hover:bg-primary/10 text-muted hover:text-primary rounded-md transition-colors cursor-pointer"
                           title="Rename"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteItem(item.id)}
-                          className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-500 rounded-md transition-colors cursor-pointer"
+                          className="p-1 hover:bg-danger/10 text-muted hover:text-danger rounded-md transition-colors cursor-pointer"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -398,12 +398,12 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                 {/* Name & Details */}
                 <div className="min-w-0">
                   <h4
-                    className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate block mt-3"
+                    className="text-xs font-semibold text-text truncate block mt-3"
                     title={item.name}
                   >
                     {item.name}
                   </h4>
-                  <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
+                  <div className="flex items-center justify-between mt-1 text-[10px] text-muted">
                     <span>{formatSize(item.size)}</span>
                     <span className="truncate max-w-[80px]">{item.uploadedBy || 'system'}</span>
                   </div>
@@ -416,26 +416,26 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
 
       {/* Folder Creation Modal */}
       {showFolderModal && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl max-w-sm w-full">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4">Create New Folder</h3>
+        <div className="fixed inset-0 bg-card-sunken/40 backdrop-blur-xs flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-card max-w-sm w-full">
+            <h3 className="text-sm font-bold text-text mb-4">Create New Folder</h3>
             <input
               type="text"
               placeholder="Folder Name (e.g. Marketing Docs)"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 mb-6 transition-all"
+              className="w-full bg-card-sunken border border-border rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-primary mb-6 transition-all"
             />
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowFolderModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-card border border-border text-text rounded-xl text-xs font-semibold hover:bg-primary/10 hover:text-primary transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolder}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
               >
                 Create
               </button>
@@ -446,25 +446,25 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
 
       {/* Rename Modal */}
       {editingFile && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl max-w-sm w-full">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4">Rename Item</h3>
+        <div className="fixed inset-0 bg-card-sunken/40 backdrop-blur-xs flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-card max-w-sm w-full">
+            <h3 className="text-sm font-bold text-text mb-4">Rename Item</h3>
             <input
               type="text"
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 mb-6 transition-all"
+              className="w-full bg-card-sunken border border-border rounded-xl px-4 py-2.5 text-xs text-text focus:outline-none focus:border-primary mb-6 transition-all"
             />
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setEditingFile(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-card border border-border text-text rounded-xl text-xs font-semibold hover:bg-primary/10 hover:text-primary transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleRename}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
               >
                 Save
               </button>
@@ -475,25 +475,25 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
 
       {/* File Preview Modal */}
       {previewFile && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50 p-6">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col h-[80vh] overflow-hidden">
+        <div className="fixed inset-0 bg-card-sunken/40 backdrop-blur-xs flex items-center justify-center z-50 p-6">
+          <div className="bg-card border border-border rounded-2xl shadow-card max-w-3xl w-full flex flex-col h-[80vh] overflow-hidden">
             {/* Preview Header */}
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between shrink-0">
+            <div className="px-6 py-4 border-b border-border bg-card flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 {getFileIcon(previewFile)}
-                <span className="text-sm font-bold text-slate-800 dark:text-white truncate">{previewFile.name}</span>
+                <span className="text-sm font-bold text-text truncate">{previewFile.name}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleDownload(previewFile)}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg cursor-pointer"
+                  className="p-2 hover:bg-primary/10 text-muted hover:text-primary rounded-lg cursor-pointer"
                   title="Download File"
                 >
                   <Download className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setPreviewFile(null)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
+                  className="px-3 py-1.5 bg-card border border-border text-text hover:bg-primary/10 hover:text-primary rounded-xl text-xs font-semibold cursor-pointer"
                 >
                   Close
                 </button>
@@ -503,7 +503,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
             {/* Preview Body & Side Info Panel */}
             <div className="flex-1 flex overflow-hidden">
               {/* Main Preview */}
-              <div className="flex-1 bg-slate-950 flex items-center justify-center p-6 overflow-auto">
+              <div className="flex-1 bg-card-sunken flex items-center justify-center p-6 overflow-auto">
                 {previewFile.type.startsWith('image/') ? (
                   <img
                     src={previewFile.content}
@@ -511,16 +511,16 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                     className="max-w-full max-h-full object-contain rounded-lg"
                   />
                 ) : previewFile.type.includes('text') || previewFile.type.includes('json') ? (
-                  <pre className="text-xs text-slate-300 font-mono w-full h-full text-left whitespace-pre-wrap">
+                  <pre className="text-xs text-text font-mono w-full h-full text-left whitespace-pre-wrap">
                     {previewFile.content}
                   </pre>
                 ) : (
-                  <div className="text-center text-slate-400">
-                    <File className="w-16 h-16 mx-auto mb-4 opacity-40 text-slate-400" />
+                  <div className="text-center text-muted">
+                    <File className="w-16 h-16 mx-auto mb-4 opacity-40 text-muted" />
                     <span className="text-sm font-semibold">No preview available for this file type.</span>
                     <button
                       onClick={() => handleDownload(previewFile)}
-                      className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold block mx-auto cursor-pointer"
+                      className="mt-4 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold block mx-auto cursor-pointer"
                     >
                       Download File
                     </button>
@@ -529,10 +529,10 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
               </div>
 
               {/* Side Info Panel */}
-              <div className="w-64 border-l border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-6 overflow-y-auto hidden md:block text-xs">
+              <div className="w-64 border-l border-border bg-card p-6 space-y-6 overflow-y-auto hidden md:block text-xs">
                 <div>
-                  <h4 className="font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-2">Metadata</h4>
-                  <div className="space-y-2 text-slate-600 dark:text-slate-300">
+                  <h4 className="font-bold text-muted uppercase tracking-wider text-[10px] mb-2">Metadata</h4>
+                  <div className="space-y-2 text-text">
                     <p>
                       <span className="font-semibold">Type:</span> {previewFile.type}
                     </p>
@@ -548,27 +548,27 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                   </div>
                 </div>
 
-                <div className="h-px bg-slate-100 dark:bg-slate-800"></div>
+                <div className="h-px bg-border"></div>
 
                 <div>
-                  <h4 className="font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-2">
+                  <h4 className="font-bold text-muted uppercase tracking-wider text-[10px] mb-2">
                     Version History
                   </h4>
                   <div className="space-y-3">
                     {previewFile.versionHistory ? (
                       previewFile.versionHistory.map((ver, idx) => (
                         <div key={idx} className="flex gap-2.5 items-start">
-                          <div className="w-6 h-6 rounded-full bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center font-bold text-[10px] text-indigo-600 dark:text-indigo-400 shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center font-bold text-[10px] text-primary shrink-0">
                             v{ver.version}
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-700 dark:text-slate-200 truncate w-36">{ver.name}</p>
-                            <p className="text-[9px] text-slate-400 mt-0.5">{ver.uploadedAt}</p>
+                            <p className="font-semibold text-text truncate w-36">{ver.name}</p>
+                            <p className="text-[9px] text-muted mt-0.5">{ver.uploadedAt}</p>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <p className="italic text-slate-400">Version history not tracked.</p>
+                      <p className="italic text-muted">Version history not tracked.</p>
                     )}
                   </div>
                 </div>

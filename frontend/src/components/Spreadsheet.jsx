@@ -421,21 +421,21 @@ export default function Spreadsheet({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden h-full">
+    <div className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full">
       {/* Menu / Headers */}
-      <div className="h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0 transition-colors z-20">
+      <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors z-20">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500 shrink-0">
+          <div className="w-7 h-7 bg-success/10 rounded-lg flex items-center justify-center text-success shrink-0">
             <TableProperties className="w-4 h-4" />
           </div>
-          <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">Spreadsheet</span>
+          <span className="font-semibold text-sm text-text">Spreadsheet</span>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Charts Preview */}
           <button
             onClick={() => setShowCharts(!showCharts)}
-            className={`p-2 rounded-xl border cursor-pointer ${showCharts ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : 'text-slate-500 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            className={`p-2 rounded-xl border cursor-pointer ${showCharts ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted border-border hover:bg-primary/10 hover:text-primary'}`}
             title="Toggle Charts"
           >
             <BarChart3 className="w-4 h-4" />
@@ -444,14 +444,14 @@ export default function Spreadsheet({
           {/* Freeze options */}
           <button
             onClick={() => setFreezeRow(!freezeRow)}
-            className={`p-2 rounded-xl border cursor-pointer ${freezeRow ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : 'text-slate-500 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            className={`p-2 rounded-xl border cursor-pointer ${freezeRow ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted border-border hover:bg-primary/10 hover:text-primary'}`}
             title="Freeze Row 1"
           >
             <Lock className="w-4 h-4" />
           </button>
           <button
             onClick={() => setFreezeCol(!freezeCol)}
-            className={`p-2 rounded-xl border cursor-pointer ${freezeCol ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : 'text-slate-500 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            className={`p-2 rounded-xl border cursor-pointer ${freezeCol ? 'bg-primary/10 text-primary border-primary/20' : 'text-muted border-border hover:bg-primary/10 hover:text-primary'}`}
             title="Freeze Col A"
           >
             <ArrowLeftRight className="w-4 h-4" />
@@ -460,7 +460,7 @@ export default function Spreadsheet({
           {/* Formatting Rules */}
           <button
             onClick={() => setShowFormattingModal(true)}
-            className="p-2 text-slate-500 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+            className="p-2 text-muted rounded-xl border border-border hover:bg-primary/10 hover:text-primary cursor-pointer"
             title="Conditional Formatting"
           >
             <Palette className="w-4 h-4" />
@@ -469,23 +469,23 @@ export default function Spreadsheet({
           {/* Pivot Table Builder */}
           <button
             onClick={() => setShowPivotBuilder(!showPivotBuilder)}
-            className="p-2 text-slate-500 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+            className="p-2 text-muted rounded-xl border border-border hover:bg-primary/10 hover:text-primary cursor-pointer"
             title="Pivot Table Summary"
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5" />
+          <div className="w-px h-5 bg-border mx-0.5" />
 
           {/* Import / Export actions */}
-          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs cursor-pointer hover:bg-slate-50">
-            <Upload className="w-3.5 h-3.5 text-slate-400" />
+          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border text-text rounded-xl font-semibold text-xs cursor-pointer hover:bg-primary/10 hover:text-primary">
+            <Upload className="w-3.5 h-3.5 text-muted" />
             <span>Import</span>
             <input type="file" onChange={handleImportXLSX} className="hidden" accept=".xlsx" />
           </label>
           <button
             onClick={handleExportXLSX}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs cursor-pointer shadow-md shadow-indigo-500/10"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-xl font-semibold text-xs cursor-pointer shadow-sm"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export</span>
@@ -494,36 +494,36 @@ export default function Spreadsheet({
       </div>
 
       {/* Formula Bar */}
-      <div className="h-9 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 px-4 flex items-center gap-3 shrink-0">
-        <div className="text-[11px] font-mono font-bold text-slate-400 dark:text-slate-500 bg-slate-200 dark:bg-slate-800 px-2.5 py-0.5 rounded border border-slate-300/30 w-12 text-center select-none">
+      <div className="h-9 border-b border-border bg-card-sunken/80 px-4 flex items-center gap-3 shrink-0">
+        <div className="text-[11px] font-mono font-bold text-muted bg-card px-2.5 py-0.5 rounded border border-border w-12 text-center select-none">
           {getCellLabel() || '—'}
         </div>
-        <div className="text-xs font-bold text-slate-400 dark:text-slate-500 select-none italic">fx</div>
+        <div className="text-xs font-bold text-muted select-none italic">fx</div>
         <input
           type="text"
           value={activeCell ? grid[sheetOffset + activeCell.r]?.[activeCell.c] || '' : ''}
           onChange={(e) => activeCell && handleCellChange(sheetOffset + activeCell.r, activeCell.c, e.target.value)}
           placeholder="Enter value or formula (=SUM(A1:A5), =A1+B2, =AVERAGE(A1:B3)...)"
           disabled={!activeCell}
-          className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+          className="flex-1 bg-card border border-border rounded-lg px-3 py-1 text-xs text-text placeholder-muted/65 focus:outline-none focus:border-primary font-mono"
         />
       </div>
 
       {/* Main Grid View */}
       <div className="flex-1 flex overflow-hidden">
         <div
-          className="flex-1 overflow-auto bg-white dark:bg-slate-950 transition-colors"
+          className="flex-1 overflow-auto bg-card transition-colors"
           ref={gridContainerRef}
           onScroll={handleGridScroll}
         >
           <table className="border-collapse w-max min-w-full">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-900 select-none">
-                <th className="w-10 h-7 border border-slate-200 dark:border-slate-800/80 sticky top-0 left-0 bg-slate-100 dark:bg-slate-900 z-30" />
+              <tr className="bg-card-sunken/80 select-none">
+                <th className="w-10 h-7 border border-border sticky top-0 left-0 bg-card-sunken z-30" />
                 {visibleGridRows[0]?.map((_, cIdx) => (
                   <th
                     key={cIdx}
-                    className="w-28 border border-slate-200 dark:border-slate-800/80 text-[10px] font-bold text-slate-400 dark:text-slate-500 text-center uppercase tracking-wider sticky top-0 bg-slate-50 dark:bg-slate-900 z-20"
+                    className="w-28 border border-border text-[10px] font-bold text-muted text-center uppercase tracking-wider sticky top-0 bg-card-sunken/90 z-20"
                   >
                     <span>{getColumnHeaderLabel(cIdx)}</span>
                   </th>
@@ -539,11 +539,11 @@ export default function Spreadsheet({
                     key={rIdx}
                     className={
                       isFrozenRow
-                        ? 'sticky top-7 z-20 shadow-sm bg-indigo-50/50 dark:bg-indigo-950/20'
-                        : 'hover:bg-slate-50/20'
+                        ? 'sticky top-7 z-20 shadow-sm bg-primary/10'
+                        : 'hover:bg-primary/5'
                     }
                   >
-                    <td className="w-10 h-7 border border-slate-200 dark:border-slate-800/80 text-[10px] font-bold text-slate-400 dark:text-slate-500 text-center bg-slate-50 dark:bg-slate-900 sticky left-0 z-20 select-none">
+                    <td className="w-10 h-7 border border-border text-[10px] font-bold text-muted text-center bg-card-sunken sticky left-0 z-20 select-none">
                       {rIdx + 1}
                     </td>
                     {row.map((cell, cIdx) => {
@@ -560,11 +560,11 @@ export default function Spreadsheet({
                         <td
                           key={cIdx}
                           style={getCellFormatStyle(rIdx, cIdx, cell)}
-                          className={`w-28 h-7 border border-slate-200 dark:border-slate-800/80 p-0 relative transition-all ${
+                          className={`w-28 h-7 border border-border p-0 relative transition-all ${
                             isActive
-                              ? 'ring-2 ring-indigo-500 ring-inset z-10 bg-indigo-500/5'
+                              ? 'ring-2 ring-primary ring-inset z-10 bg-primary/5'
                               : isFrozenCol
-                                ? 'sticky left-10 z-10 bg-indigo-50/20 dark:bg-indigo-950/10'
+                                ? 'sticky left-10 z-10 bg-primary/10'
                                 : ''
                           }`}
                         >
@@ -577,7 +577,7 @@ export default function Spreadsheet({
                             onFocus={() => setActiveCell({ r: rIdx, c: cIdx })}
                             onChange={(e) => handleCellChange(sheetOffset + rIdx, cIdx, e.target.value)}
                             onKeyDown={(e) => handleCellKeyDown(e, rIdx, cIdx)}
-                            className="w-full h-full bg-transparent border-none outline-none px-2 text-xs text-slate-850 dark:text-slate-200 font-mono focus:ring-0 focus:outline-none"
+                            className="w-full h-full bg-transparent border-none outline-none px-2 text-xs text-text font-mono focus:ring-0 focus:outline-none"
                           />
                           {!isActive && hasOtherUsers && (
                             <div
@@ -595,30 +595,28 @@ export default function Spreadsheet({
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* Dynamic Charts Preview */}
+        </div>        {/* Dynamic Charts Preview */}
         {showCharts && (
-          <div className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col shrink-0 text-xs">
+          <div className="w-80 border-l border-border bg-card p-5 flex flex-col shrink-0 text-xs">
             <div className="flex items-center justify-between mb-4">
-              <span className="font-bold uppercase tracking-wider text-slate-400 text-[10px]">Charts Drawer</span>
+              <span className="font-bold uppercase tracking-wider text-muted text-[10px]">Charts Drawer</span>
               <select
                 value={chartType}
                 onChange={(e) => setChartType(e.target.value)}
-                className="bg-slate-50 dark:bg-slate-855 text-[10px] font-bold border border-slate-200 rounded px-2 py-0.5"
+                className="bg-card-sunken text-[10px] font-bold border border-border text-text rounded px-2 py-0.5"
               >
                 <option value="bar">Bar Chart</option>
                 <option value="line">Line Chart</option>
               </select>
             </div>
             {chartData.length === 0 ? (
-              <p className="italic text-slate-450 text-center py-6">
+              <p className="italic text-muted text-center py-6">
                 Enter numbers in the current column to display charts.
               </p>
             ) : chartType === 'bar' ? (
               <svg
                 viewBox="0 0 200 120"
-                className="w-full h-44 border border-slate-100 dark:border-slate-800 rounded-lg p-2 bg-slate-950"
+                className="w-full h-44 border border-border rounded-lg p-2 bg-card-sunken"
               >
                 {chartData.map((d, i) => {
                   const maxVal = Math.max(...chartData.map((dp) => dp.val), 1)
@@ -627,7 +625,7 @@ export default function Spreadsheet({
                   const y = 90 - barHeight
                   return (
                     <g key={i}>
-                      <rect x={x} y={y} width="10" height={barHeight} fill="#4f46e5" rx="1" />
+                      <rect x={x} y={y} width="10" height={barHeight} fill="#6366f1" rx="1" />
                       <text x={x + 5} y="105" fontSize="6" fill="#94a3b8" textAnchor="middle">
                         {d.label}
                       </text>
@@ -641,7 +639,7 @@ export default function Spreadsheet({
             ) : (
               <svg
                 viewBox="0 0 200 120"
-                className="w-full h-44 border border-slate-100 dark:border-slate-800 rounded-lg p-2 bg-slate-950"
+                className="w-full h-44 border border-border rounded-lg p-2 bg-card-sunken"
               >
                 <path
                   fill="none"
@@ -678,17 +676,17 @@ export default function Spreadsheet({
 
         {/* Pivot Summary Drawer */}
         {showPivotBuilder && (
-          <div className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col shrink-0 text-xs">
-            <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-wider mb-4">
+          <div className="w-80 border-l border-border bg-card p-5 flex flex-col shrink-0 text-xs">
+            <h4 className="font-bold text-[10px] text-muted uppercase tracking-wider mb-4">
               Pivot Builder Summary
             </h4>
-            <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200/50">
-              <span className="font-bold text-slate-700 dark:text-slate-300 block mb-2">
+            <div className="bg-card-sunken p-4 rounded-xl border border-border">
+              <span className="font-bold text-text block mb-2">
                 Column A (Tags) & Column B (Sums)
               </span>
               <table className="w-full text-left text-[11px]">
                 <thead>
-                  <tr className="border-b border-slate-200 font-bold text-slate-400">
+                  <tr className="border-b border-border font-bold text-muted">
                     <th>Row Tag</th>
                     <th className="text-right">Sum Total</th>
                   </tr>
@@ -707,16 +705,16 @@ export default function Spreadsheet({
                     if (entries.length === 0) {
                       return (
                         <tr>
-                          <td colSpan={2} className="py-2 italic text-slate-400 text-center">
+                          <td colSpan={2} className="py-2 italic text-muted text-center">
                             Empty pivot range.
                           </td>
                         </tr>
                       )
                     }
                     return entries.map(([tag, sum], i) => (
-                      <tr key={i} className="border-b border-slate-100 dark:border-slate-900">
-                        <td className="py-1 text-slate-800 dark:text-slate-200">{tag}</td>
-                        <td className="py-1 text-right font-mono font-bold text-indigo-500">{sum}</td>
+                      <tr key={i} className="border-b border-border">
+                        <td className="py-1 text-text">{tag}</td>
+                        <td className="py-1 text-right font-mono font-bold text-primary">{sum}</td>
                       </tr>
                     ))
                   })()}
@@ -725,10 +723,8 @@ export default function Spreadsheet({
             </div>
           </div>
         )}
-      </div>
-
-      {/* Sheets Navigation Tab bar */}
-      <div className="h-10 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center gap-1.5 shrink-0 z-20 select-none overflow-x-auto no-scrollbar">
+      </div>      {/* Sheets Navigation Tab bar */}
+      <div className="h-10 border-t border-border bg-card px-4 flex items-center gap-1.5 shrink-0 z-20 select-none overflow-x-auto no-scrollbar">
         {ensureArray(sheetsMetadata.sheets).map((sheet, sIdx) => {
           const isActive = sheetsMetadata.activeSheet === sheet.name
           return (
@@ -737,15 +733,15 @@ export default function Spreadsheet({
                 onClick={() => updateSheetsMetadata({ ...sheetsMetadata, activeSheet: sheet.name })}
                 className={`h-7 px-3 text-xs font-semibold rounded-lg flex items-center gap-1.5 border transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 dark:bg-slate-800 text-slate-650'
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'
                 }`}
               >
                 <span>{sheet.name}</span>
               </button>
 
               {/* Action Dropdown overlays for tab actions */}
-              <div className="hidden group-hover/tab:flex absolute bottom-full left-0 mb-1 bg-slate-950 text-white rounded-lg flex items-center p-1 gap-1.5 shadow-xl border border-white/10 z-50">
+              <div className="hidden group-hover/tab:flex absolute bottom-full left-0 mb-1 bg-card border border-border text-text rounded-lg flex items-center p-1 gap-1.5 shadow-card z-50">
                 <button onClick={() => handleRenameSheet(sheet.name)} title="Rename Sheet">
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -755,7 +751,7 @@ export default function Spreadsheet({
                 <button
                   onClick={() => handleDeleteSheet(sheet.name)}
                   title="Delete Sheet"
-                  className="text-rose-400 hover:text-rose-500"
+                  className="text-danger hover:text-danger-hover"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -765,7 +761,7 @@ export default function Spreadsheet({
         })}
         <button
           onClick={handleAddSheet}
-          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-550 dark:border-slate-850 cursor-pointer"
+          className="p-1.5 rounded-lg border border-border hover:bg-primary/10 text-muted hover:text-primary cursor-pointer"
           title="Add Sheet Tab"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -774,18 +770,18 @@ export default function Spreadsheet({
 
       {/* Formatting Modal */}
       {showFormattingModal && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl max-w-sm w-full">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4">New Highlight Rule</h3>
+        <div className="fixed inset-0 bg-card-sunken/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-2xl max-w-sm w-full">
+            <h3 className="text-sm font-bold text-text mb-4">New Highlight Rule</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">
                   Target Column
                 </label>
                 <select
                   value={ruleCol}
                   onChange={(e) => setRuleCol(parseInt(e.target.value))}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl px-4 py-2 text-xs focus:outline-none"
+                  className="w-full bg-card-sunken border border-border text-text rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-primary"
                 >
                   {Array(26)
                     .fill()
@@ -797,18 +793,18 @@ export default function Spreadsheet({
                 </select>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">
                   Highlight if Value &gt;
                 </label>
                 <input
                   type="number"
                   value={ruleValue}
                   onChange={(e) => setRuleValue(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl px-4 py-2 text-xs focus:outline-none"
+                  className="w-full bg-card-sunken border border-border text-text rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-primary"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">
                   Highlight Color
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -817,7 +813,7 @@ export default function Spreadsheet({
                       key={c}
                       onClick={() => setRuleColor(c)}
                       style={{ backgroundColor: c }}
-                      className={`h-8 rounded-lg border border-slate-200 cursor-pointer ${ruleColor === c ? 'ring-2 ring-indigo-500' : ''}`}
+                      className={`h-8 rounded-lg border border-border cursor-pointer ${ruleColor === c ? 'ring-2 ring-primary' : ''}`}
                     />
                   ))}
                 </div>
@@ -826,13 +822,13 @@ export default function Spreadsheet({
             <div className="flex justify-end gap-3 pt-6">
               <button
                 onClick={() => setShowFormattingModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold"
+                className="px-4 py-2 bg-card hover:bg-primary/10 border border-border text-text rounded-xl text-xs font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={addFormattingRule}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold"
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-semibold"
               >
                 Apply Rule
               </button>

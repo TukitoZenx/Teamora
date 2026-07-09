@@ -325,11 +325,11 @@ export default function Documents({
         const rows = prompt('Rows count:', '3')
         const cols = prompt('Columns count:', '3')
         if (rows && cols) {
-          let tableHTML = '<table class="w-full border-collapse border border-slate-300 my-4">'
+          let tableHTML = '<table class="w-full border-collapse border border-border my-4">'
           for (let r = 0; r < parseInt(rows); r++) {
             tableHTML += '<tr>'
             for (let c = 0; c < parseInt(cols); c++) {
-              tableHTML += '<td class="border border-slate-300 p-2 min-w-[50px] text-xs">Cell</td>'
+              tableHTML += '<td class="border border-border p-2 min-w-[50px] text-xs">Cell</td>'
             }
             tableHTML += '</tr>'
           }
@@ -357,7 +357,7 @@ export default function Documents({
         const rangePb = quill.getSelection() || { index: quill.getLength() }
         quill.clipboard.dangerouslyPasteHTML(
           rangePb.index,
-          '<div class="page-break" style="page-break-after: always; border-bottom: 2px dashed #cbd5e1; margin: 20px 0; text-align: center; font-size: 10px; color: #94a3b8; user-select: none;">--- Page Break ---</div>'
+          '<div class="page-break" style="page-break-after: always; border-bottom: 2px dashed var(--tw-color-border); margin: 20px 0; text-align: center; font-size: 10px; color: var(--tw-color-muted); user-select: none;">--- Page Break ---</div>'
         )
         break
       }
@@ -366,7 +366,7 @@ export default function Documents({
         const rangeHr = quill.getSelection() || { index: quill.getLength() }
         quill.clipboard.dangerouslyPasteHTML(
           rangeHr.index,
-          '<hr class="my-4 border-slate-200 dark:border-slate-800" />'
+          '<hr class="my-4 border-border" />'
         )
         break
       }
@@ -376,7 +376,7 @@ export default function Documents({
           quill.focus()
           quill.clipboard.dangerouslyPasteHTML(
             0,
-            `<div style="font-size: 10px; color: #94a3b8; border-bottom: 1px solid #e2e8f0; margin-bottom: 10px;">${headerText}</div>`
+            `<div style="font-size: 10px; color: var(--tw-color-muted); border-bottom: 1px solid var(--tw-color-border); margin-bottom: 10px;">${headerText}</div>`
           )
         }
         break
@@ -456,11 +456,11 @@ export default function Documents({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden h-full">
+    <div className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full">
       {/* Title Bar */}
-      <div className="h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 flex items-center justify-between shrink-0 transition-colors">
+      <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-500 shrink-0">
+          <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center text-primary shrink-0">
             <FileText className="w-4 h-4" />
           </div>
           <input
@@ -470,15 +470,15 @@ export default function Documents({
               setDocTitle(e.target.value)
               onRenameDocument?.(e.target.value)
             }}
-            className="font-semibold text-sm text-slate-800 dark:text-slate-100 bg-transparent border-none focus:outline-none focus:bg-slate-50 dark:focus:bg-slate-800/40 px-2 py-1 rounded-md max-w-[200px] md:max-w-md transition-colors"
+            className="font-semibold text-sm text-text bg-transparent border-none focus:outline-none focus:bg-primary/10 px-2 py-1 rounded-md max-w-[200px] md:max-w-md transition-colors"
             placeholder="Untitled Document"
           />
           {isSaving ? (
-            <span className="text-[10px] text-indigo-500 animate-pulse bg-indigo-500/5 px-2 py-0.5 rounded-full border border-indigo-500/10">
+            <span className="text-[10px] text-primary animate-pulse bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
               Saving...
             </span>
           ) : (
-            <span className="text-[10px] text-emerald-500 bg-emerald-500/5 px-2 py-0.5 rounded-full border border-emerald-500/10">
+            <span className="text-[10px] text-success bg-success/10 px-2 py-0.5 rounded-full border border-success/20">
               Saved
             </span>
           )}
@@ -489,8 +489,8 @@ export default function Documents({
             onClick={() => setActiveSidePanel(activeSidePanel === 'comments' ? null : 'comments')}
             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
               activeSidePanel === 'comments'
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white hover:bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                ? 'bg-primary text-white border-primary'
+                : 'bg-card hover:bg-primary/10 border-border text-muted'
             }`}
             title="Comments Sidebar"
           >
@@ -500,8 +500,8 @@ export default function Documents({
             onClick={() => setActiveSidePanel(activeSidePanel === 'versions' ? null : 'versions')}
             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
               activeSidePanel === 'versions'
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white hover:bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                ? 'bg-primary text-white border-primary'
+                : 'bg-card hover:bg-primary/10 border-border text-muted'
             }`}
             title="Version History"
           >
@@ -511,80 +511,80 @@ export default function Documents({
       </div>
 
       {/* Menu / Ribbon Bar */}
-      <div className="h-9 border-b border-slate-200 dark:border-slate-800 bg-slate-50/85 dark:bg-slate-900/85 px-3 flex items-center gap-0.5 shrink-0 relative z-30 select-none">
+      <div className="h-9 border-b border-border bg-card-sunken/85 px-3 flex items-center gap-0.5 shrink-0 relative z-30 select-none">
         {/* FILE */}
         <div className="relative group">
-          <button className="px-3 py-1 text-xs font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200">
+          <button className="px-3 py-1 text-xs font-medium rounded-md text-muted hover:bg-card hover:text-text">
             File
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 min-w-[180px] py-1 hidden group-hover:block">
+          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-card z-50 min-w-[180px] py-1 hidden group-hover:block">
             <button
               onClick={() => handleMenuAction('newDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <FileText className="w-3.5 h-3.5" />
               New Document
             </button>
             <button
               onClick={() => handleMenuAction('openDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <FolderOpen className="w-3.5 h-3.5" />
               Open...
             </button>
             <button
               onClick={() => handleMenuAction('saveDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Save className="w-3.5 h-3.5" />
               Save
             </button>
             <button
               onClick={() => handleMenuAction('saveDraft')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Download className="w-3.5 h-3.5" />
               Save Draft
             </button>
             <button
               onClick={() => handleMenuAction('renameDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Type className="w-3.5 h-3.5" />
               Rename
             </button>
             <button
               onClick={() => handleMenuAction('duplicateDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Copy className="w-3.5 h-3.5" />
               Duplicate
             </button>
             <button
               onClick={() => handleMenuAction('openVersions')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <History className="w-3.5 h-3.5" />
               Version History
             </button>
-            <div className="h-px bg-slate-200 dark:bg-slate-800 my-1"></div>
+            <div className="h-px bg-border my-1"></div>
             <button
               onClick={() => handleMenuAction('exportPdf')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Download className="w-3.5 h-3.5" />
               Export PDF
             </button>
             <button
               onClick={() => handleMenuAction('exportDocx')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Download className="w-3.5 h-3.5" />
               Export DOCX
             </button>
             <button
               onClick={() => handleMenuAction('printDoc')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Printer className="w-3.5 h-3.5" />
               Print
@@ -594,84 +594,84 @@ export default function Documents({
 
         {/* INSERT */}
         <div className="relative group">
-          <button className="px-3 py-1 text-xs font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200">
+          <button className="px-3 py-1 text-xs font-medium rounded-md text-muted hover:bg-card hover:text-text">
             Insert
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 min-w-[180px] py-1 hidden group-hover:block">
+          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-card z-50 min-w-[180px] py-1 hidden group-hover:block">
             <button
               onClick={() => handleMenuAction('insertImage')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Image className="w-3.5 h-3.5" />
               Image URL
             </button>
             <button
               onClick={() => handleMenuAction('insertTable')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Table2 className="w-3.5 h-3.5" />
               Table Grid
             </button>
             <button
               onClick={() => handleMenuAction('insertLink')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Link className="w-3.5 h-3.5" />
               Hyperlink
             </button>
-            <div className="h-px bg-slate-200 dark:bg-slate-800 my-1"></div>
+            <div className="h-px bg-border my-1"></div>
             <button
               onClick={() => handleMenuAction('insertPageBreak')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Page Break
             </button>
             <button
               onClick={() => handleMenuAction('insertHr')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Horizontal Line
             </button>
             <button
               onClick={() => handleMenuAction('insertHeader')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Header
             </button>
             <button
               onClick={() => handleMenuAction('insertFooter')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Footer
             </button>
             <button
               onClick={() => handleMenuAction('insertPageNumber')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Page Number
             </button>
             <button
               onClick={() => handleMenuAction('insertDate')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Current Date
             </button>
             <button
               onClick={() => handleMenuAction('insertShape')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               <Shapes className="w-3.5 h-3.5" />
               Shapes
             </button>
             <button
               onClick={() => handleMenuAction('insertIcon')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Icons (Star)
             </button>
             <button
               onClick={() => handleMenuAction('insertEquation')}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-350"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
             >
               Math Equation
             </button>
@@ -680,10 +680,10 @@ export default function Documents({
 
         {/* LAYOUT */}
         <div className="relative group">
-          <button className="px-3 py-1 text-xs font-medium rounded-md text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200">
+          <button className="px-3 py-1 text-xs font-medium rounded-md text-muted hover:bg-card hover:text-text">
             Layout
           </button>
-          <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 min-w-[200px] p-3 hidden group-hover:block text-[11px] text-slate-600 dark:text-slate-400 space-y-3">
+          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-xl shadow-card z-50 min-w-[200px] p-3 hidden group-hover:block text-[11px] text-muted space-y-3">
             <div>
               <span className="font-bold block mb-1">Margins</span>
               <div className="flex gap-1.5">
@@ -691,7 +691,7 @@ export default function Documents({
                   <button
                     key={m}
                     onClick={() => setPageMargin(m)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer ${pageMargin === m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200'}`}
+                    className={`px-2 py-0.5 border rounded cursor-pointer ${pageMargin === m ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
                   >
                     {m}
                   </button>
@@ -705,7 +705,7 @@ export default function Documents({
                   <button
                     key={o}
                     onClick={() => setOrientation(o)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${orientation === o ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200'}`}
+                    className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${orientation === o ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
                   >
                     {o}
                   </button>
@@ -719,7 +719,7 @@ export default function Documents({
                   <button
                     key={p}
                     onClick={() => setPaperSize(p)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer ${paperSize === p ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200'}`}
+                    className={`px-2 py-0.5 border rounded cursor-pointer ${paperSize === p ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
                   >
                     {p}
                   </button>
@@ -733,7 +733,7 @@ export default function Documents({
                   <button
                     key={c}
                     onClick={() => setColumnsCount(c)}
-                    className={`px-2.5 py-0.5 border rounded cursor-pointer ${columnsCount === c ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200'}`}
+                    className={`px-2.5 py-0.5 border rounded cursor-pointer ${columnsCount === c ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
                   >
                     {c} Col
                   </button>
@@ -748,7 +748,7 @@ export default function Documents({
                     key={c}
                     onClick={() => setPageColor(c)}
                     style={{ backgroundColor: c }}
-                    className={`h-6 rounded border cursor-pointer ${pageColor === c ? 'ring-2 ring-indigo-500' : ''}`}
+                    className={`h-6 rounded border cursor-pointer ${pageColor === c ? 'ring-2 ring-primary' : ''}`}
                   />
                 ))}
               </div>
@@ -760,7 +760,7 @@ export default function Documents({
                   <button
                     key={b}
                     onClick={() => setPageBorder(b)}
-                    className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${pageBorder === b ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 border-slate-200'}`}
+                    className={`px-2 py-0.5 border rounded cursor-pointer capitalize ${pageBorder === b ? 'bg-primary text-white border-primary' : 'bg-card border-border text-text hover:bg-primary/10'}`}
                   >
                     {b}
                   </button>
@@ -772,12 +772,12 @@ export default function Documents({
       </div>
 
       {/* Editor Formatting Ribbon */}
-      <div className="h-10 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 flex items-center gap-1.5 shrink-0 z-20 overflow-x-auto no-scrollbar">
+      <div className="h-10 border-b border-border bg-card px-4 flex items-center gap-1.5 shrink-0 z-20 overflow-x-auto no-scrollbar">
         {/* Zoom Select */}
         <select
           value={zoom}
           onChange={(e) => setZoom(parseInt(e.target.value))}
-          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 cursor-pointer"
+          className="bg-card-sunken text-xs font-semibold px-2 py-1 rounded border border-border text-text cursor-pointer focus:border-primary"
           title="Zoom"
         >
           <option value="50">50%</option>
@@ -789,7 +789,7 @@ export default function Documents({
           <option value="150">150%</option>
         </select>
 
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+        <div className="w-px h-4 bg-border" />
 
         {/* Font Select */}
         <select
@@ -798,7 +798,7 @@ export default function Documents({
             setFontFamily(e.target.value)
             applyFormat('font', e.target.value)
           }}
-          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-350 cursor-pointer"
+          className="bg-card-sunken text-xs font-semibold px-2 py-1 rounded border border-border text-text cursor-pointer focus:border-primary"
         >
           {FONTS.map((f) => (
             <option key={f} value={f}>
@@ -814,7 +814,7 @@ export default function Documents({
             setFontSize(e.target.value)
             applyFormat('size', e.target.value)
           }}
-          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-1 rounded border border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-350 cursor-pointer"
+          className="bg-card-sunken text-xs font-semibold px-2 py-1 rounded border border-border text-text cursor-pointer focus:border-primary"
         >
           {SIZES.map((s) => (
             <option key={s} value={s}>
@@ -823,34 +823,34 @@ export default function Documents({
           ))}
         </select>
 
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-850" />
+        <div className="w-px h-4 bg-border" />
 
         {/* Formatting actions */}
         <button
           onClick={() => applyFormat('bold', true)}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 font-bold cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary font-bold cursor-pointer"
         >
           B
         </button>
         <button
           onClick={() => applyFormat('italic', true)}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 italic cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary italic cursor-pointer"
         >
           I
         </button>
         <button
           onClick={() => applyFormat('underline', true)}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 underline cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary underline cursor-pointer"
         >
           U
         </button>
 
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+        <div className="w-px h-4 bg-border" />
 
         {/* Highlighting */}
         <button
           onClick={() => applyFormat('background', '#fef08a')}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-amber-500 font-bold cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-amber-500 font-bold cursor-pointer"
           title="Highlight Yellow"
         >
           🖍️
@@ -868,51 +868,51 @@ export default function Documents({
           title="Text Color"
         />
 
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+        <div className="w-px h-4 bg-border" />
 
         {/* Alignment */}
         <button
           onClick={() => applyFormat('align', '')}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
         >
           <AlignLeft className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => applyFormat('align', 'center')}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
         >
           <AlignCenter className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => applyFormat('align', 'right')}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
         >
           <AlignRight className="w-3.5 h-3.5" />
         </button>
 
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+        <div className="w-px h-4 bg-border" />
 
         {/* Lists */}
         <button
           onClick={() => applyFormat('list', 'bullet')}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
         >
           <List className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => applyFormat('list', 'ordered')}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-600 dark:text-slate-400 cursor-pointer"
+          className="p-1 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
         >
           <ListOrdered className="w-3.5 h-3.5" />
         </button>
 
-        <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+        <div className="w-px h-4 bg-border" />
 
         {/* Spacings */}
         <select
           value={lineSpacing}
           onChange={(e) => setLineSpacing(e.target.value)}
-          className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 cursor-pointer"
+          className="bg-card-sunken text-xs font-semibold px-2 py-0.5 rounded border border-border text-text cursor-pointer focus:border-primary"
         >
           {LINE_SPACINGS.map((s) => (
             <option key={s} value={s}>
@@ -930,7 +930,7 @@ export default function Documents({
               if (range) quill.removeFormat(range.index, range.length)
             }
           }}
-          className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-500 rounded text-[10px] font-bold text-slate-600 cursor-pointer ml-auto"
+          className="px-2 py-1 bg-card hover:bg-danger/10 hover:text-danger rounded text-[10px] font-bold text-muted cursor-pointer ml-auto"
         >
           Clear Style
         </button>
@@ -940,11 +940,11 @@ export default function Documents({
       <div className="flex-1 flex overflow-hidden">
         {/* Main Editor Page Layout */}
         <div
-          className="flex-1 overflow-y-auto flex justify-center bg-slate-100 dark:bg-slate-900 p-4 shadow-inner"
+          className="flex-1 overflow-y-auto flex justify-center bg-card-sunken p-4 shadow-inner"
           ref={scrollContainerRef}
         >
           <div
-            className="w-full bg-white dark:bg-slate-950 shadow-lg transition-all relative flex flex-col my-4 min-h-[1056px] h-max border border-slate-200 dark:border-slate-800 origin-top"
+            className="w-full bg-card shadow-card transition-all relative flex flex-col my-4 min-h-[1056px] h-max border border-border origin-top"
             style={{
               maxWidth: orientation === 'landscape' ? '1056px' : '816px',
               transform: `scale(${zoom / 100})`,
@@ -952,18 +952,18 @@ export default function Documents({
             }}
           >
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
-            <div ref={wrapperRef} className="flex-1 quill-editor-wrapper text-slate-800 dark:text-slate-100 p-8"></div>
+            <div ref={wrapperRef} className="flex-1 quill-editor-wrapper text-text p-8"></div>
           </div>
         </div>
 
         {/* Collapsible sidebar panels */}
         {activeSidePanel === 'comments' && (
-          <div className="w-72 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col shrink-0 text-xs">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between font-bold text-[10px] text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/10 shrink-0">
+          <div className="w-72 border-l border-border bg-card flex flex-col shrink-0 text-xs">
+            <div className="p-4 border-b border-border flex items-center justify-between font-bold text-[10px] text-muted uppercase tracking-wider bg-card-sunken/50 shrink-0">
               <span>Comments Threads</span>
               <button
                 onClick={() => setActiveSidePanel(null)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="text-muted hover:text-text cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -971,42 +971,42 @@ export default function Documents({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
               {ensureArray(comments).length === 0 ? (
-                <p className="italic text-slate-400 text-center py-6">No comment threads in this document.</p>
+                <p className="italic text-muted text-center py-6">No comment threads in this document.</p>
               ) : (
                 ensureArray(comments).map((c) => (
                   <div
                     key={c.id}
-                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-xl p-3 relative"
+                    className="bg-card-sunken border border-border/80 rounded-xl p-3 relative"
                   >
                     <button
                       onClick={() => handleDeleteComment(c.id)}
-                      className="absolute top-2.5 right-2.5 p-1 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-300 hover:text-rose-500 rounded-md cursor-pointer"
+                      className="absolute top-2.5 right-2.5 p-1 hover:bg-danger/10 text-muted hover:text-danger rounded-md cursor-pointer"
                       title="Resolve Thread"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    <div className="flex items-center justify-between text-[8px] font-bold text-slate-400 mb-1">
+                    <div className="flex items-center justify-between text-[8px] font-bold text-muted mb-1">
                       <span>{c.user}</span>
                       <span>{c.timestamp}</span>
                     </div>
-                    <p className="text-slate-700 dark:text-slate-200 leading-normal">{c.text}</p>
+                    <p className="text-text leading-normal">{c.text}</p>
                   </div>
                 ))
               )}
             </div>
 
-            <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+            <div className="p-3 border-t border-border flex gap-2">
               <input
                 type="text"
                 placeholder="Write a comment..."
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-[11px] text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+                className="flex-1 h-9 bg-card-sunken border border-border rounded-xl px-3 py-2 text-[11px] text-text placeholder:text-muted/65 focus:outline-none focus:border-primary"
               />
               <button
                 onClick={handleAddComment}
-                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold cursor-pointer"
+                className="px-3 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-[10px] font-bold cursor-pointer"
               >
                 Send
               </button>
@@ -1015,12 +1015,12 @@ export default function Documents({
         )}
 
         {activeSidePanel === 'versions' && (
-          <div className="w-72 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-col shrink-0 text-xs">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between font-bold text-[10px] text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/10 shrink-0">
+          <div className="w-72 border-l border-border bg-card flex flex-col shrink-0 text-xs">
+            <div className="p-4 border-b border-border flex items-center justify-between font-bold text-[10px] text-muted uppercase tracking-wider bg-card-sunken/50 shrink-0">
               <span>Version History</span>
               <button
                 onClick={() => setActiveSidePanel(null)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="text-muted hover:text-text cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -1028,21 +1028,21 @@ export default function Documents({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
               {ensureArray(versions).length === 0 ? (
-                <p className="italic text-slate-400 text-center py-6">No saved history drafts.</p>
+                <p className="italic text-muted text-center py-6">No saved history drafts.</p>
               ) : (
                 ensureArray(versions).map((ver, i) => (
                   <div
                     key={ver.versionId}
-                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-xl p-3 space-y-2"
+                    className="bg-card-sunken border border-border/80 rounded-xl p-3 space-y-2"
                   >
-                    <div className="flex items-center justify-between text-[8px] font-bold text-slate-400">
+                    <div className="flex items-center justify-between text-[8px] font-bold text-muted">
                       <span>Draft #{ensureArray(versions).length - i}</span>
                       <span>{ver.timestamp}</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">Saved by {ver.user}</p>
+                    <p className="text-[10px] text-muted/80 truncate">Saved by {ver.user}</p>
                     <button
                       onClick={() => onRevertVersion(ver)}
-                      className="w-full py-1.5 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-indigo-100/50 dark:border-indigo-900/20"
+                      className="w-full py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[9px] font-bold transition-all cursor-pointer border border-primary/20"
                     >
                       Restore Draft
                     </button>
@@ -1055,7 +1055,7 @@ export default function Documents({
       </div>
 
       {/* Document Metrics Status Bar */}
-      <div className="h-6 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 flex items-center justify-between text-[9px] font-bold text-slate-400 select-none shrink-0">
+      <div className="h-6 border-t border-border bg-card px-4 flex items-center justify-between text-[9px] font-bold text-muted select-none shrink-0">
         <div className="flex items-center gap-3">
           <span>
             PAGE: {currentPage} of {stats.pages}
@@ -1065,7 +1065,7 @@ export default function Documents({
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <Sparkles className="w-2.5 h-2.5 text-indigo-500" /> READING TIME: ~{stats.readTime} MIN
+            <Sparkles className="w-2.5 h-2.5 text-primary" /> READING TIME: ~{stats.readTime} MIN
           </span>
           <span>COLLABORATORS: {activeUsersCount}</span>
         </div>
