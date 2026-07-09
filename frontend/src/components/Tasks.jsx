@@ -1,6 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { CheckSquare, List, Calendar as CalendarIcon, Plus, User, Clock, AlertTriangle, MessageSquare, Send, Trash2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState } from 'react'
+import {
+  CheckSquare,
+  List,
+  Calendar as CalendarIcon,
+  Plus,
+  User,
+  Clock,
+  MessageSquare,
+  Send,
+  Trash2
+} from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function Tasks({
   tasksList = [],
@@ -10,25 +20,25 @@ export default function Tasks({
   activeUsers = [],
   currentUserRole = 'editor'
 }) {
-  const [activeTab, setActiveTab] = useState('kanban'); // 'kanban' | 'list' | 'calendar'
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
-  
-  // Create task states
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskDesc, setTaskDesc] = useState('');
-  const [taskStatus, setTaskStatus] = useState('todo'); // 'backlog', 'todo', 'in-progress', 'review', 'completed'
-  const [taskPriority, setTaskPriority] = useState('medium'); // 'low', 'medium', 'high'
-  const [taskAssignee, setTaskAssignee] = useState('');
-  const [taskDueDate, setTaskDueDate] = useState('');
-  
-  // Comment input
-  const [commentInput, setCommentInput] = useState('');
+  const [activeTab, setActiveTab] = useState('kanban') // 'kanban' | 'list' | 'calendar'
+  const [showTaskModal, setShowTaskModal] = useState(false)
+  const [selectedTask, setSelectedTask] = useState(null)
 
-  const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter';
+  // Create task states
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDesc, setTaskDesc] = useState('')
+  const [taskStatus, setTaskStatus] = useState('todo') // 'backlog', 'todo', 'in-progress', 'review', 'completed'
+  const [taskPriority, setTaskPriority] = useState('medium') // 'low', 'medium', 'high'
+  const [taskAssignee, setTaskAssignee] = useState('')
+  const [taskDueDate, setTaskDueDate] = useState('')
+
+  // Comment input
+  const [commentInput, setCommentInput] = useState('')
+
+  const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter'
 
   const handleCreateTask = () => {
-    if (!taskTitle.trim()) return;
+    if (!taskTitle.trim()) return
 
     const newTask = {
       id: 'task-' + Math.random().toString(36).substring(7),
@@ -41,83 +51,92 @@ export default function Tasks({
       comments: [],
       createdBy: userName,
       createdAt: new Date().toLocaleDateString()
-    };
+    }
 
-    const updated = [...tasksList, newTask];
-    socket.emit('update-tasks', { roomId, tasks: updated });
+    const updated = [...tasksList, newTask]
+    socket.emit('update-tasks', { roomId, tasks: updated })
 
     // Reset Form
-    setTaskTitle('');
-    setTaskDesc('');
-    setTaskStatus('todo');
-    setTaskPriority('medium');
-    setTaskAssignee('');
-    setTaskDueDate('');
-    setShowTaskModal(false);
-    toast.success('Task created successfully!');
-  };
+    setTaskTitle('')
+    setTaskDesc('')
+    setTaskStatus('todo')
+    setTaskPriority('medium')
+    setTaskAssignee('')
+    setTaskDueDate('')
+    setShowTaskModal(false)
+    toast.success('Task created successfully!')
+  }
 
   const handleUpdateStatus = (taskId, newStatus) => {
     const updated = tasksList.map((t) => {
       if (t.id === taskId) {
-        return { ...t, status: newStatus };
+        return { ...t, status: newStatus }
       }
-      return t;
-    });
-    socket.emit('update-tasks', { roomId, tasks: updated });
-    toast.success(`Task status updated to ${newStatus.replace('-', ' ')}`);
-  };
+      return t
+    })
+    socket.emit('update-tasks', { roomId, tasks: updated })
+    toast.success(`Task status updated to ${newStatus.replace('-', ' ')}`)
+  }
 
   const handleDeleteTask = (taskId) => {
-    const updated = tasksList.filter((t) => t.id !== taskId);
-    socket.emit('update-tasks', { roomId, tasks: updated });
-    setSelectedTask(null);
-    toast.success('Task deleted successfully.');
-  };
+    const updated = tasksList.filter((t) => t.id !== taskId)
+    socket.emit('update-tasks', { roomId, tasks: updated })
+    setSelectedTask(null)
+    toast.success('Task deleted successfully.')
+  }
 
   const handleAddComment = () => {
-    if (!commentInput.trim() || !selectedTask) return;
+    if (!commentInput.trim() || !selectedTask) return
 
     const commentObj = {
       text: commentInput,
       user: userName,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
+    }
 
     const updated = tasksList.map((t) => {
       if (t.id === selectedTask.id) {
-        const newComments = [...(t.comments || []), commentObj];
+        const newComments = [...(t.comments || []), commentObj]
         // Keep selectedTask in sync locally
-        setSelectedTask({ ...t, comments: newComments });
-        return { ...t, comments: newComments };
+        setSelectedTask({ ...t, comments: newComments })
+        return { ...t, comments: newComments }
       }
-      return t;
-    });
+      return t
+    })
 
-    socket.emit('update-tasks', { roomId, tasks: updated });
-    setCommentInput('');
-  };
+    socket.emit('update-tasks', { roomId, tasks: updated })
+    setCommentInput('')
+  }
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high': return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200/50';
-      case 'medium': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200/50';
-      default: return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200/50'; // low
+      case 'high':
+        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200/50'
+      case 'medium':
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200/50'
+      default:
+        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200/50' // low
     }
-  };
+  }
 
   const getLaneLabel = (laneId) => {
-    switch(laneId) {
-      case 'backlog': return 'Backlog';
-      case 'todo': return 'To Do';
-      case 'in-progress': return 'In Progress';
-      case 'review': return 'In Review';
-      case 'completed': return 'Completed';
-      default: return 'Lanes';
+    switch (laneId) {
+      case 'backlog':
+        return 'Backlog'
+      case 'todo':
+        return 'To Do'
+      case 'in-progress':
+        return 'In Progress'
+      case 'review':
+        return 'In Review'
+      case 'completed':
+        return 'Completed'
+      default:
+        return 'Lanes'
     }
-  };
+  }
 
-  const lanes = ['backlog', 'todo', 'in-progress', 'review', 'completed'];
+  const lanes = ['backlog', 'todo', 'in-progress', 'review', 'completed']
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden h-full">
@@ -184,16 +203,20 @@ export default function Tasks({
         {activeTab === 'kanban' && (
           <div className="flex gap-4 h-full min-w-max items-start">
             {lanes.map((lane) => {
-              const laneTasks = tasksList.filter((t) => t.status === lane);
+              const laneTasks = tasksList.filter((t) => t.status === lane)
               return (
-                <div 
+                <div
                   key={lane}
                   className="w-72 bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/80 rounded-2xl flex flex-col max-h-full transition-colors overflow-hidden"
                 >
                   {/* Lane Header */}
                   <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/10">
-                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">{getLaneLabel(lane)}</span>
-                    <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full font-bold">{laneTasks.length}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
+                      {getLaneLabel(lane)}
+                    </span>
+                    <span className="text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full font-bold">
+                      {laneTasks.length}
+                    </span>
                   </div>
 
                   {/* Lane Cards List */}
@@ -211,7 +234,9 @@ export default function Tasks({
                         >
                           <div>
                             <div className="flex items-center justify-between gap-2">
-                              <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border ${getPriorityColor(task.priority)}`}>
+                              <span
+                                className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border ${getPriorityColor(task.priority)}`}
+                              >
                                 {task.priority}
                               </span>
                               <span className="text-[9px] text-slate-400 dark:text-slate-500 font-mono font-medium flex items-center gap-1">
@@ -219,7 +244,9 @@ export default function Tasks({
                                 {task.dueDate}
                               </span>
                             </div>
-                            <h4 className="font-semibold text-slate-800 dark:text-slate-100 text-xs mt-2 leading-snug">{task.title}</h4>
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-100 text-xs mt-2 leading-snug">
+                              {task.title}
+                            </h4>
                           </div>
 
                           <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-900">
@@ -239,7 +266,7 @@ export default function Tasks({
                     )}
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         )}
@@ -262,11 +289,13 @@ export default function Tasks({
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {tasksList.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">No tasks created yet.</td>
+                      <td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">
+                        No tasks created yet.
+                      </td>
                     </tr>
                   ) : (
                     tasksList.map((task) => (
-                      <tr 
+                      <tr
                         key={task.id}
                         onClick={() => setSelectedTask(task)}
                         className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 cursor-pointer text-xs"
@@ -278,7 +307,9 @@ export default function Tasks({
                           </span>
                         </td>
                         <td className="px-6 py-3.5">
-                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getPriorityColor(task.priority)}`}>
+                          <span
+                            className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getPriorityColor(task.priority)}`}
+                          >
                             {task.priority}
                           </span>
                         </td>
@@ -303,7 +334,7 @@ export default function Tasks({
                 <p className="italic text-slate-400 text-center py-4">No deadlines set.</p>
               ) : (
                 tasksList.map((task) => (
-                  <div 
+                  <div
                     key={task.id}
                     onClick={() => setSelectedTask(task)}
                     className="flex items-center justify-between p-3.5 border border-slate-100 dark:border-slate-800/80 rounded-xl hover:border-indigo-500/50 cursor-pointer hover:shadow-xs transition-all bg-slate-50/20 dark:bg-slate-950/10"
@@ -316,7 +347,9 @@ export default function Tasks({
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-right">
-                      <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getPriorityColor(task.priority)}`}>
+                      <span
+                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getPriorityColor(task.priority)}`}
+                      >
                         {task.priority}
                       </span>
                       <span className="text-xs font-mono font-bold text-rose-500">{task.dueDate}</span>
@@ -341,7 +374,9 @@ export default function Tasks({
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
               {/* Task Title */}
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Task Title</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Task Title
+                </label>
                 <input
                   type="text"
                   placeholder="Design login system Mockups"
@@ -353,7 +388,9 @@ export default function Tasks({
 
               {/* Description */}
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Task Description</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Task Description
+                </label>
                 <textarea
                   placeholder="Outline acceptance criteria or technical notes..."
                   value={taskDesc}
@@ -366,7 +403,9 @@ export default function Tasks({
               {/* Status and Priority */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Status Lane</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Status Lane
+                  </label>
                   <select
                     value={taskStatus}
                     onChange={(e) => setTaskStatus(e.target.value)}
@@ -380,7 +419,9 @@ export default function Tasks({
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Priority</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Priority
+                  </label>
                   <select
                     value={taskPriority}
                     onChange={(e) => setTaskPriority(e.target.value)}
@@ -396,7 +437,9 @@ export default function Tasks({
               {/* Assignee & Due Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Assignee</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Assignee
+                  </label>
                   <select
                     value={taskAssignee}
                     onChange={(e) => setTaskAssignee(e.target.value)}
@@ -404,12 +447,16 @@ export default function Tasks({
                   >
                     <option value="">Select Assignee</option>
                     {activeUsers.map((m, idx) => (
-                      <option key={idx} value={m.user}>{m.user}</option>
+                      <option key={idx} value={m.user}>
+                        {m.user}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Due Date</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Due Date
+                  </label>
                   <input
                     type="date"
                     value={taskDueDate}
@@ -422,13 +469,13 @@ export default function Tasks({
 
             {/* Modal Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
-              <button 
+              <button
                 onClick={() => setShowTaskModal(false)}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleCreateTask}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors"
               >
@@ -451,7 +498,7 @@ export default function Tasks({
               </div>
               <div className="flex gap-2">
                 {canEdit && (
-                  <button 
+                  <button
                     onClick={() => handleDeleteTask(selectedTask.id)}
                     className="p-2 bg-rose-50 dark:bg-rose-950/20 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-xl transition-colors cursor-pointer"
                     title="Delete Task"
@@ -459,7 +506,7 @@ export default function Tasks({
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <button 
+                <button
                   onClick={() => setSelectedTask(null)}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
                 >
@@ -473,7 +520,9 @@ export default function Tasks({
               {/* Left Column: Details form */}
               <div className="flex-1 p-6 space-y-5 overflow-y-auto border-r border-slate-100 dark:border-slate-800/80">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">{selectedTask.title}</h3>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
+                    {selectedTask.title}
+                  </h3>
                   {selectedTask.description && (
                     <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed mt-2 bg-slate-50 dark:bg-slate-950/40 p-3 rounded-lg border border-slate-200/30">
                       {selectedTask.description}
@@ -484,7 +533,9 @@ export default function Tasks({
                 {/* Edit Controls */}
                 <div className="grid grid-cols-2 gap-4 text-[11px] text-slate-600 dark:text-slate-300">
                   <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Status</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Status
+                    </label>
                     <select
                       disabled={!canEdit}
                       value={selectedTask.status}
@@ -500,15 +551,17 @@ export default function Tasks({
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Priority</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Priority
+                    </label>
                     <select
                       disabled={!canEdit}
                       value={selectedTask.priority}
                       onChange={(e) => {
-                        const pri = e.target.value;
-                        const updated = tasksList.map(t => t.id === selectedTask.id ? { ...t, priority: pri } : t);
-                        socket.emit('update-tasks', { roomId, tasks: updated });
-                        setSelectedTask(prev => ({ ...prev, priority: pri }));
+                        const pri = e.target.value
+                        const updated = tasksList.map((t) => (t.id === selectedTask.id ? { ...t, priority: pri } : t))
+                        socket.emit('update-tasks', { roomId, tasks: updated })
+                        setSelectedTask((prev) => ({ ...prev, priority: pri }))
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none"
                     >
@@ -519,15 +572,21 @@ export default function Tasks({
                   </div>
 
                   <div>
-                    <span className="font-semibold block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Assignee</span>
+                    <span className="font-semibold block text-[9px] text-slate-400 uppercase tracking-wider mb-1">
+                      Assignee
+                    </span>
                     <div className="flex items-center gap-1.5 py-1 bg-slate-100/50 dark:bg-slate-800 px-2 rounded-lg border border-slate-200/20">
                       <User className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="font-medium text-slate-700 dark:text-slate-300 truncate w-24">{selectedTask.assignee}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300 truncate w-24">
+                        {selectedTask.assignee}
+                      </span>
                     </div>
                   </div>
 
                   <div>
-                    <span className="font-semibold block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Due Date</span>
+                    <span className="font-semibold block text-[9px] text-slate-400 uppercase tracking-wider mb-1">
+                      Due Date
+                    </span>
                     <div className="flex items-center gap-1.5 py-1 bg-slate-100/50 dark:bg-slate-800 px-2 rounded-lg border border-slate-200/20 font-mono font-medium">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span className="text-slate-700 dark:text-slate-300">{selectedTask.dueDate}</span>
@@ -540,22 +599,26 @@ export default function Tasks({
               <div className="w-full md:w-80 flex flex-col bg-slate-50/50 dark:bg-slate-950/20">
                 {/* Comments List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3.5 no-scrollbar">
-                  <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-wider mb-3">Task Comments ({selectedTask.comments?.length || 0})</h4>
-                  
-                  {(!selectedTask.comments || selectedTask.comments.length === 0) ? (
+                  <h4 className="font-bold text-[10px] text-slate-400 uppercase tracking-wider mb-3">
+                    Task Comments ({selectedTask.comments?.length || 0})
+                  </h4>
+
+                  {!selectedTask.comments || selectedTask.comments.length === 0 ? (
                     <p className="italic text-slate-400 text-center py-6">No comments written yet.</p>
                   ) : (
                     selectedTask.comments.map((c, i) => (
                       <div key={i} className="flex gap-2.5 items-start">
                         <div className="w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-[10px] text-indigo-600 dark:text-indigo-400 shrink-0">
-                          {c.user.substring(0,2).toUpperCase()}
+                          {c.user.substring(0, 2).toUpperCase()}
                         </div>
                         <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200/20 rounded-xl p-2.5">
                           <div className="flex items-center justify-between text-[8px] font-bold text-slate-400 mb-1">
                             <span>{c.user}</span>
                             <span>{c.timestamp}</span>
                           </div>
-                          <p className="text-[10px] leading-relaxed text-slate-700 dark:text-slate-200 whitespace-pre-wrap">{c.text}</p>
+                          <p className="text-[10px] leading-relaxed text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
+                            {c.text}
+                          </p>
                         </div>
                       </div>
                     ))
@@ -588,5 +651,5 @@ export default function Tasks({
         </div>
       )}
     </div>
-  );
+  )
 }

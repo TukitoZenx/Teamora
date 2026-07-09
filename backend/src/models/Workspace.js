@@ -205,6 +205,16 @@ const workspaceSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    archivedAt: {
+      type: Date,
+      default: null,
+      index: true
+    },
+    archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
     joinApproval: {
       type: Boolean,
       default: true

@@ -6,7 +6,8 @@ const clientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').repl
 const sessionCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  path: '/'
 });
 
 const setSessionUser = (req, user) =>

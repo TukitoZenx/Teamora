@@ -42,7 +42,7 @@ export default function ProfileDropdown() {
         className="cursor-pointer rounded-full"
         title={displayName}
       >
-        <Avatar label={displayName.charAt(0).toUpperCase()} />
+        <Avatar label={displayName.charAt(0).toUpperCase()} src={user?.avatar} />
       </button>
 
       {open && (

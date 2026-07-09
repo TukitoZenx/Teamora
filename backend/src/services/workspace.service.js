@@ -26,9 +26,9 @@ const cleanWorkspace = (workspace, currentUserId) => {
     delete data.joinRequests;
   }
 
-  data.notifications = (data.notifications || []).filter((notification) => (
-    currentUserId && getEntityId(notification.recipient)?.toString() === currentUserId.toString()
-  ));
+  data.notifications = (data.notifications || []).filter(
+    (notification) => currentUserId && getEntityId(notification.recipient)?.toString() === currentUserId.toString()
+  );
 
   return data;
 };
@@ -219,7 +219,11 @@ const ensureApproval = (workspace, userId) => {
 const getDisplayName = (user) => user?.fullName || user?.username || user?.email || 'A teammate';
 
 const getOwnerName = (workspace) => {
-  if (workspace?.owner && typeof workspace.owner === 'object' && (workspace.owner.fullName || workspace.owner.username || workspace.owner.email)) {
+  if (
+    workspace?.owner &&
+    typeof workspace.owner === 'object' &&
+    (workspace.owner.fullName || workspace.owner.username || workspace.owner.email)
+  ) {
     return getDisplayName(workspace.owner);
   }
 
@@ -247,27 +251,34 @@ const upsertRecentWorkspace = async (userId, workspace, status, extra = {}) => {
   await User.updateOne({ _id: userId }, { $push: { recentWorkspaces: { $each: [entry], $position: 0 } } });
 };
 
-const removeRecentWorkspaceForEveryone = async (workspaceId) => {
-  await User.updateMany({}, { $pull: { recentWorkspaces: { workspace: workspaceId } } });
-};
-
 const cleanRecentWorkspace = (entry, userId, activeWorkspaceIds = new Set()) => {
   const workspaceId = getEntityId(entry.workspace)?.toString();
   const workspace = entry.workspace && typeof entry.workspace === 'object' ? entry.workspace : null;
-  const active = workspaceId && activeWorkspaceIds.has(workspaceId);
+  const trashed = Boolean(workspace?.archivedAt || entry.status === 'trashed');
+  const active = !trashed && workspaceId && activeWorkspaceIds.has(workspaceId);
   const pendingRequest = workspace?.joinRequests?.find((request) => {
     const requesterId = getEntityId(request.requester);
     return requesterId?.toString() === userId.toString() && request.status === 'pending';
   });
-  const status = active ? 'active' : pendingRequest ? 'pending' : entry.status === 'active' ? 'removed' : entry.status;
+  const status = trashed
+    ? 'trashed'
+    : active
+      ? 'active'
+      : pendingRequest
+        ? 'pending'
+        : entry.status === 'active'
+          ? 'removed'
+          : entry.status;
   const statusLabel =
-    status === 'active'
-      ? 'Active'
-      : status === 'pending'
-        ? 'Pending'
-        : status === 'removed'
-          ? 'Removed Access'
-          : 'Previously Joined';
+    status === 'trashed'
+      ? 'Workspace Trash'
+      : status === 'active'
+        ? 'Active'
+        : status === 'pending'
+          ? 'Pending'
+          : status === 'removed'
+            ? 'Removed Access'
+            : 'Previously Joined';
 
   return {
     _id: workspaceId,
@@ -303,7 +314,9 @@ const createWorkspace = async (userId, payload) => {
 };
 
 const getWorkspaces = async (userId) => {
-  const workspaces = await populateWorkspace(Workspace.find({ members: userId }).sort({ updatedAt: -1 }));
+  const workspaces = await populateWorkspace(
+    Workspace.find({ members: userId, archivedAt: null }).sort({ updatedAt: -1 })
+  );
 
   const activeWorkspaceIds = new Set(workspaces.map((workspace) => workspace._id.toString()));
   const user = await User.findById(userId)
@@ -349,7 +362,7 @@ const getWorkspaceById = async (userId, workspaceId) => {
 
   const workspace = await populateWorkspace(Workspace.findById(workspaceId));
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -365,7 +378,7 @@ const updateWorkspace = async (userId, workspaceId, payload) => {
 
   const workspace = await Workspace.findById(workspaceId);
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -405,16 +418,41 @@ const deleteWorkspace = async (userId, workspaceId) => {
 
   const workspace = await Workspace.findById(workspaceId);
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
   assertOwner(workspace, userId);
-  await workspace.deleteOne();
-  await removeRecentWorkspaceForEveryone(workspace._id);
+  workspace.active = false;
+  workspace.archivedAt = new Date();
+  workspace.archivedBy = userId;
+  await workspace.save();
+
+  const populated = await populateWorkspace(Workspace.findById(workspace._id));
+  const historyUserIds = new Set([
+    ...workspace.members.map((memberId) => memberId.toString()),
+    workspace.owner.toString()
+  ]);
+
+  await Promise.all(
+    Array.from(historyUserIds).map((memberId) =>
+      upsertRecentWorkspace(memberId, populated, 'trashed', {
+        leftAt: workspace.archivedAt,
+        lastSeenAt: workspace.archivedAt
+      })
+    )
+  );
 
   try {
-    await mongoose.connection.collection('rooms').deleteOne({ _id: workspaceId.toString() });
+    await mongoose.connection.collection('rooms').updateOne(
+      { _id: workspaceId.toString() },
+      {
+        $set: {
+          archivedAt: workspace.archivedAt,
+          archivedBy: userId.toString()
+        }
+      }
+    );
   } catch {
     // Workspace metadata is authoritative here; room data may live in a separate legacy service.
   }
@@ -425,9 +463,11 @@ const getInvitePreview = async (userId, inviteCode) => {
     throw createError('Invite code is required');
   }
 
-  const workspace = await Workspace.findOne({ inviteCode: inviteCode.trim().toUpperCase() });
+  const workspace = await Workspace.findOne({
+    inviteCode: inviteCode.trim().toUpperCase()
+  });
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -456,9 +496,11 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
     throw createError('Invite code is required');
   }
 
-  const workspace = await Workspace.findOne({ inviteCode: inviteCode.trim().toUpperCase() }).populate('owner', USER_SELECT);
+  const workspace = await Workspace.findOne({
+    inviteCode: inviteCode.trim().toUpperCase()
+  }).populate('owner', USER_SELECT);
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -466,9 +508,12 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
     throw createError('You are already a member of this workspace', 409);
   }
 
-  if (hasActiveApproval(workspace, userId)) {
-    workspace.members.push(userId);
+  const autoJoin = async () => {
+    if (!isWorkspaceMember(workspace, userId)) {
+      workspace.members.push(userId);
+    }
     workspace.active = true;
+    ensureApproval(workspace, userId);
     workspace.joinRequests.forEach((request) => {
       const requesterId = getEntityId(request.requester);
       if (requesterId?.toString() === userId.toString() && request.status === 'pending') {
@@ -484,6 +529,16 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
       joined: true,
       workspace: cleanWorkspace(populated, userId)
     };
+  };
+
+  // Owners can disable join approval in workspace settings. When off, invite
+  // holders join immediately instead of waiting for an accept/decline cycle.
+  if (workspace.joinApproval === false) {
+    return autoJoin();
+  }
+
+  if (hasActiveApproval(workspace, userId)) {
+    return autoJoin();
   }
 
   const existingPending = workspace.joinRequests.find((request) => {
@@ -522,7 +577,7 @@ const acceptJoinRequest = async (ownerId, workspaceId, requestId) => {
 
   const workspace = await Workspace.findById(workspaceId).populate('joinRequests.requester', USER_SELECT);
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -593,27 +648,31 @@ const declineJoinRequest = async (ownerId, workspaceId, requestId) => {
 
 const getNotifications = async (userId) => {
   const workspaces = await populateWorkspace(
-    Workspace.find({ 'notifications.recipient': userId }).sort({ updatedAt: -1 })
+    Workspace.find({ 'notifications.recipient': userId }).sort({
+      updatedAt: -1
+    })
   );
 
-  return workspaces.flatMap((workspace) =>
-    workspace.notifications
-      .filter((notification) => notification.recipient.toString() === userId.toString())
-      .map((notification) => ({
-        _id: notification._id,
-        type: notification.type,
-        title: notification.type === 'join_request' ? 'Join Request' : 'Workspace Access',
-        message: notification.message,
-        requester: notification.requester,
-        requesterName: getDisplayName(notification.requester),
-        requestId: notification.request,
-        workspaceId: workspace._id,
-        workspaceName: workspace.name,
-        read: notification.read,
-        createdAt: notification.createdAt,
-        requestStatus: workspace.joinRequests.id(notification.request)?.status || null
-      }))
-  ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return workspaces
+    .flatMap((workspace) =>
+      workspace.notifications
+        .filter((notification) => getEntityId(notification.recipient)?.toString() === userId.toString())
+        .map((notification) => ({
+          _id: notification._id,
+          type: notification.type,
+          title: notification.type === 'join_request' ? 'Join Request' : 'Workspace Access',
+          message: notification.message,
+          requester: notification.requester,
+          requesterName: getDisplayName(notification.requester),
+          requestId: notification.request,
+          workspaceId: workspace._id,
+          workspaceName: workspace.name,
+          read: notification.read,
+          createdAt: notification.createdAt,
+          requestStatus: workspace.joinRequests.id(notification.request)?.status || null
+        }))
+    )
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 };
 
 const markNotificationRead = async (userId, notificationId) => {
@@ -641,7 +700,7 @@ const listTasks = async (userId, workspaceId) => {
   validateObjectId(workspaceId);
   const workspace = await populateWorkspace(Workspace.findById(workspaceId));
 
-  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+  if (!workspace || workspace.archivedAt || !isWorkspaceMember(workspace, userId)) {
     throw createError('Workspace not found', 404);
   }
 
@@ -652,7 +711,7 @@ const createTask = async (userId, workspaceId, payload) => {
   validateObjectId(workspaceId);
   const workspace = await Workspace.findById(workspaceId);
 
-  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+  if (!workspace || workspace.archivedAt || !isWorkspaceMember(workspace, userId)) {
     throw createError('Workspace not found', 404);
   }
 
@@ -681,7 +740,7 @@ const updateTask = async (userId, workspaceId, taskId, payload) => {
   validateObjectId(workspaceId);
   const workspace = await Workspace.findById(workspaceId);
 
-  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+  if (!workspace || workspace.archivedAt || !isWorkspaceMember(workspace, userId)) {
     throw createError('Workspace not found', 404);
   }
 
@@ -700,7 +759,8 @@ const updateTask = async (userId, workspaceId, taskId, payload) => {
   if (payload.startTime !== undefined) task.startTime = validateOptionalText(payload.startTime, 'Start time', 10);
   if (payload.endTime !== undefined) task.endTime = validateOptionalText(payload.endTime, 'End time', 10);
   if (payload.reminder !== undefined) task.reminder = validateOptionalText(payload.reminder, 'Reminder', 40);
-  if (payload.workspaceName !== undefined) task.workspaceName = validateOptionalText(payload.workspaceName, 'Workspace', 120);
+  if (payload.workspaceName !== undefined)
+    task.workspaceName = validateOptionalText(payload.workspaceName, 'Workspace', 120);
 
   await workspace.save();
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
@@ -712,7 +772,7 @@ const deleteTask = async (userId, workspaceId, taskId) => {
   validateObjectId(workspaceId);
   const workspace = await Workspace.findById(workspaceId);
 
-  if (!workspace || !isWorkspaceMember(workspace, userId)) {
+  if (!workspace || workspace.archivedAt || !isWorkspaceMember(workspace, userId)) {
     throw createError('Workspace not found', 404);
   }
 
@@ -731,7 +791,7 @@ const removeMember = async (ownerId, workspaceId, memberId) => {
   validateObjectId(memberId);
   const workspace = await Workspace.findById(workspaceId);
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -764,7 +824,7 @@ const leaveWorkspace = async (userId, workspaceId) => {
 
   const workspace = await Workspace.findById(workspaceId);
 
-  if (!workspace) {
+  if (!workspace || workspace.archivedAt) {
     throw createError('Workspace not found', 404);
   }
 
@@ -775,12 +835,65 @@ const leaveWorkspace = async (userId, workspaceId) => {
   }
 
   const isOwner = workspace.owner.toString() === userId.toString();
+  workspace.members = workspace.members.filter((memberId) => memberId.toString() !== userId.toString());
 
-  if (isOwner) {
-    workspace.owner = userId;
+  // Revoke approval so a later invite request still goes through join approval
+  // (when enabled) instead of auto-joining via hasActiveApproval().
+  const leavingApproval = workspace.approvedMembers?.find(
+    (item) => getEntityId(item.user)?.toString() === userId.toString()
+  );
+  if (leavingApproval) {
+    leavingApproval.revokedAt = new Date();
   }
 
-  workspace.members = workspace.members.filter((memberId) => memberId.toString() !== userId.toString());
+  // If the owner leaves and nobody else remains, archive the workspace so it
+  // still shows up in dashboard history instead of disappearing completely.
+  if (isOwner && workspace.members.length === 0) {
+    workspace.active = false;
+    workspace.archivedAt = new Date();
+    workspace.archivedBy = userId;
+    await workspace.save();
+
+    const populated = await populateWorkspace(Workspace.findById(workspace._id));
+    await upsertRecentWorkspace(userId, populated, 'trashed', {
+      leftAt: workspace.archivedAt,
+      lastSeenAt: workspace.archivedAt
+    });
+
+    try {
+      await mongoose.connection.collection('rooms').updateOne(
+        { _id: workspaceId.toString() },
+        {
+          $set: {
+            archivedAt: workspace.archivedAt,
+            archivedBy: userId.toString()
+          }
+        }
+      );
+    } catch {
+      // Workspace metadata is authoritative here; room data may live in a separate legacy service.
+    }
+
+    return {
+      success: true,
+      workspaceDeleted: false,
+      workspaceInactive: true,
+      ownershipTransferred: false,
+      newOwnerId: null
+    };
+  }
+
+  let ownershipTransferred = false;
+
+  // If the owner leaves but teammates remain, ownership must transfer to someone
+  // who is still a member. Otherwise the previous owner would keep owner-only
+  // privileges (update/delete workspace, manage members, resolve join requests)
+  // via assertOwner() even after no longer being a member — a broken-access-control bug.
+  if (isOwner) {
+    workspace.owner = workspace.members[0];
+    ownershipTransferred = true;
+  }
+
   workspace.active = workspace.members.length > 0;
   await workspace.save();
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
@@ -790,7 +903,8 @@ const leaveWorkspace = async (userId, workspaceId) => {
     success: true,
     workspaceDeleted: false,
     workspaceInactive: !workspace.active,
-    ownershipTransferred: false
+    ownershipTransferred,
+    newOwnerId: ownershipTransferred ? workspace.owner.toString() : null
   };
 };
 

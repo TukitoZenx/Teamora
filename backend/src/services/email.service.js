@@ -7,9 +7,9 @@ const createEmailError = (message, statusCode = 503) => {
 };
 
 const getEmailConfig = () => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, EMAIL_FROM } = process.env;
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, EMAIL_FROM, SMTP_FROM } = process.env;
 
-  if (!SMTP_USER || !SMTP_PASS || !EMAIL_FROM) {
+  if (!SMTP_USER || !SMTP_PASS) {
     throw createEmailError('Email service is not configured (Missing credentials).', 500);
   }
 
@@ -29,7 +29,7 @@ const getEmailConfig = () => {
     secure: SMTP_SECURE ? SMTP_SECURE === 'true' : port === 465,
     user: cleanUser,
     pass: cleanPass,
-    from: EMAIL_FROM.trim()
+    from: (EMAIL_FROM || SMTP_FROM || cleanUser).trim()
   };
 };
 
@@ -37,7 +37,14 @@ const getTransport = () => {
   const config = getEmailConfig();
 
   return nodemailer.createTransport({
-    service: 'gmail',
+    // Use the explicit host/port/secure from config instead of the 'gmail'
+    // service shorthand so SMTP_HOST/SMTP_PORT/SMTP_SECURE are actually honored.
+    // Defaults (smtp.gmail.com:465, secure) match Gmail's settings exactly, so
+    // this is behavior-compatible with the previous hardcoded 'gmail' service
+    // while also supporting any other SMTP provider via env vars.
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
     auth: {
       user: config.user,
       pass: config.pass
@@ -91,9 +98,6 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
   }
 
   try {
-    console.log("SMTP USER:", process.env.SMTP_USER);
-    console.log("SMTP HOST:", process.env.SMTP_HOST);
-
     const info = await transport.sendMail({
       from: config.from,
       to,
@@ -109,8 +113,11 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
       ].join('\n')
     });
 
-    console.log("EMAIL SEND RESPONSE:", info.response);
-    console.info('Teamora password reset email sent', { to, from: config.from });
+    console.info('Teamora password reset email sent', {
+      to,
+      from: config.from,
+      smtpResponse: info.response
+    });
   } catch (error) {
     console.error('Teamora password reset email failed. Full error stack:', error.stack || error);
     if (error.statusCode) throw error;

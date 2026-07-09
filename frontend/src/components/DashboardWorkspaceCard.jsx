@@ -118,16 +118,38 @@ export default function DashboardWorkspaceCard({
       {menuOpen && (
         <DropdownMenu className="top-14 z-20 w-56">
           <MenuButton label="Open" onClick={(event) => handleMenuAction(event, () => onOpen(workspace))} />
-          {isOwner && <MenuButton icon={Edit3} label="Rename" onClick={(event) => handleMenuAction(event, () => onRename(workspace))} />}
-          <MenuButton icon={pinned ? PinOff : Pin} label={pinned ? 'Unpin' : 'Pin'} onClick={(event) => handleMenuAction(event, () => onTogglePin(workspace._id))} />
+          {isOwner && (
+            <MenuButton
+              icon={Edit3}
+              label="Rename"
+              onClick={(event) => handleMenuAction(event, () => onRename(workspace))}
+            />
+          )}
+          <MenuButton
+            icon={pinned ? PinOff : Pin}
+            label={pinned ? 'Unpin' : 'Pin'}
+            onClick={(event) => handleMenuAction(event, () => onTogglePin(workspace._id))}
+          />
           <MenuButton
             icon={Star}
             label={favorite ? 'Remove Favorite' : 'Favorite'}
             onClick={(event) => handleMenuAction(event, () => onToggleFavorite(workspace._id))}
           />
-          <MenuButton icon={Copy} label="Copy Workspace ID" onClick={(event) => handleMenuAction(event, () => onCopyId(workspace._id))} />
-          <MenuButton icon={UserPlus} label="Copy Invite Link" onClick={(event) => handleMenuAction(event, () => onInvite(workspace))} />
-          <MenuButton icon={LogOut} label="Leave Workspace" onClick={(event) => handleMenuAction(event, () => onLeave(workspace))} />
+          <MenuButton
+            icon={Copy}
+            label="Copy Workspace ID"
+            onClick={(event) => handleMenuAction(event, () => onCopyId(workspace._id))}
+          />
+          <MenuButton
+            icon={UserPlus}
+            label="Copy Invite Link"
+            onClick={(event) => handleMenuAction(event, () => onInvite(workspace))}
+          />
+          <MenuButton
+            icon={LogOut}
+            label="Leave Workspace"
+            onClick={(event) => handleMenuAction(event, () => onLeave(workspace))}
+          />
           {isOwner && (
             <MenuButton
               icon={Trash2}
@@ -143,5 +165,9 @@ export default function DashboardWorkspaceCard({
 }
 
 function MenuButton({ icon: Icon = Building2, label, danger = false, onClick }) {
-  return <DropdownItem icon={Icon} danger={danger} onClick={onClick}>{label}</DropdownItem>
+  return (
+    <DropdownItem icon={Icon} danger={danger} onClick={onClick}>
+      {label}
+    </DropdownItem>
+  )
 }

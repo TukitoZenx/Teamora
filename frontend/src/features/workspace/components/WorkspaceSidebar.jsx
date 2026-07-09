@@ -8,6 +8,7 @@ import {
   FileText,
   Folder,
   Home,
+  MessageSquare,
   Paintbrush,
   Presentation,
   Settings,
@@ -33,7 +34,8 @@ const groups = [
   ],
   [
     { key: 'members', label: 'Members', icon: Users },
-    { key: 'shared-files', label: 'Shared Files', icon: Folder }
+    { key: 'shared-files', label: 'Shared Files', icon: Folder },
+    { key: 'chat', label: 'Chat', icon: MessageSquare }
   ],
   [{ key: 'settings', label: 'Settings', icon: Settings }]
 ]
@@ -51,7 +53,9 @@ export default function WorkspaceSidebar({
   const [showExpandButton, setShowExpandButton] = useState(false)
 
   return (
-    <aside className={`flex h-full flex-col border-r border-[#E5E7EB] bg-white transition-[width] duration-220 ease-in-out ${collapsed ? 'w-[72px]' : 'w-[240px]'} ${className}`}>
+    <aside
+      className={`flex h-full flex-col border-r border-[#E5E7EB] bg-white transition-[width] duration-220 ease-in-out ${collapsed ? 'w-[72px]' : 'w-[240px]'} ${className}`}
+    >
       <div className="flex h-16 items-center justify-between border-b border-[#E5E7EB] px-4">
         <div className="flex items-center gap-3 overflow-hidden">
           <div
@@ -122,11 +126,29 @@ export default function WorkspaceSidebar({
       <div className="sticky bottom-0 border-t border-[#E5E7EB] bg-white p-2">
         {isOwner ? (
           <div className="space-y-1">
-            <SidebarItem icon={DoorOpen} label="Leave Workspace" danger collapsed={collapsed} onClick={onLeaveWorkspace} />
-            <SidebarItem icon={Trash2} label="Delete Workspace" danger collapsed={collapsed} onClick={onDeleteWorkspace} />
+            <SidebarItem
+              icon={DoorOpen}
+              label="Leave Workspace"
+              danger
+              collapsed={collapsed}
+              onClick={onLeaveWorkspace}
+            />
+            <SidebarItem
+              icon={Trash2}
+              label="Delete Workspace"
+              danger
+              collapsed={collapsed}
+              onClick={onDeleteWorkspace}
+            />
           </div>
         ) : (
-          <SidebarItem icon={DoorOpen} label="Leave Workspace" danger collapsed={collapsed} onClick={onLeaveWorkspace} />
+          <SidebarItem
+            icon={DoorOpen}
+            label="Leave Workspace"
+            danger
+            collapsed={collapsed}
+            onClick={onLeaveWorkspace}
+          />
         )}
       </div>
     </aside>

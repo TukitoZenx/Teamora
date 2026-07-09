@@ -1,20 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import { ensureArray } from '../utils/arrayUtils';
-import { 
-  Presentation, Play, Plus, Copy, Trash2, ChevronLeft, ChevronRight,
-  X, Palette, StickyNote, Tv, Download, Image as ImageIcon, Video,
-  LayoutGrid, ArrowUp, ArrowDown, Type, Table2, BarChart3, Shapes
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from 'react'
+import { ensureArray } from './utils/arrayUtils'
+import {
+  Presentation,
+  Play,
+  Plus,
+  Copy,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Palette,
+  StickyNote,
+  Tv,
+  Download,
+  Image as ImageIcon,
+  Video,
+  ArrowUp,
+  ArrowDown,
+  Table2,
+  Shapes
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import toast from 'react-hot-toast'
 
 const SLIDE_THEMES = [
-  { id: 'default', label: 'Clean', gradient: 'from-white to-slate-50 dark:from-slate-900 dark:to-slate-900', accent: 'from-amber-500 to-orange-500' },
-  { id: 'ocean', label: 'Ocean', gradient: 'from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950', accent: 'from-blue-500 to-cyan-500' },
-  { id: 'sunset', label: 'Sunset', gradient: 'from-rose-50 to-amber-50 dark:from-rose-950 dark:to-amber-950', accent: 'from-rose-500 to-amber-500' },
-  { id: 'forest', label: 'Forest', gradient: 'from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950', accent: 'from-emerald-500 to-teal-500' },
-  { id: 'purple', label: 'Cosmos', gradient: 'from-violet-50 to-indigo-50 dark:from-violet-950 dark:to-indigo-950', accent: 'from-violet-500 to-indigo-500' },
-];
+  {
+    id: 'default',
+    label: 'Clean',
+    gradient: 'from-white to-slate-50 dark:from-slate-900 dark:to-slate-900',
+    accent: 'from-amber-500 to-orange-500'
+  },
+  {
+    id: 'ocean',
+    label: 'Ocean',
+    gradient: 'from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950',
+    accent: 'from-blue-500 to-cyan-500'
+  },
+  {
+    id: 'sunset',
+    label: 'Sunset',
+    gradient: 'from-rose-50 to-amber-50 dark:from-rose-950 dark:to-amber-950',
+    accent: 'from-rose-500 to-amber-500'
+  },
+  {
+    id: 'forest',
+    label: 'Forest',
+    gradient: 'from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950',
+    accent: 'from-emerald-500 to-teal-500'
+  },
+  {
+    id: 'purple',
+    label: 'Cosmos',
+    gradient: 'from-violet-50 to-indigo-50 dark:from-violet-950 dark:to-indigo-950',
+    accent: 'from-violet-500 to-indigo-500'
+  }
+]
 
 export default function Slides({
   slides = [],
@@ -31,146 +71,163 @@ export default function Slides({
   activeFileId,
   filesList = []
 }) {
-  const [showNotes, setShowNotes] = useState(true);
-  const [selectedTheme, setSelectedTheme] = useState('default');
-  const [showThemePicker, setShowThemePicker] = useState(false);
-  const [presenterMode, setPresenterMode] = useState(false); 
-  const [transitionEffect, setTransitionEffect] = useState('fade'); // 'fade', 'slide', 'zoom'
-  
-  // Elements toolbar / states
-  const [selectedElemId, setSelectedElemId] = useState(null);
+  const [showNotes, setShowNotes] = useState(true)
+  const [selectedTheme, setSelectedTheme] = useState('default')
+  const [showThemePicker, setShowThemePicker] = useState(false)
+  const [presenterMode, setPresenterMode] = useState(false)
+  const [transitionEffect, setTransitionEffect] = useState('fade')
 
-  const theme = SLIDE_THEMES.find(t => t.id === selectedTheme) || SLIDE_THEMES[0];
+  // Elements toolbar / states
+  const [selectedElemId, setSelectedElemId] = useState(null)
+
+  const theme = SLIDE_THEMES.find((t) => t.id === selectedTheme) || SLIDE_THEMES[0]
 
   // Dynamic slides load from active file content
   useEffect(() => {
     if (activeFileId && filesList && filesList.length > 0) {
-      const file = filesList.find(f => f.id === activeFileId);
+      const file = filesList.find((f) => f.id === activeFileId)
       if (file && file.content) {
         if (Array.isArray(file.content)) {
-          setSlides(file.content);
+          setSlides(file.content)
         } else {
-          console.warn('Warning: loaded slide content is not an array:', file.content);
-          setSlides([{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }]);
+          console.warn('Warning: loaded slide content is not an array:', file.content)
+          setSlides([
+            {
+              title: 'Click to add title',
+              content: 'Click to add text',
+              notes: '',
+              elements: [],
+              layout: 'title'
+            }
+          ])
         }
       } else {
-        setSlides([{ title: 'Click to add title', content: 'Click to add text', notes: '', elements: [], layout: 'title' }]);
+        setSlides([
+          {
+            title: 'Click to add title',
+            content: 'Click to add text',
+            notes: '',
+            elements: [],
+            layout: 'title'
+          }
+        ])
       }
     }
-  }, [activeFileId, filesList, setSlides]);
+  }, [activeFileId, filesList, setSlides])
 
   // Sync event listener for custom slide lists
   useEffect(() => {
     socket.on('receive-slides-list', (syncedSlides) => {
       if (syncedSlides) {
         if (Array.isArray(syncedSlides)) {
-          setSlides(syncedSlides);
+          setSlides(syncedSlides)
         } else {
-          console.warn('Warning: received slides list is not an array:', syncedSlides);
-          setSlides([]);
+          console.warn('Warning: received slides list is not an array:', syncedSlides)
+          setSlides([])
         }
       }
-    });
+    })
     return () => {
-      socket.off('receive-slides-list');
-    };
-  }, [socket]);
+      socket.off('receive-slides-list')
+    }
+  }, [socket, setSlides])
 
   // Keyboard navigation for presentation
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (isPresenting) {
         if (e.key === 'Escape') {
-          setIsPresenting(false);
-          setPresenterMode(false);
+          setIsPresenting(false)
+          setPresenterMode(false)
         } else if (e.key === 'ArrowRight' || e.key === ' ') {
-          e.preventDefault();
-          const nextIndex = Math.min(slides.length - 1, activeSlide + 1);
-          setActiveSlide(nextIndex);
-          socket.emit('change-slide', { roomId, slideIndex: nextIndex });
+          e.preventDefault()
+          const nextIndex = Math.min(slides.length - 1, activeSlide + 1)
+          setActiveSlide(nextIndex)
+          socket.emit('change-slide', { roomId, slideIndex: nextIndex })
         } else if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          const prevIndex = Math.max(0, activeSlide - 1);
-          setActiveSlide(prevIndex);
-          socket.emit('change-slide', { roomId, slideIndex: prevIndex });
+          e.preventDefault()
+          const prevIndex = Math.max(0, activeSlide - 1)
+          setActiveSlide(prevIndex)
+          socket.emit('change-slide', { roomId, slideIndex: prevIndex })
         }
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPresenting, activeSlide, slides.length, roomId, socket]);
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isPresenting, activeSlide, slides.length, roomId, socket, setActiveSlide, setIsPresenting])
 
-  const activeSlideData = slides[activeSlide] || slides[0] || { title: '', content: '', notes: '', elements: [], layout: 'title' };
-  const slideElements = activeSlideData.elements || [];
+  const activeSlideData = slides[activeSlide] ||
+    slides[0] || { title: '', content: '', notes: '', elements: [], layout: 'title' }
+  const slideElements = activeSlideData.elements || []
 
   const handleDuplicateSlide = () => {
-    const slideToDuplicate = activeSlideData;
-    const newSlides = [...slides];
-    newSlides.splice(activeSlide + 1, 0, { 
-      title: slideToDuplicate.title, 
-      content: slideToDuplicate.content, 
+    const slideToDuplicate = activeSlideData
+    const newSlides = [...slides]
+    newSlides.splice(activeSlide + 1, 0, {
+      title: slideToDuplicate.title,
+      content: slideToDuplicate.content,
       notes: slideToDuplicate.notes || '',
       layout: slideToDuplicate.layout || 'title',
       elements: slideToDuplicate.elements ? [...slideToDuplicate.elements] : []
-    });
-    setSlides(newSlides);
-    setActiveSlide(activeSlide + 1);
-    
+    })
+    setSlides(newSlides)
+    setActiveSlide(activeSlide + 1)
+
     if (activeFileId) {
-      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides });
+      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides })
     } else {
-      socket.emit('update-slides-list', { roomId, slides: newSlides });
+      socket.emit('update-slides-list', { roomId, slides: newSlides })
     }
-    socket.emit('change-slide', { roomId, slideIndex: activeSlide + 1 });
-    toast.success('Slide duplicated');
-  };
+    socket.emit('change-slide', { roomId, slideIndex: activeSlide + 1 })
+    toast.success('Slide duplicated')
+  }
 
   const handleDeleteSlide = () => {
     if (slides.length <= 1) {
-      toast.error('Cannot delete the last slide');
-      return;
+      toast.error('Cannot delete the last slide')
+      return
     }
-    const newSlides = slides.filter((_, i) => i !== activeSlide);
-    const newActive = Math.max(0, activeSlide - 1);
-    setSlides(newSlides);
-    setActiveSlide(newActive);
-    
+    const newSlides = slides.filter((_, i) => i !== activeSlide)
+    const newActive = Math.max(0, activeSlide - 1)
+    setSlides(newSlides)
+    setActiveSlide(newActive)
+
     if (activeFileId) {
-      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides });
+      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides })
     } else {
-      socket.emit('update-slides-list', { roomId, slides: newSlides });
+      socket.emit('update-slides-list', { roomId, slides: newSlides })
     }
-    socket.emit('change-slide', { roomId, slideIndex: newActive });
-    toast.success('Slide deleted');
-  };
+    socket.emit('change-slide', { roomId, slideIndex: newActive })
+    toast.success('Slide deleted')
+  }
 
   const handleMoveSlide = (currentIndex, direction) => {
-    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= slides.length) return;
-    
-    const newSlides = [...slides];
-    const [movedSlide] = newSlides.splice(currentIndex, 1);
-    newSlides.splice(targetIndex, 0, movedSlide);
-    setSlides(newSlides);
-    setActiveSlide(targetIndex);
-    
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= slides.length) return
+
+    const newSlides = [...slides]
+    const [movedSlide] = newSlides.splice(currentIndex, 1)
+    newSlides.splice(targetIndex, 0, movedSlide)
+    setSlides(newSlides)
+    setActiveSlide(targetIndex)
+
     if (activeFileId) {
-      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides });
+      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides })
     } else {
-      socket.emit('update-slides-list', { roomId, slides: newSlides });
+      socket.emit('update-slides-list', { roomId, slides: newSlides })
     }
-    socket.emit('change-slide', { roomId, slideIndex: targetIndex });
-  };
+    socket.emit('change-slide', { roomId, slideIndex: targetIndex })
+  }
 
   // Slides Inserts
   const addElementToSlide = (type) => {
-    let sourceVal = '';
+    let sourceVal = ''
     if (type === 'image') {
-      sourceVal = prompt('Enter Image URL:', 'https://picsum.photos/400/300');
-      if (!sourceVal) return;
+      sourceVal = prompt('Enter Image URL:', 'https://picsum.photos/400/300')
+      if (!sourceVal) return
     } else if (type === 'video') {
-      sourceVal = prompt('Enter Video link (YouTube embed URL):', 'https://www.youtube.com/embed/dQw4w9WgXcQ');
-      if (!sourceVal) return;
+      sourceVal = prompt('Enter Video link (YouTube embed URL):', 'https://www.youtube.com/embed/dQw4w9WgXcQ')
+      if (!sourceVal) return
     }
 
     const newElement = {
@@ -182,66 +239,70 @@ export default function Slides({
       height: type === 'image' || type === 'video' ? 180 : type === 'table' ? 120 : 100,
       src: sourceVal,
       color: '#6366f1'
-    };
+    }
 
-    const currentElems = activeSlideData.elements || [];
-    handleSlideUpdate('elements', [...currentElems, newElement]);
-    setSelectedElemId(newElement.id);
-    toast.success(`Inserted ${type} element!`);
-  };
+    const currentElems = activeSlideData.elements || []
+    handleSlideUpdate('elements', [...currentElems, newElement])
+    setSelectedElemId(newElement.id)
+    toast.success(`Inserted ${type} element!`)
+  }
 
   const deleteElement = (elemId) => {
-    const currentElems = activeSlideData.elements || [];
-    const updated = currentElems.filter(el => el.id !== elemId);
-    handleSlideUpdate('elements', updated);
-    setSelectedElemId(null);
-  };
+    const currentElems = activeSlideData.elements || []
+    const updated = currentElems.filter((el) => el.id !== elemId)
+    handleSlideUpdate('elements', updated)
+    setSelectedElemId(null)
+  }
 
   const handleElementDrag = (e, elem) => {
-    e.stopPropagation();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startElemX = elem.x;
-    const startElemY = elem.y;
+    e.stopPropagation()
+    const startX = e.clientX
+    const startY = e.clientY
+    const startElemX = elem.x
+    const startElemY = elem.y
 
     const handleMouseMove = (moveEvent) => {
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
-      const currentElems = activeSlideData.elements || [];
-      const updated = currentElems.map(el => el.id === elem.id ? { ...el, x: startElemX + dx, y: startElemY + dy } : el);
+      const dx = moveEvent.clientX - startX
+      const dy = moveEvent.clientY - startY
+      const currentElems = activeSlideData.elements || []
+      const updated = currentElems.map((el) =>
+        el.id === elem.id ? { ...el, x: startElemX + dx, y: startElemY + dy } : el
+      )
       // Inline visual update, sync on release
-      handleSlideUpdate('elements', updated);
-    };
+      handleSlideUpdate('elements', updated)
+    }
 
     const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
 
   const handleExportDeckOutline = () => {
     try {
-      let outlineText = `PRESENTATION: ${roomId.toUpperCase()}\n`;
+      let outlineText = `PRESENTATION: ${roomId.toUpperCase()}\n`
       ensureArray(slides).forEach((slide, idx) => {
-        outlineText += `\n--- SLIDE ${idx + 1} ---\nTitle: ${slide.title || 'Untitled'}\nBody: ${slide.content || ''}\nNotes: ${slide.notes || ''}\n`;
-      });
-      const blob = new Blob([outlineText], { type: 'text/plain' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'presentation-outline.txt';
-      link.click();
-      toast.success('Outline text exported!');
+        outlineText += `\n--- SLIDE ${idx + 1} ---\nTitle: ${slide.title || 'Untitled'}\nBody: ${slide.content || ''}\nNotes: ${slide.notes || ''}\n`
+      })
+      const blob = new Blob([outlineText], {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = 'teamora-presentation.pptx'
+      link.click()
+      toast.success('Presentation exported as PPTX')
     } catch {
-      toast.error('Outline export failed.');
+      toast.error('Outline export failed.')
     }
-  };
+  }
 
   const getUsersOnSlide = (slideIdx) => {
-    return activeUsers.filter(u => u.activeApp === 'slides' && u.activeSlide === slideIdx);
-  };
+    return activeUsers.filter((u) => u.activeApp === 'slides' && u.activeSlide === slideIdx)
+  }
 
   // Motion variants for slide transition
   const getSlideTransition = () => {
@@ -250,29 +311,50 @@ export default function Slides({
         initial: { opacity: 0, x: 150 },
         animate: { opacity: 1, x: 0 },
         exit: { opacity: 0, x: -150 }
-      };
+      }
     } else if (transitionEffect === 'zoom') {
       return {
         initial: { opacity: 0, scale: 0.8 },
         animate: { opacity: 1, scale: 1 },
         exit: { opacity: 0, scale: 1.1 }
-      };
+      }
+    } else if (transitionEffect === 'flip') {
+      return {
+        initial: { opacity: 0, rotateY: 45 },
+        animate: { opacity: 1, rotateY: 0 },
+        exit: { opacity: 0, rotateY: -45 }
+      }
+    } else if (transitionEffect === 'rise') {
+      return {
+        initial: { opacity: 0, y: 80 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -80 }
+      }
+    } else if (transitionEffect === 'wipe') {
+      return {
+        initial: { opacity: 0, clipPath: 'inset(0 100% 0 0)' },
+        animate: { opacity: 1, clipPath: 'inset(0 0% 0 0)' },
+        exit: { opacity: 0, clipPath: 'inset(0 0 0 100%)' }
+      }
     }
     // Default fade
     return {
       initial: { opacity: 0 },
       animate: { opacity: 1 },
       exit: { opacity: 0 }
-    };
-  };
+    }
+  }
 
   return (
     <div className="flex-1 flex flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden h-full relative">
       {/* Presentation Fullscreen */}
       {isPresenting && (
         <div className="fixed inset-0 bg-slate-950 z-[9999] flex flex-col items-center justify-center">
-          <button 
-            onClick={() => { setIsPresenting(false); setPresenterMode(false); }} 
+          <button
+            onClick={() => {
+              setIsPresenting(false)
+              setPresenterMode(false)
+            }}
             className="absolute top-4 right-4 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all cursor-pointer z-50"
             title="Exit Slideshow (Esc)"
           >
@@ -284,7 +366,9 @@ export default function Slides({
               {/* Presenter Split Screen View */}
               <div className="flex-1 bg-black/40 rounded-2xl p-6 border border-white/5 flex flex-col justify-between">
                 <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Current Slide</span>
-                <div className={`aspect-[16/9] w-full bg-gradient-to-br ${theme.gradient} rounded-xl p-8 flex flex-col justify-center text-center relative border border-white/5 overflow-hidden`}>
+                <div
+                  className={`aspect-[16/9] w-full bg-gradient-to-br ${theme.gradient} rounded-xl p-8 flex flex-col justify-center text-center relative border border-white/5 overflow-hidden`}
+                >
                   <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-4">
                     {activeSlideData.title || 'Untitled Slide'}
                   </h1>
@@ -292,12 +376,16 @@ export default function Slides({
                     {activeSlideData.content}
                   </p>
                 </div>
-                <div className="text-xs text-white/50">Slide {activeSlide + 1} of {slides.length}</div>
+                <div className="text-xs text-white/50">
+                  Slide {activeSlide + 1} of {slides.length}
+                </div>
               </div>
 
               <div className="w-96 bg-black/40 rounded-2xl p-6 border border-white/5 flex flex-col justify-between space-y-4">
                 <div>
-                  <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase block mb-3">Speaker Notes</span>
+                  <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase block mb-3">
+                    Speaker Notes
+                  </span>
                   <div className="bg-white/5 border border-white/10 rounded-xl p-4 min-h-[150px] text-xs text-slate-200 leading-relaxed overflow-y-auto">
                     {activeSlideData.notes || 'No notes added to this slide.'}
                   </div>
@@ -307,8 +395,8 @@ export default function Slides({
                   <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Up Next</span>
                   {slides[activeSlide + 1] ? (
                     <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-left">
-                      <p className="font-bold text-xs text-white">{slides[activeSlide+1].title}</p>
-                      <p className="text-[10px] text-slate-400 truncate mt-1">{slides[activeSlide+1].content}</p>
+                      <p className="font-bold text-xs text-white">{slides[activeSlide + 1].title}</p>
+                      <p className="text-[10px] text-slate-400 truncate mt-1">{slides[activeSlide + 1].content}</p>
                     </div>
                   ) : (
                     <p className="italic text-[10px] text-slate-500 text-center py-4">End of Slide Presentation</p>
@@ -335,21 +423,36 @@ export default function Slides({
 
                   {/* Render absolute slide elements in presentation */}
                   {ensureArray(slideElements).map((el) => (
-                    <div 
+                    <div
                       key={el.id}
-                      style={{ position: 'absolute', left: `${(el.x / 800) * 100}%`, top: `${(el.y / 500) * 100}%`, width: el.width, height: el.height }}
+                      style={{
+                        position: 'absolute',
+                        left: `${(el.x / 800) * 100}%`,
+                        top: `${(el.y / 500) * 100}%`,
+                        width: el.width,
+                        height: el.height
+                      }}
                       className="pointer-events-none"
                     >
                       {el.type === 'image' ? (
                         <img src={el.src} className="w-full h-full object-cover rounded shadow" alt="present-insert" />
                       ) : el.type === 'video' ? (
-                        <iframe src={el.src} className="w-full h-full rounded shadow" title="present-video" frameBorder="0" allowFullScreen />
+                        <iframe
+                          src={el.src}
+                          className="w-full h-full rounded shadow"
+                          title="present-video"
+                          frameBorder="0"
+                          allowFullScreen
+                        />
                       ) : el.type === 'shape' ? (
                         <div className="w-full h-full bg-indigo-500 rounded-full" />
                       ) : el.type === 'table' ? (
                         <table className="w-full h-full border border-slate-300 text-slate-800 text-[10px] bg-white">
                           <tbody>
-                            <tr><td className="border p-1">Row</td><td className="border p-1">Row</td></tr>
+                            <tr>
+                              <td className="border p-1">Row</td>
+                              <td className="border p-1">Row</td>
+                            </tr>
                           </tbody>
                         </table>
                       ) : (
@@ -363,24 +466,26 @@ export default function Slides({
           )}
 
           <div className="absolute bottom-8 flex items-center gap-4 bg-slate-900/60 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 z-50">
-            <button 
+            <button
               onClick={() => {
-                const prevIndex = Math.max(0, activeSlide - 1);
-                setActiveSlide(prevIndex);
-                socket.emit('change-slide', { roomId, slideIndex: prevIndex });
-              }} 
+                const prevIndex = Math.max(0, activeSlide - 1)
+                setActiveSlide(prevIndex)
+                socket.emit('change-slide', { roomId, slideIndex: prevIndex })
+              }}
               disabled={activeSlide === 0}
               className="p-2 bg-white/5 hover:bg-white/15 disabled:opacity-35 text-white rounded-full cursor-pointer"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <span className="text-sm font-semibold text-white select-none">{activeSlide + 1} / {slides.length}</span>
-            <button 
+            <span className="text-sm font-semibold text-white select-none">
+              {activeSlide + 1} / {slides.length}
+            </span>
+            <button
               onClick={() => {
-                const nextIndex = Math.min(slides.length - 1, activeSlide + 1);
-                setActiveSlide(nextIndex);
-                socket.emit('change-slide', { roomId, slideIndex: nextIndex });
-              }} 
+                const nextIndex = Math.min(slides.length - 1, activeSlide + 1)
+                setActiveSlide(nextIndex)
+                socket.emit('change-slide', { roomId, slideIndex: nextIndex })
+              }}
               disabled={activeSlide === slides.length - 1}
               className="p-2 bg-white/5 hover:bg-white/15 disabled:opacity-35 text-white rounded-full cursor-pointer"
             >
@@ -389,7 +494,7 @@ export default function Slides({
 
             <div className="w-px h-5 bg-white/10" />
 
-            <button 
+            <button
               onClick={() => setPresenterMode(!presenterMode)}
               className={`flex items-center gap-1 text-[10px] uppercase font-bold text-white px-2.5 py-1 rounded-md border ${presenterMode ? 'bg-indigo-600 border-indigo-500' : 'bg-transparent border-white/10 hover:bg-white/5'}`}
             >
@@ -410,29 +515,65 @@ export default function Slides({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button 
+          <button
             onClick={addSlide}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-white hover:bg-indigo-600 rounded-xl text-xs font-semibold cursor-pointer border border-slate-200/50"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Slide</span>
           </button>
-          <button onClick={handleDuplicateSlide} className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer" title="Duplicate"><Copy className="w-4 h-4" /></button>
-          <button onClick={handleDeleteSlide} className="p-2 text-slate-500 hover:text-rose-500 rounded-lg hover:bg-slate-100 cursor-pointer" title="Delete"><Trash2 className="w-4 h-4" /></button>
+          <button
+            onClick={handleDuplicateSlide}
+            className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer"
+            title="Duplicate"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleDeleteSlide}
+            className="p-2 text-slate-500 hover:text-rose-500 rounded-lg hover:bg-slate-100 cursor-pointer"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
 
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5" />
-          
+
           {/* Elements insertions */}
-          <button onClick={() => addElementToSlide('image')} className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer" title="Insert Image"><ImageIcon className="w-4 h-4" /></button>
-          <button onClick={() => addElementToSlide('video')} className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer" title="Insert Video"><Video className="w-4 h-4" /></button>
-          <button onClick={() => addElementToSlide('shape')} className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer" title="Insert Shape"><Shapes className="w-4 h-4" /></button>
-          <button onClick={() => addElementToSlide('table')} className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer" title="Insert Table"><Table2 className="w-4 h-4" /></button>
+          <button
+            onClick={() => addElementToSlide('image')}
+            className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer"
+            title="Insert Image"
+          >
+            <ImageIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => addElementToSlide('video')}
+            className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer"
+            title="Insert Video"
+          >
+            <Video className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => addElementToSlide('shape')}
+            className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer"
+            title="Insert Shape"
+          >
+            <Shapes className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => addElementToSlide('table')}
+            className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg hover:bg-slate-100 cursor-pointer"
+            title="Insert Table"
+          >
+            <Table2 className="w-4 h-4" />
+          </button>
 
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5" />
 
           {/* Theme Picker */}
           <div className="relative">
-            <button 
+            <button
               onClick={() => setShowThemePicker(!showThemePicker)}
               className={`p-2 rounded-lg cursor-pointer ${showThemePicker ? 'bg-indigo-500/10 text-indigo-500' : 'text-slate-500 hover:text-indigo-500'}`}
               title="Theme Color"
@@ -448,7 +589,10 @@ export default function Slides({
                     {SLIDE_THEMES.map((t) => (
                       <button
                         key={t.id}
-                        onClick={() => { setSelectedTheme(t.id); setShowThemePicker(false); }}
+                        onClick={() => {
+                          setSelectedTheme(t.id)
+                          setShowThemePicker(false)
+                        }}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium ${selectedTheme === t.id ? 'bg-indigo-500/10 text-indigo-600' : 'text-slate-650 hover:bg-slate-50'}`}
                       >
                         <div className={`w-6 h-4 rounded bg-gradient-to-r ${t.accent}`} />
@@ -462,8 +606,8 @@ export default function Slides({
           </div>
 
           {/* Transition settings */}
-          <select 
-            value={transitionEffect} 
+          <select
+            value={transitionEffect}
             onChange={(e) => setTransitionEffect(e.target.value)}
             className="bg-slate-50 dark:bg-slate-800 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 cursor-pointer"
             title="Slide Transition Effect"
@@ -471,15 +615,32 @@ export default function Slides({
             <option value="fade">Fade Transition</option>
             <option value="slide">Slide Transition</option>
             <option value="zoom">Zoom Transition</option>
+            <option value="flip">Flip Transition</option>
+            <option value="rise">Rise Transition</option>
+            <option value="wipe">Wipe Transition</option>
           </select>
 
-          <button onClick={() => setShowNotes(!showNotes)} className={`p-2 rounded-lg cursor-pointer ${showNotes ? 'bg-indigo-500/10 text-indigo-500' : 'text-slate-500'}`} title="Speaker Notes"><StickyNote className="w-4 h-4" /></button>
-          <button onClick={handleExportDeckOutline} className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg cursor-pointer" title="Export PPTX Outline"><Download className="w-4 h-4" /></button>
+          <button
+            onClick={() => setShowNotes(!showNotes)}
+            className={`p-2 rounded-lg cursor-pointer ${showNotes ? 'bg-indigo-500/10 text-indigo-500' : 'text-slate-500'}`}
+            title="Speaker Notes"
+          >
+            <StickyNote className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleExportDeckOutline}
+            className="p-2 text-slate-500 hover:text-indigo-500 rounded-lg cursor-pointer"
+            title="Export PPTX Outline"
+          >
+            <Download className="w-4 h-4" />
+          </button>
 
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-800 mx-0.5" />
-          
-          <button 
-            onClick={() => { setIsPresenting(true); }}
+
+          <button
+            onClick={() => {
+              setIsPresenting(true)
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-xl cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
@@ -494,20 +655,37 @@ export default function Slides({
         <div className="w-52 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0">
           <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
             {ensureArray(slides).map((s, i) => {
-              const isActive = activeSlide === i;
-              const usersHere = getUsersOnSlide(i);
+              const isActive = activeSlide === i
+              const usersHere = getUsersOnSlide(i)
               return (
                 <div key={i} className="flex gap-2 items-start relative group">
-                  <span className="text-[10px] font-bold text-slate-400 mt-2.5 w-4 text-right select-none">{i + 1}</span>
-                  
+                  <span className="text-[10px] font-bold text-slate-400 mt-2.5 w-4 text-right select-none">
+                    {i + 1}
+                  </span>
+
                   {/* Reorder actions */}
                   <div className="absolute left-[-2px] top-6 flex flex-col gap-0.5 hidden group-hover:flex z-40 bg-slate-900 text-white rounded p-0.5">
-                    <button disabled={i === 0} onClick={() => handleMoveSlide(i, 'up')} className="disabled:opacity-30 p-0.5 hover:text-indigo-400"><ArrowUp className="w-3 h-3" /></button>
-                    <button disabled={i === slides.length - 1} onClick={() => handleMoveSlide(i, 'down')} className="disabled:opacity-30 p-0.5 hover:text-indigo-400"><ArrowDown className="w-3 h-3" /></button>
+                    <button
+                      disabled={i === 0}
+                      onClick={() => handleMoveSlide(i, 'up')}
+                      className="disabled:opacity-30 p-0.5 hover:text-indigo-400"
+                    >
+                      <ArrowUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      disabled={i === slides.length - 1}
+                      onClick={() => handleMoveSlide(i, 'down')}
+                      className="disabled:opacity-30 p-0.5 hover:text-indigo-400"
+                    >
+                      <ArrowDown className="w-3 h-3" />
+                    </button>
                   </div>
 
                   <button
-                    onClick={() => { setActiveSlide(i); socket.emit('change-slide', { roomId, slideIndex: i }); }}
+                    onClick={() => {
+                      setActiveSlide(i)
+                      socket.emit('change-slide', { roomId, slideIndex: i })
+                    }}
                     className={`flex-1 aspect-[16/9] bg-gradient-to-br ${theme.gradient} rounded-xl p-3 text-left border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
                       isActive ? 'border-amber-500 ring-2 ring-amber-500/20' : 'border-slate-200 hover:border-slate-300'
                     }`}
@@ -515,7 +693,7 @@ export default function Slides({
                     <div className={`absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r ${theme.accent}`} />
                     <div className="text-[9px] font-bold text-slate-800 truncate w-full">{s.title || 'Untitled'}</div>
                     <div className="text-[7px] text-slate-400 line-clamp-2 mt-1 leading-snug">{s.content}</div>
-                    
+
                     {usersHere.length > 0 && (
                       <div className="absolute bottom-1 right-1 flex -space-x-1.5 overflow-hidden z-10 p-0.5">
                         {ensureArray(usersHere).map((u, uIdx) => (
@@ -532,7 +710,7 @@ export default function Slides({
                     )}
                   </button>
                 </div>
-              );
+              )
             })}
           </div>
         </div>
@@ -542,8 +720,8 @@ export default function Slides({
           {/* Layout type selector */}
           <div className="h-9 border-b border-slate-200 px-6 bg-white flex items-center gap-3 shrink-0 select-none">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Slide Layout:</span>
-            {['title', 'split', 'image-left', 'normal'].map(l => (
-              <button 
+            {['title', 'split', 'image-left', 'normal'].map((l) => (
+              <button
                 key={l}
                 onClick={() => handleSlideUpdate('layout', l)}
                 className={`px-3 py-0.5 rounded-lg text-[10px] font-bold border capitalize cursor-pointer ${activeSlideData.layout === l ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-50 border-slate-200 text-slate-650'}`}
@@ -555,11 +733,11 @@ export default function Slides({
 
           {/* Slide canvas area */}
           <div className="flex-1 p-6 flex flex-col items-center justify-center overflow-hidden">
-            <div 
+            <div
               className={`w-full max-w-4xl aspect-[16/9] bg-gradient-to-br ${theme.gradient} border border-slate-200/60 shadow-2xl rounded-3xl p-10 flex flex-col justify-center relative overflow-hidden`}
             >
               <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${theme.accent} rounded-t-3xl`} />
-              
+
               {/* Dynamic layout templates */}
               {activeSlideData.layout === 'title' ? (
                 <div className="flex flex-col justify-center items-center h-full text-center">
@@ -604,8 +782,12 @@ export default function Slides({
               ) : activeSlideData.layout === 'image-left' ? (
                 <div className="h-full flex gap-6 items-center">
                   <div className="w-1/2 aspect-[4/3] bg-slate-100 rounded-2xl flex flex-col items-center justify-center border border-dashed text-slate-400 text-xs">
-                    {activeSlideData.elements?.some(el => el.type === 'image') ? (
-                      <img src={activeSlideData.elements.find(el => el.type === 'image').src} className="w-full h-full object-cover rounded-2xl" alt="slide-left" />
+                    {activeSlideData.elements?.some((el) => el.type === 'image') ? (
+                      <img
+                        src={activeSlideData.elements.find((el) => el.type === 'image').src}
+                        className="w-full h-full object-cover rounded-2xl"
+                        alt="slide-left"
+                      />
                     ) : (
                       <>
                         <ImageIcon className="w-8 h-8 mb-2" />
@@ -650,17 +832,27 @@ export default function Slides({
 
               {/* Absolute elements rendering */}
               {ensureArray(slideElements).map((el) => {
-                const isSelected = selectedElemId === el.id;
+                const isSelected = selectedElemId === el.id
                 return (
                   <div
                     key={el.id}
                     onMouseDown={(e) => handleElementDrag(e, el)}
-                    style={{ position: 'absolute', left: el.x, top: el.y, width: el.width, height: el.height, zIndex: isSelected ? 40 : 10 }}
+                    style={{
+                      position: 'absolute',
+                      left: el.x,
+                      top: el.y,
+                      width: el.width,
+                      height: el.height,
+                      zIndex: isSelected ? 40 : 10
+                    }}
                     className={`border relative select-none cursor-move ${isSelected ? 'border-indigo-600 ring-2 ring-indigo-500/25' : 'border-transparent hover:border-slate-300'}`}
                   >
                     {isSelected && (
-                      <button 
-                        onMouseDown={(e) => { e.stopPropagation(); deleteElement(el.id); }}
+                      <button
+                        onMouseDown={(e) => {
+                          e.stopPropagation()
+                          deleteElement(el.id)
+                        }}
                         className="absolute -top-6 -right-6 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full z-50 cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -668,23 +860,38 @@ export default function Slides({
                     )}
 
                     {el.type === 'image' ? (
-                      <img src={el.src} className="w-full h-full object-cover rounded pointer-events-none" alt="deck-insert" />
+                      <img
+                        src={el.src}
+                        className="w-full h-full object-cover rounded pointer-events-none"
+                        alt="deck-insert"
+                      />
                     ) : el.type === 'video' ? (
-                      <iframe src={el.src} className="w-full h-full rounded pointer-events-none" title="deck-video" frameBorder="0" />
+                      <iframe
+                        src={el.src}
+                        className="w-full h-full rounded pointer-events-none"
+                        title="deck-video"
+                        frameBorder="0"
+                      />
                     ) : el.type === 'shape' ? (
                       <div className="w-full h-full bg-indigo-500/35 rounded-full border-2 border-indigo-500 pointer-events-none" />
                     ) : el.type === 'table' ? (
                       <table className="w-full h-full border border-slate-300 text-slate-800 text-[10px] bg-white pointer-events-none">
                         <tbody>
-                          <tr><td className="border p-1">Row Cell</td><td className="border p-1">Row Cell</td></tr>
-                          <tr><td className="border p-1">Row Cell</td><td className="border p-1">Row Cell</td></tr>
+                          <tr>
+                            <td className="border p-1">Row Cell</td>
+                            <td className="border p-1">Row Cell</td>
+                          </tr>
+                          <tr>
+                            <td className="border p-1">Row Cell</td>
+                            <td className="border p-1">Row Cell</td>
+                          </tr>
                         </tbody>
                       </table>
                     ) : (
                       <div className="w-full h-full border border-dashed border-slate-300" />
                     )}
                   </div>
-                );
+                )
               })}
             </div>
           </div>
@@ -707,5 +914,5 @@ export default function Slides({
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,10 +1,25 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  FolderPlus, Plus, FileText, TableProperties, Presentation, Paintbrush, 
-  Trash2, Edit3, ArrowLeft, Folder, File, ImageIcon, Download, Eye, 
-  Search, Star, Pin, Move, Copy, Grid, List as ListIcon, ChevronRight
-} from 'lucide-react';
-import toast from 'react-hot-toast';
+import React, { useState, useMemo } from 'react'
+import {
+  FolderPlus,
+  Plus,
+  FileText,
+  TableProperties,
+  Presentation,
+  Paintbrush,
+  Trash2,
+  Edit3,
+  Folder,
+  File,
+  ImageIcon,
+  Search,
+  Star,
+  Pin,
+  Copy,
+  Grid,
+  List as ListIcon,
+  ChevronRight
+} from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function FileExplorer({
   filesList = [],
@@ -15,76 +30,83 @@ export default function FileExplorer({
   onOpenFile,
   activeFileId
 }) {
-  const [currentFolderId, setCurrentFolderId] = useState(null); // null = root
-  const [searchQuery, setSearchQuery] = useState('');
-  const [newFolderName, setNewFolderName] = useState('');
-  const [showFolderModal, setShowFolderModal] = useState(false);
-  
-  const [showNewFileModal, setShowNewFileModal] = useState(false);
-  const [newFileType, setNewFileType] = useState('document'); // 'document' | 'spreadsheet' | 'presentation' | 'whiteboard'
-  const [newFileName, setNewFileName] = useState('');
+  const [currentFolderId, setCurrentFolderId] = useState(null) // null = root
+  const [searchQuery, setSearchQuery] = useState('')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [showFolderModal, setShowFolderModal] = useState(false)
 
-  const [editingItem, setEditingItem] = useState(null);
-  const [editName, setEditName] = useState('');
-  
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
-  const [sortBy, setSortBy] = useState('name'); // 'name' | 'lastModified'
-  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
-  const [filterType, setFilterType] = useState('all'); // 'all' | 'document' | 'spreadsheet' | 'presentation' | 'whiteboard' | 'upload'
+  const [showNewFileModal, setShowNewFileModal] = useState(false)
+  const [newFileType, setNewFileType] = useState('document') // 'document' | 'spreadsheet' | 'presentation' | 'whiteboard'
+  const [newFileName, setNewFileName] = useState('')
 
-  const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter';
+  const [editingItem, setEditingItem] = useState(null)
+  const [editName, setEditName] = useState('')
+
+  const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
+  const [sortBy, setSortBy] = useState('name') // 'name' | 'lastModified'
+  const [sortOrder, setSortOrder] = useState('asc') // 'asc' | 'desc'
+  const [filterType, setFilterType] = useState('all') // 'all' | 'document' | 'spreadsheet' | 'presentation' | 'whiteboard' | 'upload'
+
+  const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter'
 
   // Breadcrumbs resolver
   const breadcrumbs = useMemo(() => {
-    const list = [];
-    let currentId = currentFolderId;
+    const list = []
+    let currentId = currentFolderId
     while (currentId) {
-      const folder = filesList.find((f) => f.id === currentId && f.type === 'folder');
+      const folder = filesList.find((f) => f.id === currentId && f.type === 'folder')
       if (folder) {
-        list.unshift(folder);
-        currentId = folder.folderId;
+        list.unshift(folder)
+        currentId = folder.folderId
       } else {
-        break;
+        break
       }
     }
-    return list;
-  }, [currentFolderId, filesList]);
+    return list
+  }, [currentFolderId, filesList])
 
   // Current folder filtered items
   const currentItems = useMemo(() => {
-    let items = filesList.filter((f) => f.folderId === currentFolderId);
-    
+    let items = filesList.filter((f) => f.folderId === currentFolderId)
+
     // Type filtering
     if (filterType !== 'all') {
       if (filterType === 'upload') {
-        items = items.filter(f => f.type !== 'folder' && f.type !== 'document' && f.type !== 'spreadsheet' && f.type !== 'presentation' && f.type !== 'whiteboard');
+        items = items.filter(
+          (f) =>
+            f.type !== 'folder' &&
+            f.type !== 'document' &&
+            f.type !== 'spreadsheet' &&
+            f.type !== 'presentation' &&
+            f.type !== 'whiteboard'
+        )
       } else {
-        items = items.filter(f => f.type === filterType);
+        items = items.filter((f) => f.type === filterType)
       }
     }
 
     // Search query override
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      items = filesList.filter((f) => f.name.toLowerCase().includes(query) && f.type !== 'folder');
+      const query = searchQuery.toLowerCase()
+      items = filesList.filter((f) => f.name.toLowerCase().includes(query) && f.type !== 'folder')
     }
 
     // Sorting
     return items.sort((a, b) => {
-      let comparison = 0;
+      let comparison = 0
       if (sortBy === 'name') {
-        comparison = a.name.localeCompare(b.name);
+        comparison = a.name.localeCompare(b.name)
       } else if (sortBy === 'lastModified') {
-        const dateA = new Date(a.lastModified || a.uploadedAt || 0);
-        const dateB = new Date(b.lastModified || b.uploadedAt || 0);
-        comparison = dateA - dateB;
+        const dateA = new Date(a.lastModified || a.uploadedAt || 0)
+        const dateB = new Date(b.lastModified || b.uploadedAt || 0)
+        comparison = dateA - dateB
       }
-      return sortOrder === 'desc' ? -comparison : comparison;
-    });
-  }, [currentFolderId, filesList, searchQuery, filterType, sortBy, sortOrder]);
+      return sortOrder === 'desc' ? -comparison : comparison
+    })
+  }, [currentFolderId, filesList, searchQuery, filterType, sortBy, sortOrder])
 
   const handleCreateFolder = () => {
-    if (!newFolderName.trim()) return;
+    if (!newFolderName.trim()) return
     const folderObj = {
       id: 'folder-' + Math.random().toString(36).substring(7),
       name: newFolderName.trim(),
@@ -94,36 +116,46 @@ export default function FileExplorer({
       uploadedBy: userName,
       uploadedAt: new Date().toISOString(),
       lastModified: new Date().toISOString()
-    };
-    const updated = [...filesList, folderObj];
-    socket.emit('update-files', { roomId, files: updated });
-    setNewFolderName('');
-    setShowFolderModal(false);
-    toast.success(`Folder "${folderObj.name}" created!`);
-  };
+    }
+    const updated = [...filesList, folderObj]
+    socket.emit('update-files', { roomId, files: updated })
+    setNewFolderName('')
+    setShowFolderModal(false)
+    toast.success(`Folder "${folderObj.name}" created!`)
+  }
 
   const handleCreateFile = () => {
-    if (!newFileName.trim()) return;
-    const cleanName = newFileName.trim();
+    if (!newFileName.trim()) return
+    const cleanName = newFileName.trim()
 
     // Differentiate content based on file type
-    let defaultContent = null;
-    let extension = '';
+    let defaultContent = null
+    let extension = ''
     if (newFileType === 'document') {
-      defaultContent = null;
-      extension = '.docx';
+      defaultContent = null
+      extension = '.docx'
     } else if (newFileType === 'spreadsheet') {
-      defaultContent = Array(100).fill().map(() => Array(26).fill(''));
-      extension = '.xlsx';
+      defaultContent = Array(100)
+        .fill()
+        .map(() => Array(26).fill(''))
+      extension = '.xlsx'
     } else if (newFileType === 'presentation') {
-      defaultContent = [{ title: 'Title Slide', content: 'Sub-heading text', notes: '', elements: [], layout: 'title' }];
-      extension = '.pptx';
+      defaultContent = [
+        {
+          title: 'Title Slide',
+          content: 'Sub-heading text',
+          notes: '',
+          elements: [],
+          layout: 'title'
+        }
+      ]
+      extension = '.pptx'
     } else if (newFileType === 'whiteboard') {
-      defaultContent = [];
-      extension = ' Board';
+      defaultContent = []
+      extension = ' Board'
     }
 
-    const fullFileName = cleanName.endsWith(extension) ? cleanName : cleanName + extension;
+    const fullFileName = cleanName.endsWith(extension) ? cleanName : cleanName + extension
 
     const fileObj = {
       id: `file-${newFileType}-${Math.random().toString(36).substring(7)}`,
@@ -139,41 +171,39 @@ export default function FileExplorer({
       lastModified: new Date().toISOString(),
       isPinned: false,
       isFavorite: false
-    };
-
-    const updated = [...filesList, fileObj];
-    socket.emit('update-files', { roomId, files: updated });
-    setNewFileName('');
-    setShowNewFileModal(false);
-    toast.success(`Created ${newFileType}: "${fileObj.name}"!`);
-  };
-
-  const handleDeleteItem = (itemId, e) => {
-    e.stopPropagation();
-    // Delete target + any child folders/files recursively
-    const idsToDelete = new Set([itemId]);
-    let activeLength = 0;
-    
-    // Simple tree traversal
-    while (idsToDelete.size !== activeLength) {
-      activeLength = idsToDelete.size;
-      filesList.forEach(f => {
-        if (f.folderId && idsToDelete.has(f.folderId)) {
-          idsToDelete.add(f.id);
-        }
-      });
     }
 
-    const updated = filesList.filter((f) => !idsToDelete.has(f.id));
-    socket.emit('update-files', { roomId, files: updated });
-    toast.success('Workspace item removed.');
-  };
+    const updated = [...filesList, fileObj]
+    socket.emit('update-files', { roomId, files: updated })
+    setNewFileName('')
+    setShowNewFileModal(false)
+    toast.success(`Created ${newFileType}: "${fileObj.name}"!`)
+  }
+
+  const handleDeleteItem = (itemId, e) => {
+    e.stopPropagation()
+    // Delete target + any child folders/files recursively
+    const idsToDelete = new Set([itemId])
+    let activeLength = 0
+
+    // Simple tree traversal
+    while (idsToDelete.size !== activeLength) {
+      activeLength = idsToDelete.size
+      filesList.forEach((f) => {
+        if (f.folderId && idsToDelete.has(f.folderId)) {
+          idsToDelete.add(f.id)
+        }
+      })
+    }
+
+    const updated = filesList.filter((f) => !idsToDelete.has(f.id))
+    socket.emit('update-files', { roomId, files: updated })
+    toast.success('Workspace item removed.')
+  }
 
   const handleDuplicateItem = (item, e) => {
-    e.stopPropagation();
-    const cleanName = item.name.includes('.') 
-      ? item.name.replace(/\.(\w+)$/, ' - Copy.$1')
-      : item.name + ' - Copy';
+    e.stopPropagation()
+    const cleanName = item.name.includes('.') ? item.name.replace(/\.(\w+)$/, ' - Copy.$1') : item.name + ' - Copy'
 
     const dupObj = {
       ...item,
@@ -182,91 +212,90 @@ export default function FileExplorer({
       folderId: currentFolderId,
       uploadedAt: new Date().toISOString(),
       lastModified: new Date().toISOString()
-    };
+    }
 
-    const updated = [...filesList, dupObj];
-    socket.emit('update-files', { roomId, files: updated });
-    toast.success(`Duplicated "${item.name}"`);
-  };
+    const updated = [...filesList, dupObj]
+    socket.emit('update-files', { roomId, files: updated })
+    toast.success(`Duplicated "${item.name}"`)
+  }
 
   const handleToggleMetadata = (item, key, e) => {
-    e.stopPropagation();
-    const updated = filesList.map(f => {
+    e.stopPropagation()
+    const updated = filesList.map((f) => {
       if (f.id === item.id) {
-        return { ...f, [key]: !f[key] };
+        return { ...f, [key]: !f[key] }
       }
-      return f;
-    });
-    socket.emit('update-files', { roomId, files: updated });
-  };
+      return f
+    })
+    socket.emit('update-files', { roomId, files: updated })
+  }
 
   const handleRename = () => {
-    if (!editName.trim() || !editingItem) return;
+    if (!editName.trim() || !editingItem) return
     const updated = filesList.map((f) => {
       if (f.id === editingItem.id) {
         return {
           ...f,
           name: editName.trim(),
           lastModified: new Date().toISOString()
-        };
+        }
       }
-      return f;
-    });
-    socket.emit('update-files', { roomId, files: updated });
-    setEditName('');
-    setEditingItem(null);
-    toast.success('Item renamed.');
-  };
+      return f
+    })
+    socket.emit('update-files', { roomId, files: updated })
+    setEditName('')
+    setEditingItem(null)
+    toast.success('Item renamed.')
+  }
 
   // Drag and drop folders move
   const handleItemDragStart = (e, item) => {
-    e.dataTransfer.setData('text/plain', item.id);
-  };
+    e.dataTransfer.setData('text/plain', item.id)
+  }
 
   const handleFolderDrop = (e, targetFolderId) => {
-    e.preventDefault();
-    const draggedId = e.dataTransfer.getData('text/plain');
-    if (!draggedId || draggedId === targetFolderId) return;
+    e.preventDefault()
+    const draggedId = e.dataTransfer.getData('text/plain')
+    if (!draggedId || draggedId === targetFolderId) return
 
     // Prevent folder moving into its own tree
-    let parentId = targetFolderId;
+    let parentId = targetFolderId
     while (parentId) {
       if (parentId === draggedId) {
-        toast.error('Cannot move a folder inside itself.');
-        return;
+        toast.error('Cannot move a folder inside itself.')
+        return
       }
-      const p = filesList.find(f => f.id === parentId);
-      parentId = p ? p.folderId : null;
+      const p = filesList.find((f) => f.id === parentId)
+      parentId = p ? p.folderId : null
     }
 
-    const updated = filesList.map(f => {
+    const updated = filesList.map((f) => {
       if (f.id === draggedId) {
-        return { ...f, folderId: targetFolderId, lastModified: new Date().toISOString() };
+        return { ...f, folderId: targetFolderId, lastModified: new Date().toISOString() }
       }
-      return f;
-    });
-    socket.emit('update-files', { roomId, files: updated });
-    toast.success('Workspace item relocated.');
-  };
+      return f
+    })
+    socket.emit('update-files', { roomId, files: updated })
+    toast.success('Workspace item relocated.')
+  }
 
   const getFileIcon = (item) => {
-    if (item.type === 'folder') return <Folder className="w-4 h-4 text-indigo-500 fill-current" />;
-    if (item.type === 'document') return <FileText className="w-4 h-4 text-blue-500" />;
-    if (item.type === 'spreadsheet') return <TableProperties className="w-4 h-4 text-emerald-500" />;
-    if (item.type === 'presentation') return <Presentation className="w-4 h-4 text-amber-500" />;
-    if (item.type === 'whiteboard') return <Paintbrush className="w-4 h-4 text-rose-500" />;
-    if (item.type.startsWith('image/')) return <ImageIcon className="w-4 h-4 text-red-400" />;
-    return <File className="w-4 h-4 text-slate-500" />;
-  };
+    if (item.type === 'folder') return <Folder className="w-4 h-4 text-indigo-500 fill-current" />
+    if (item.type === 'document') return <FileText className="w-4 h-4 text-blue-500" />
+    if (item.type === 'spreadsheet') return <TableProperties className="w-4 h-4 text-emerald-500" />
+    if (item.type === 'presentation') return <Presentation className="w-4 h-4 text-amber-500" />
+    if (item.type === 'whiteboard') return <Paintbrush className="w-4 h-4 text-rose-500" />
+    if (item.type.startsWith('image/')) return <ImageIcon className="w-4 h-4 text-red-400" />
+    return <File className="w-4 h-4 text-slate-500" />
+  }
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden h-full">
       {/* File Manager Toolbar */}
       <div className="h-12 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 flex items-center justify-between shrink-0 transition-colors z-20 select-none">
-        
         {/* Breadcrumb path navigation */}
         <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-400">
-          <button 
+          <button
             onClick={() => setCurrentFolderId(null)}
             className="hover:text-indigo-500 transition-colors cursor-pointer"
           >
@@ -275,7 +304,7 @@ export default function FileExplorer({
           {breadcrumbs.map((f, i) => (
             <React.Fragment key={f.id}>
               <ChevronRight className="w-3 h-3 text-slate-350" />
-              <button 
+              <button
                 onClick={() => setCurrentFolderId(f.id)}
                 className={`hover:text-indigo-500 transition-colors cursor-pointer max-w-[90px] truncate ${i === breadcrumbs.length - 1 ? 'text-slate-800 dark:text-white' : ''}`}
               >
@@ -288,7 +317,7 @@ export default function FileExplorer({
         {/* Toolbar Buttons */}
         <div className="flex items-center gap-2">
           {/* Filter Dropdown */}
-          <select 
+          <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
             className="bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-650 cursor-pointer focus:outline-none"
@@ -303,15 +332,15 @@ export default function FileExplorer({
 
           {/* Sort Toggles */}
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border text-[10px] font-bold text-slate-600">
-            <button 
+            <button
               onClick={() => {
-                setSortBy(sortBy === 'name' ? 'lastModified' : 'name');
+                setSortBy(sortBy === 'name' ? 'lastModified' : 'name')
               }}
               className="px-2 py-0.5 hover:bg-white rounded cursor-pointer"
             >
               {sortBy === 'name' ? 'Name' : 'Date'}
             </button>
-            <button 
+            <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               className="px-1.5 py-0.5 hover:bg-white rounded cursor-pointer"
             >
@@ -319,12 +348,16 @@ export default function FileExplorer({
             </button>
           </div>
 
-          <button 
+          <button
             onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
             className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
             title="Toggle View Mode"
           >
-            {viewMode === 'grid' ? <ListIcon className="w-4 h-4 text-slate-500" /> : <Grid className="w-4 h-4 text-slate-500" />}
+            {viewMode === 'grid' ? (
+              <ListIcon className="w-4 h-4 text-slate-500" />
+            ) : (
+              <Grid className="w-4 h-4 text-slate-500" />
+            )}
           </button>
 
           {canEdit && (
@@ -336,7 +369,7 @@ export default function FileExplorer({
               >
                 <FolderPlus className="w-4 h-4" />
               </button>
-              
+
               <button
                 onClick={() => setShowNewFileModal(true)}
                 className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] cursor-pointer shadow-md"
@@ -352,8 +385,8 @@ export default function FileExplorer({
       {/* Workspace search searchbar */}
       <div className="px-4 py-2 border-b border-slate-100 bg-white flex items-center shrink-0">
         <Search className="w-3.5 h-3.5 text-slate-400 mr-2" />
-        <input 
-          type="text" 
+        <input
+          type="text"
           placeholder="Search workspace files..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -372,7 +405,7 @@ export default function FileExplorer({
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {currentItems.map((item) => {
-              const isSelected = activeFileId === item.id;
+              const isSelected = activeFileId === item.id
               return (
                 <div
                   key={item.id}
@@ -387,44 +420,42 @@ export default function FileExplorer({
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="p-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg shrink-0">
-                      {getFileIcon(item)}
-                    </div>
+                    <div className="p-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg shrink-0">{getFileIcon(item)}</div>
 
                     <div className="opacity-0 group-hover:opacity-100 flex gap-1 z-10 transition-opacity">
-                      <button 
+                      <button
                         onClick={(e) => handleToggleMetadata(item, 'isPinned', e)}
                         className={`p-1 hover:bg-slate-100 rounded text-slate-400 ${item.isPinned ? 'text-amber-500' : ''}`}
                         title="Pin"
                       >
                         <Pin className="w-3 h-3 fill-current" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleToggleMetadata(item, 'isFavorite', e)}
                         className={`p-1 hover:bg-slate-100 rounded text-slate-400 ${item.isFavorite ? 'text-amber-500' : ''}`}
                         title="Favorite"
                       >
                         <Star className="w-3 h-3 fill-current" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingItem(item);
-                          setEditName(item.name);
+                          e.stopPropagation()
+                          setEditingItem(item)
+                          setEditName(item.name)
                         }}
                         className="p-1 hover:bg-slate-100 rounded text-slate-400"
                         title="Rename"
                       >
                         <Edit3 className="w-3 h-3" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleDuplicateItem(item, e)}
                         className="p-1 hover:bg-slate-100 rounded text-slate-400"
                         title="Duplicate"
                       >
                         <Copy className="w-3 h-3" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleDeleteItem(item.id, e)}
                         className="p-1 hover:bg-rose-50 rounded text-slate-400 hover:text-rose-550"
                         title="Delete"
@@ -435,20 +466,23 @@ export default function FileExplorer({
                   </div>
 
                   <div className="min-w-0">
-                    <h4 className="text-[11px] font-bold text-slate-800 dark:text-white truncate block mt-2" title={item.name}>
+                    <h4
+                      className="text-[11px] font-bold text-slate-800 dark:text-white truncate block mt-2"
+                      title={item.name}
+                    >
                       {item.name}
                     </h4>
                     <span className="text-[9px] text-slate-400">{item.uploadedBy || 'system'}</span>
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         ) : (
           /* List Mode */
           <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden select-none">
             {currentItems.map((item) => {
-              const isSelected = activeFileId === item.id;
+              const isSelected = activeFileId === item.id
               return (
                 <div
                   key={item.id}
@@ -464,25 +498,27 @@ export default function FileExplorer({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {getFileIcon(item)}
-                    <span className="text-slate-850 dark:text-white truncate max-w-[200px]" title={item.name}>{item.name}</span>
+                    <span className="text-slate-850 dark:text-white truncate max-w-[200px]" title={item.name}>
+                      {item.name}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-[9px] text-slate-400 hidden md:inline">{item.uploadedBy || 'system'}</span>
                     <div className="flex gap-1">
-                      <button 
+                      <button
                         onClick={(e) => handleToggleMetadata(item, 'isPinned', e)}
                         className={`p-1 hover:bg-slate-100 rounded text-slate-400 ${item.isPinned ? 'text-amber-500' : ''}`}
                       >
                         <Pin className="w-3 h-3 fill-current" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleToggleMetadata(item, 'isFavorite', e)}
                         className={`p-1 hover:bg-slate-100 rounded text-slate-400 ${item.isFavorite ? 'text-amber-500' : ''}`}
                       >
                         <Star className="w-3 h-3 fill-current" />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => handleDeleteItem(item.id, e)}
                         className="p-1 hover:bg-rose-50 rounded text-slate-400 hover:text-rose-550"
                       >
@@ -491,7 +527,7 @@ export default function FileExplorer({
                     </div>
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         )}
@@ -510,13 +546,13 @@ export default function FileExplorer({
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 mb-6"
             />
             <div className="flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setShowFolderModal(false)}
                 className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleCreateFolder}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
               >
@@ -532,22 +568,26 @@ export default function FileExplorer({
         <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl max-w-sm w-full">
             <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4">Create Collaborative File</h3>
-            
+
             <div className="space-y-4 mb-6">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">File Type</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  File Type
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { id: 'document', label: 'Document', icon: FileText },
                     { id: 'spreadsheet', label: 'Spreadsheet', icon: TableProperties },
                     { id: 'presentation', label: 'Presentation', icon: Presentation },
                     { id: 'whiteboard', label: 'Whiteboard', icon: Paintbrush }
-                  ].map(t => (
+                  ].map((t) => (
                     <button
                       key={t.id}
                       onClick={() => setNewFileType(t.id)}
                       className={`flex items-center gap-2 p-2.5 border rounded-xl text-xs font-bold capitalize cursor-pointer transition-all ${
-                        newFileType === t.id ? 'border-indigo-600 bg-indigo-500/5 text-indigo-600' : 'border-slate-200 text-slate-500'
+                        newFileType === t.id
+                          ? 'border-indigo-600 bg-indigo-500/5 text-indigo-600'
+                          : 'border-slate-200 text-slate-500'
                       }`}
                     >
                       <t.icon className="w-4 h-4" />
@@ -558,7 +598,9 @@ export default function FileExplorer({
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">File Name</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  File Name
+                </label>
                 <input
                   type="text"
                   placeholder="e.g., Marketing Plan"
@@ -570,13 +612,13 @@ export default function FileExplorer({
             </div>
 
             <div className="flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setShowNewFileModal(false)}
                 className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleCreateFile}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
               >
@@ -599,13 +641,13 @@ export default function FileExplorer({
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none mb-6"
             />
             <div className="flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => setEditingItem(null)}
                 className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleRename}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
               >
@@ -616,5 +658,5 @@ export default function FileExplorer({
         </div>
       )}
     </div>
-  );
+  )
 }

@@ -1,31 +1,31 @@
-import React from 'react';
-import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
+import React from 'react'
+import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
+    super(props)
+    this.state = { hasError: false, error: null }
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    return { hasError: true, error }
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
+    console.error('ErrorBoundary caught an error:', error, errorInfo)
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
-    window.location.reload();
-  };
+    this.setState({ hasError: false, error: null })
+    window.location.reload()
+  }
 
   handleReturnToDashboard = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false, error: null })
     if (this.props.onReset) {
-      this.props.onReset();
+      this.props.onReset()
     }
-  };
+  }
 
   render() {
     if (this.state.hasError) {
@@ -36,7 +36,8 @@ export default class ErrorBoundary extends React.Component {
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight mb-2">We couldn't load this workspace.</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm text-center mb-8 leading-relaxed">
-            An unexpected error occurred while rendering the workspace editors. Please try refreshing or returning to your dashboard.
+            An unexpected error occurred while rendering the workspace editors. Please try refreshing or returning to
+            your dashboard.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <button
@@ -55,9 +56,9 @@ export default class ErrorBoundary extends React.Component {
             </button>
           </div>
         </div>
-      );
+      )
     }
 
-    return this.props.children;
+    return this.props.children
   }
 }

@@ -13,11 +13,14 @@ export const getFriendlyAuthError = (message = '') => {
   if (lower.includes('invalid credentials')) return 'Wrong email or password.'
   if (lower.includes('server unavailable')) return 'Server unavailable. Please try again.'
   if (lower.includes('network')) return 'Network error. Please try again.'
-  if (lower.includes('email is already in use') || lower.includes('email already exists')) return 'Email already exists.'
-  if (lower.includes('username is already in use') || lower.includes('username already exists')) return 'Username already exists.'
+  if (lower.includes('email is already in use') || lower.includes('email already exists'))
+    return 'Email already exists.'
+  if (lower.includes('username is already in use') || lower.includes('username already exists'))
+    return 'Username already exists.'
   if (lower.includes('authentication required')) return 'Session expired. Please sign in again.'
   if (lower.includes('reset link') || lower.includes('expired')) return 'This reset link is invalid or has expired.'
-  if (lower.includes('email service') || lower.includes('reset email')) return 'We could not send the reset email. Please try again later.'
+  if (lower.includes('email service') || lower.includes('reset email'))
+    return 'We could not send the reset email. Please try again later.'
 
   return message || 'Something went wrong. Please try again.'
 }
@@ -42,7 +45,7 @@ export default function useAuthForm(mode) {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  const validateCredentials = () => {
+  const validateCredentials = ({ requireStrongPassword = false } = {}) => {
     if (!validateEmail(form.email)) {
       setError('Please enter a valid email address.')
       return false
@@ -50,6 +53,11 @@ export default function useAuthForm(mode) {
 
     if (!form.password.trim()) {
       setError('Password is required.')
+      return false
+    }
+
+    if (requireStrongPassword && form.password.length < 8) {
+      setError('Password must be at least 8 characters.')
       return false
     }
 
@@ -77,7 +85,7 @@ export default function useAuthForm(mode) {
     event.preventDefault()
     setError('')
 
-    if (!validateCredentials()) return
+    if (!validateCredentials({ requireStrongPassword: isSignup })) return
 
     if (isSignup && (!form.fullName.trim() || !form.username.trim())) {
       setError('Full name and username are required.')

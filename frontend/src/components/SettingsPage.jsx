@@ -1,19 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useOutletContext, useParams } from 'react-router-dom'
-import {
-  Bell,
-  ChevronLeft,
-  ChevronRight,
-  Laptop,
-  Lock,
-  Menu,
-  ShieldCheck,
-  Smartphone,
-  User,
-  X
-} from 'lucide-react'
+import toast from 'react-hot-toast'
+import { Bell, Camera, ChevronLeft, Laptop, Lock, Menu, ShieldCheck, Smartphone, User, X } from 'lucide-react'
 import Button from './ui/Button'
 import Input from './ui/Input'
+import Avatar from './ui/Avatar'
+import { useAuth } from '../hooks/useAuth'
+import { completeProfile, forgotPassword, getGoogleAuthUrl } from '../features/auth/services/auth'
 
 const sections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -141,25 +134,59 @@ function SectionHeader({ title, description }) {
 }
 
 function ProfileSection({ user }) {
+  const { refreshUser } = useAuth()
   const displayName = user?.fullName || user?.username || user?.email?.split('@')[0] || 'Teamora user'
   const initial = displayName.charAt(0).toUpperCase()
+  const fileInputRef = useRef(null)
   const [form, setForm] = useState({
     fullName: user?.fullName || '',
     username: user?.username || '',
-    email: user?.email || ''
+    avatar: user?.avatar || ''
   })
+  const [userId, setUserId] = useState(user?._id)
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    setForm({
-      fullName: user?.fullName || '',
-      username: user?.username || '',
-      email: user?.email || ''
-    })
-  }, [user])
+  if (user?._id && user._id !== userId) {
+    setUserId(user._id)
+    setForm({ fullName: user?.fullName || '', username: user?.username || '', avatar: user?.avatar || '' })
+  }
 
-  const handleSave = () => {
-    window.localStorage.setItem('teamora-profile', JSON.stringify(form))
-    window.alert('Profile updated')
+  const handlePictureChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.')
+      return
+    }
+    if (file.size > 1024 * 1024) {
+      toast.error('Choose an image smaller than 1 MB.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setForm((current) => ({ ...current, avatar: String(reader.result || '') }))
+      toast.success('Picture ready to save')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleSave = async () => {
+    if (!form.fullName.trim() || !form.username.trim()) {
+      toast.error('Full name and username are required.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      await completeProfile({ fullName: form.fullName.trim(), username: form.username.trim(), avatar: form.avatar })
+      await refreshUser()
+      toast.success('Profile updated')
+    } catch (error) {
+      toast.error(error.message || 'Failed to update profile')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -167,16 +194,29 @@ function ProfileSection({ user }) {
       <SectionHeader title="Profile" description="Manage your personal Teamora account details." />
       <form className="grid gap-5" onSubmit={(event) => event.preventDefault()}>
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-[#7C3AED] text-xl font-semibold text-white">{initial}</div>
-          <Button type="button" variant="secondary" className="py-2">
+          <Avatar label={initial} src={form.avatar} className="h-16 w-16 text-xl" />
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePictureChange} className="hidden" />
+          <Button type="button" variant="secondary" className="py-2" onClick={() => fileInputRef.current?.click()}>
+            <Camera className="mr-2 h-4 w-4" />
             Change Picture
           </Button>
         </div>
-        <SettingsInput label="Full Name" placeholder="Your full name" value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} />
-        <SettingsInput label="Username" placeholder="teamora-user" value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} />
-        <SettingsInput label="Email" placeholder="you@example.com" type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} readOnly={Boolean(user?.oauth)} />
-        <Button type="button" className="h-12 w-fit" onClick={handleSave}>
-          Save Changes
+        <SettingsInput
+          label="Full Name"
+          placeholder="Your full name"
+          value={form.fullName}
+          onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))}
+        />
+        <SettingsInput
+          label="Username"
+          placeholder="teamora-user"
+          value={form.username}
+          onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+        />
+        <SettingsInput label="Email" placeholder="you@example.com" type="email" value={user?.email || ''} readOnly />
+        <p className="-mt-2 text-xs text-[#9CA3AF]">Email changes aren't supported yet.</p>
+        <Button type="button" className="h-12 w-fit" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Changes'}
         </Button>
       </form>
     </>
@@ -184,18 +224,65 @@ function ProfileSection({ user }) {
 }
 
 function SecuritySection() {
-  const [passwordChanged, setPasswordChanged] = useState(false)
-  const [googleConnected, setGoogleConnected] = useState(true)
-  const [sessions, setSessions] = useState(3)
+  const { user } = useAuth()
+  const isGoogleAccount = user?.provider === 'google'
+  const [sendingReset, setSendingReset] = useState(false)
+
+  const sendPasswordReset = async () => {
+    if (!user?.email || sendingReset) return
+    setSendingReset(true)
+    try {
+      await forgotPassword(user.email)
+      toast.success('Password reset email sent')
+    } catch (error) {
+      toast.error(error.message || 'Unable to send password reset email')
+    } finally {
+      setSendingReset(false)
+    }
+  }
+
+  const connectGoogle = () => {
+    sessionStorage.setItem('teamora-google-auth-started', 'true')
+    window.location.assign(getGoogleAuthUrl())
+  }
 
   return (
     <>
       <SectionHeader title="Security" description="Review login methods and account protection settings." />
       <div className="space-y-3">
-        <SettingsAction icon={Lock} title="Change Password" description="Update the password used for email sign in." action={passwordChanged ? 'Updated' : 'Change'} onClick={() => { setPasswordChanged(true) }} />
-        <SettingsAction icon={ShieldCheck} title="Connected Google Account" description="Manage the Google account connected to Teamora." action={googleConnected ? 'Connected' : 'Connect'} onClick={() => setGoogleConnected((current) => !current)} />
-        <SettingsAction icon={Smartphone} title="Active Sessions" description={`You currently have ${sessions} active sessions.`} action={`${sessions} active`} onClick={() => setSessions(1)} />
-        <SettingsAction title="Sign Out Other Devices" description="Keep this session active and sign out everywhere else." action="Sign Out" danger onClick={() => setSessions(1)} />
+        {isGoogleAccount ? (
+          <SettingsAction
+            icon={Lock}
+            title="Password"
+            description="Your account signs in with Google, so there is no Teamora password to change."
+            action="Google sign-in"
+            onClick={() => {}}
+          />
+        ) : (
+          <SettingsAction
+            icon={Lock}
+            title="Change Password"
+            description="Send a password reset link to your email to choose a new password."
+            action={sendingReset ? 'Sending...' : 'Change'}
+            onClick={sendPasswordReset}
+          />
+        )}
+        <SettingsAction
+          icon={ShieldCheck}
+          title="Connected Google Account"
+          description={
+            isGoogleAccount ? 'Your account signs in with Google.' : 'Your account signs in with an email and password.'
+          }
+          action={isGoogleAccount ? 'Connected' : 'Connect'}
+          onClick={isGoogleAccount ? undefined : connectGoogle}
+        />
+        <SettingsAction
+          icon={Smartphone}
+          title="Active Sessions"
+          description={`Current browser session for ${user?.email || 'this account'} started on ${new Date().toLocaleDateString()}.`}
+          action="Current"
+          onClick={() => {}}
+        />
       </div>
     </>
   )
@@ -204,30 +291,70 @@ function SecuritySection() {
 function NotificationsSection() {
   const [preferences, setPreferences] = useState(() => {
     const saved = window.localStorage.getItem('teamora-notifications')
-    return saved ? JSON.parse(saved) : {
-      emailNotifications: true,
-      workspaceInvitations: true,
-      meetingReminders: true,
-      documentActivity: true,
-      mentionNotifications: true
-    }
+    return saved
+      ? JSON.parse(saved)
+      : {
+          emailNotifications: true,
+          workspaceInvitations: true,
+          meetingReminders: true,
+          documentActivity: true,
+          mentionNotifications: true
+        }
   })
 
   useEffect(() => {
     window.localStorage.setItem('teamora-notifications', JSON.stringify(preferences))
+    window.dispatchEvent(new CustomEvent('teamora-notification-preferences-changed', { detail: preferences }))
   }, [preferences])
 
-  const toggle = (key) => setPreferences((current) => ({ ...current, [key]: !current[key] }))
+  const toggle = async (key) => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      await Notification.requestPermission()
+    }
+    setPreferences((current) => ({ ...current, [key]: !current[key] }))
+  }
+
+  const testNotification = (title) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+      toast.success(`${title} preference saved`)
+      return
+    }
+    new Notification('Teamora notification', { body: `${title} is enabled.` })
+  }
 
   return (
     <>
       <SectionHeader title="Notifications" description="Choose which Teamora updates should reach you." />
       <div className="space-y-3">
-        <ToggleRow label="Email notifications" active={preferences.emailNotifications} onToggle={() => toggle('emailNotifications')} />
-        <ToggleRow label="Workspace invitations" active={preferences.workspaceInvitations} onToggle={() => toggle('workspaceInvitations')} />
-        <ToggleRow label="Meeting reminders" active={preferences.meetingReminders} onToggle={() => toggle('meetingReminders')} />
-        <ToggleRow label="Document activity" active={preferences.documentActivity} onToggle={() => toggle('documentActivity')} />
-        <ToggleRow label="Mention notifications" active={preferences.mentionNotifications} onToggle={() => toggle('mentionNotifications')} />
+        <ToggleRow
+          label="Email notifications"
+          active={preferences.emailNotifications}
+          onToggle={() => toggle('emailNotifications')}
+          onTest={() => testNotification('Email notifications')}
+        />
+        <ToggleRow
+          label="Workspace invitations"
+          active={preferences.workspaceInvitations}
+          onToggle={() => toggle('workspaceInvitations')}
+        />
+        <ToggleRow
+          label="Meeting reminders"
+          active={preferences.meetingReminders}
+          onToggle={() => toggle('meetingReminders')}
+          onTest={() => testNotification('Meeting notifications')}
+        />
+        <ToggleRow
+          label="Document activity"
+          active={preferences.documentActivity}
+          onToggle={() => toggle('documentActivity')}
+          onTest={() => testNotification('Document notifications')}
+        />
+        <ToggleRow
+          label="Mention notifications"
+          active={preferences.mentionNotifications}
+          onToggle={() => toggle('mentionNotifications')}
+          onTest={() => testNotification('Mention notifications')}
+        />
       </div>
     </>
   )
@@ -236,21 +363,51 @@ function NotificationsSection() {
 function AppearanceSection() {
   const [preferences, setPreferences] = useState(() => {
     const saved = window.localStorage.getItem('teamora-appearance')
-    return saved ? JSON.parse(saved) : { density: 'Comfortable', language: 'English', timeZone: 'UTC', dateFormat: 'MM/DD/YYYY' }
+    return saved
+      ? JSON.parse(saved)
+      : { density: 'Comfortable', language: 'English', timeZone: 'UTC', dateFormat: 'MM/DD/YYYY' }
   })
 
   useEffect(() => {
     window.localStorage.setItem('teamora-appearance', JSON.stringify(preferences))
+    document.documentElement.dataset.density = preferences.density.toLowerCase()
+    document.documentElement.lang =
+      preferences.language === 'Español' ? 'es' : preferences.language === 'Français' ? 'fr' : 'en'
+    document.documentElement.dataset.timeZone = preferences.timeZone
+    document.documentElement.dataset.dateFormat = preferences.dateFormat
   }, [preferences])
 
   return (
     <>
-      <SectionHeader title="Appearance" description="Adjust layout and regional preferences for your workspace experience." />
+      <SectionHeader
+        title="Appearance"
+        description="Adjust layout and regional preferences for your workspace experience."
+      />
       <div className="space-y-3">
-        <SelectRow label="Interface density" value={preferences.density} options={['Comfortable', 'Compact']} onChange={(value) => setPreferences((current) => ({ ...current, density: value }))} />
-        <SelectRow label="Language" value={preferences.language} options={['English', 'Español', 'Français']} onChange={(value) => setPreferences((current) => ({ ...current, language: value }))} />
-        <SelectRow label="Time zone" value={preferences.timeZone} options={['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo']} onChange={(value) => setPreferences((current) => ({ ...current, timeZone: value }))} />
-        <SelectRow label="Date format" value={preferences.dateFormat} options={['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']} onChange={(value) => setPreferences((current) => ({ ...current, dateFormat: value }))} />
+        <SelectRow
+          label="Interface density"
+          value={preferences.density}
+          options={['Comfortable', 'Compact']}
+          onChange={(value) => setPreferences((current) => ({ ...current, density: value }))}
+        />
+        <SelectRow
+          label="Language"
+          value={preferences.language}
+          options={['English', 'Español', 'Français']}
+          onChange={(value) => setPreferences((current) => ({ ...current, language: value }))}
+        />
+        <SelectRow
+          label="Time zone"
+          value={preferences.timeZone}
+          options={['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo']}
+          onChange={(value) => setPreferences((current) => ({ ...current, timeZone: value }))}
+        />
+        <SelectRow
+          label="Date format"
+          value={preferences.dateFormat}
+          options={['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']}
+          onChange={(value) => setPreferences((current) => ({ ...current, dateFormat: value }))}
+        />
       </div>
     </>
   )
@@ -260,13 +417,7 @@ function SettingsInput({ label, type = 'text', placeholder, value = '', onChange
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-[#374151]">{label}</span>
-      <Input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        readOnly={readOnly}
-      />
+      <Input type={type} value={value} onChange={onChange} placeholder={placeholder} readOnly={readOnly} />
     </label>
   )
 }
@@ -283,25 +434,42 @@ function SettingsAction({ icon: Icon = ShieldCheck, title, description, action, 
           <p className="mt-1 text-sm text-[#6B7280]">{description}</p>
         </div>
       </div>
-      <button type="button" onClick={onClick} className={`h-10 rounded-[14px] px-4 text-sm font-semibold transition duration-[180ms] ${danger ? 'text-[#EF4444] hover:bg-red-50' : 'text-[#7C3AED] hover:bg-[#F8F5FF]'}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`h-10 rounded-[14px] px-4 text-sm font-semibold transition duration-[180ms] ${danger ? 'text-[#EF4444] hover:bg-red-50' : 'text-[#7C3AED] hover:bg-[#F8F5FF]'}`}
+      >
         {action}
       </button>
     </div>
   )
 }
 
-function ToggleRow({ label, active = false, onToggle }) {
+function ToggleRow({ label, active = false, onToggle, onTest }) {
   return (
-    <div className="flex items-center justify-between rounded-[20px] border border-[#E5E7EB] p-4">
+    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#E5E7EB] p-4">
       <span className="text-sm font-medium text-[#111827]">{label}</span>
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`flex h-6 w-11 items-center rounded-full p-1 transition duration-[180ms] ${active ? 'bg-[#7C3AED]' : 'bg-[#E5E7EB]'}`}
-        aria-label={label}
-      >
-        <span className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${active ? 'translate-x-5' : 'translate-x-0'}`} />
-      </button>
+      <div className="flex items-center gap-2">
+        {active && onTest && (
+          <button
+            type="button"
+            onClick={onTest}
+            className="h-9 rounded-[12px] px-3 text-xs font-semibold text-[#7C3AED] transition hover:bg-[#F8F5FF]"
+          >
+            Test
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`flex h-6 w-11 items-center rounded-full p-1 transition duration-[180ms] ${active ? 'bg-[#7C3AED]' : 'bg-[#E5E7EB]'}`}
+          aria-label={label}
+        >
+          <span
+            className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${active ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      </div>
     </div>
   )
 }
@@ -310,9 +478,15 @@ function SelectRow({ label, value, options, onChange }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#E5E7EB] p-4">
       <span className="text-sm font-medium text-[#111827]">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="rounded-[14px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] outline-none focus:border-[#7C3AED]">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="rounded-[14px] border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] outline-none focus:border-[#7C3AED]"
+      >
         {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
+          <option key={option} value={option}>
+            {option}
+          </option>
         ))}
       </select>
     </div>

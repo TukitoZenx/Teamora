@@ -1,5 +1,20 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, Building2, CalendarDays, Clock3, MoreHorizontal, Pin, PinOff, Plus, Search, Star, Trash2, UserPlus, Users, X } from 'lucide-react'
+import {
+  ArrowRight,
+  Building2,
+  CalendarDays,
+  Clock3,
+  MoreHorizontal,
+  Pin,
+  PinOff,
+  Plus,
+  Search,
+  Star,
+  Trash2,
+  UserPlus,
+  Users,
+  X
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import WorkspaceLeaveDialog from './WorkspaceLeaveDialog'
 import WorkspaceModal from './WorkspaceModal'
@@ -36,6 +51,10 @@ const statusStyles = {
   removed: {
     label: 'Removed',
     className: 'border-red-200 bg-red-50 text-red-700'
+  },
+  trashed: {
+    label: 'Trash',
+    className: 'border-slate-300 bg-slate-100 text-slate-700'
   }
 }
 
@@ -129,7 +148,8 @@ export default function Dashboard({
         memberCount: workspace.memberCount || workspace.members?.length || 0,
         status: workspace.status || 'previously_joined',
         canOpen: Boolean(workspace.canOpen),
-        lastOpenedAt: openedMap[id] || workspace.lastSeenAt || workspace.updatedAt || workspace.leftAt || workspace.requestedAt
+        lastOpenedAt:
+          openedMap[id] || workspace.lastSeenAt || workspace.updatedAt || workspace.leftAt || workspace.requestedAt
       })
     })
 
@@ -160,6 +180,7 @@ export default function Dashboard({
       .filter((workspace) => {
         if (activeTab === 'Pinned' && !pinnedIds.includes(workspace.workspaceId)) return false
         if (activeTab === 'Favorites' && !favoriteIds.includes(workspace.workspaceId)) return false
+        if (activeTab === 'History' && workspace.status === 'active') return false
         return true
       })
       .filter((workspace) => {
@@ -189,7 +210,8 @@ export default function Dashboard({
 
     const nextMap = {
       ...openedMap,
-      [workspace.workspaceId]: openedMap[workspace.workspaceId] || workspace.lastOpenedAt || workspace.updatedAt || workspace.createdAt || 0
+      [workspace.workspaceId]:
+        openedMap[workspace.workspaceId] || workspace.lastOpenedAt || workspace.updatedAt || workspace.createdAt || 0
     }
     setOpenedMap(nextMap)
     localStorage.setItem('teamora-opened-workspaces', JSON.stringify(nextMap))
@@ -198,7 +220,9 @@ export default function Dashboard({
 
   const joinWorkspace = async (workspace) => {
     try {
-      const joinedWorkspace = await onJoinWorkspace(workspace.inviteLink || workspace.inviteCode || workspace.workspaceId)
+      const joinedWorkspace = await onJoinWorkspace(
+        workspace.inviteLink || workspace.inviteCode || workspace.workspaceId
+      )
       if (joinedWorkspace?._id) {
         openWorkspace({ ...joinedWorkspace, workspaceId: joinedWorkspace._id, canOpen: true })
       }
@@ -264,7 +288,9 @@ export default function Dashboard({
 
       <section className="mb-6 flex flex-col gap-3 border-b border-[#E5E7EB] pb-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">{getGreeting()}, {firstName} 👋</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">
+            {getGreeting()}, {firstName} 👋
+          </h1>
           <p className="mt-1 text-sm text-[#6B7280]">{subtitle}</p>
         </div>
         <div className="inline-flex items-center gap-2 text-sm font-medium text-[#6B7280]">
@@ -276,28 +302,33 @@ export default function Dashboard({
       <section className="space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="group relative min-w-0 lg:basis-[60%]">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF] transition group-focus-within:text-[#7C3AED]" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search workspaces..."
-            className="h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white pl-11 pr-24 text-sm text-[#111827] outline-none transition duration-[180ms] placeholder:text-[#9CA3AF] hover:border-[#7C3AED] focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={clearQuery}
-              className="absolute right-16 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-xl text-[#9CA3AF] transition hover:bg-[#F3F4F6] hover:text-[#111827]"
-              aria-label="Clear search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-          <kbd className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] px-2 py-1 text-[11px] font-semibold text-[#9CA3AF]">
-            Ctrl K
-          </kbd>
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF] transition group-focus-within:text-[#7C3AED]" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search workspaces..."
+              className="h-12 w-full rounded-2xl border border-[#E5E7EB] bg-white pl-11 pr-24 text-sm text-[#111827] outline-none transition duration-[180ms] placeholder:text-[#9CA3AF] hover:border-[#7C3AED] focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={clearQuery}
+                className="absolute right-16 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-xl text-[#9CA3AF] transition hover:bg-[#F3F4F6] hover:text-[#111827]"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            <kbd className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] px-2 py-1 text-[11px] font-semibold text-[#9CA3AF]">
+              Ctrl K
+            </kbd>
           </div>
-          <Button type="button" variant="secondary" className="h-12 border-[#7C3AED] px-5 text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white" onClick={() => setModalMode('join')}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-12 border-[#7C3AED] px-5 text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white"
+            onClick={() => setModalMode('join')}
+          >
             <UserPlus className="h-4 w-4" />
             Join Workspace
           </Button>
@@ -309,28 +340,36 @@ export default function Dashboard({
 
         <div className="flex flex-col gap-3 border-b border-[#E5E7EB] pb-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`relative rounded-full px-4 py-2 text-sm font-semibold transition duration-[180ms] ${
-                activeTab === tab
-                  ? 'bg-[#7C3AED] text-white'
-                  : 'bg-white text-[#6B7280] ring-1 ring-[#E5E7EB] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
-              }`}
-            >
-              {tab}
-              {activeTab === tab && <span className="absolute -bottom-[13px] left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[#7C3AED]" />}
-            </button>
-          ))}
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`relative rounded-full px-4 py-2 text-sm font-semibold transition duration-[180ms] ${
+                  activeTab === tab
+                    ? 'bg-[#7C3AED] text-white'
+                    : 'bg-white text-[#6B7280] ring-1 ring-[#E5E7EB] hover:bg-[#F8F5FF] hover:text-[#7C3AED]'
+                }`}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <span className="absolute -bottom-[13px] left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-[#7C3AED]" />
+                )}
+              </button>
+            ))}
           </div>
 
           <label className="flex h-10 w-full items-center justify-between rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#6B7280] md:w-44">
             <span>Sort</span>
-            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="bg-transparent text-right text-sm font-semibold text-[#111827] outline-none">
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              className="bg-transparent text-right text-sm font-semibold text-[#111827] outline-none"
+            >
               {sortOptions.map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </select>
           </label>
@@ -378,12 +417,7 @@ export default function Dashboard({
         />
       )}
 
-      {leaveWorkspace && (
-        <WorkspaceLeaveDialog
-          onCancel={() => setLeaveWorkspace(null)}
-          onLeave={handleLeave}
-        />
-      )}
+      {leaveWorkspace && <WorkspaceLeaveDialog onCancel={() => setLeaveWorkspace(null)} onLeave={handleLeave} />}
     </main>
   )
 }
@@ -439,9 +473,7 @@ function WorkspaceLauncherCard({
   }
 
   return (
-    <article
-      className="group relative rounded-[20px] border border-[#E5E7EB] bg-white p-5 shadow-sm transition duration-[180ms] ease-out hover:-translate-y-1 hover:border-[#7C3AED] hover:shadow-lg"
-    >
+    <article className="group relative rounded-[20px] border border-[#E5E7EB] bg-white p-5 shadow-sm transition duration-[180ms] ease-out hover:-translate-y-1 hover:border-[#7C3AED] hover:shadow-lg">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED]">
@@ -454,11 +486,19 @@ function WorkspaceLauncherCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <IconAction active={favorite} label={favorite ? 'Remove favorite' : 'Favorite workspace'} onClick={onFavorite}>
+          <IconAction
+            active={favorite}
+            label={favorite ? 'Remove favorite' : 'Favorite workspace'}
+            onClick={onFavorite}
+          >
             <Star className="h-4 w-4" fill={favorite ? 'currentColor' : 'none'} />
           </IconAction>
           <IconAction active={pinned} label={pinned ? 'Unpin workspace' : 'Pin workspace'} onClick={onPin}>
-            {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" fill={pinned ? 'currentColor' : 'none'} />}
+            {pinned ? (
+              <PinOff className="h-4 w-4" />
+            ) : (
+              <Pin className="h-4 w-4" fill={pinned ? 'currentColor' : 'none'} />
+            )}
           </IconAction>
           <button
             type="button"
@@ -486,7 +526,9 @@ function WorkspaceLauncherCard({
       </div>
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[#F3F4F6] pt-4">
-        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${status.className}`}>
+        <span
+          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${status.className}`}
+        >
           {status.label}
         </span>
 
@@ -508,13 +550,37 @@ function WorkspaceLauncherCard({
 
       {menuOpen && (
         <DropdownMenu className="right-5 top-14 z-20 w-56">
-          {isActive && <DropdownItem icon={ArrowRight} onClick={(event) => runMenuAction(event, onOpen)}>Open</DropdownItem>}
-          {isOwner && <DropdownItem icon={Building2} onClick={(event) => runMenuAction(event, onRename)}>Rename</DropdownItem>}
-          <DropdownItem icon={pinned ? PinOff : Pin} onClick={(event) => runMenuAction(event, onPin)}>{pinned ? 'Unpin' : 'Pin'}</DropdownItem>
-          <DropdownItem icon={Star} onClick={(event) => runMenuAction(event, onFavorite)}>{favorite ? 'Remove Favorite' : 'Favorite'}</DropdownItem>
-          {isActive && <DropdownItem icon={X} danger onClick={(event) => runMenuAction(event, onLeave)}>Leave Workspace</DropdownItem>}
-          {canRemoveFromHistory && <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onRemove)}>Remove from History</DropdownItem>}
-          {isOwner && <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onDelete)}>Delete Workspace</DropdownItem>}
+          {isActive && (
+            <DropdownItem icon={ArrowRight} onClick={(event) => runMenuAction(event, onOpen)}>
+              Open
+            </DropdownItem>
+          )}
+          {isOwner && (
+            <DropdownItem icon={Building2} onClick={(event) => runMenuAction(event, onRename)}>
+              Rename
+            </DropdownItem>
+          )}
+          <DropdownItem icon={pinned ? PinOff : Pin} onClick={(event) => runMenuAction(event, onPin)}>
+            {pinned ? 'Unpin' : 'Pin'}
+          </DropdownItem>
+          <DropdownItem icon={Star} onClick={(event) => runMenuAction(event, onFavorite)}>
+            {favorite ? 'Remove Favorite' : 'Favorite'}
+          </DropdownItem>
+          {isActive && (
+            <DropdownItem icon={X} danger onClick={(event) => runMenuAction(event, onLeave)}>
+              Leave Workspace
+            </DropdownItem>
+          )}
+          {canRemoveFromHistory && (
+            <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onRemove)}>
+              Remove from History
+            </DropdownItem>
+          )}
+          {isOwner && (
+            <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onDelete)}>
+              Delete Workspace
+            </DropdownItem>
+          )}
         </DropdownMenu>
       )}
     </article>
@@ -551,7 +617,12 @@ function DashboardEmptyState({ onCreate, onJoin }) {
         <Button type="button" onClick={onCreate}>
           Create Workspace
         </Button>
-        <Button type="button" variant="secondary" className="border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white" onClick={onJoin}>
+        <Button
+          type="button"
+          variant="secondary"
+          className="border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white"
+          onClick={onJoin}
+        >
           Join Workspace
         </Button>
       </div>

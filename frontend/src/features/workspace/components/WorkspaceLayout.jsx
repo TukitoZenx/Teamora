@@ -19,7 +19,9 @@ export default function WorkspaceLayout({
 }) {
   const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('teamora-sidebar-collapsed') === 'true')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('teamora-sidebar-collapsed') === 'true'
+  )
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const isOwner = getOwnerId(workspace)?.toString() === getUserId(user)?.toString()
@@ -77,6 +79,7 @@ export default function WorkspaceLayout({
         onBackToDashboard={onBackToDashboard}
         onWorkspaceSettings={() => selectItem('settings')}
         onLeaveWorkspace={requestLeaveWorkspace}
+        onSelectSection={selectItem}
       />
 
       <div className="hidden lg:block">
@@ -115,8 +118,18 @@ export default function WorkspaceLayout({
         </div>
       )}
 
-      <main className={`h-full overflow-y-auto pt-[72px] transition-[padding-left] duration-220 ease-in-out ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[240px]'}`}>
-        <div className={`mx-auto px-5 py-6 ${activeItem === 'calendar' ? 'max-w-none' : 'max-w-7xl'}`}>{children}</div>
+      <main
+        className={`h-full overflow-y-auto pt-[72px] transition-[padding-left] duration-220 ease-in-out ${sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[240px]'}`}
+      >
+        <div
+          className={`mx-auto ${
+            activeItem === 'meetings'
+              ? 'h-full max-w-none px-0 py-0'
+              : `px-5 py-6 ${activeItem === 'calendar' ? 'max-w-none' : 'max-w-7xl'}`
+          }`}
+        >
+          {children}
+        </div>
       </main>
 
       {showLeaveConfirm && (

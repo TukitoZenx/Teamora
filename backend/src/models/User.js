@@ -28,7 +28,7 @@ const recentWorkspaceSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'pending', 'previously_joined', 'removed'],
+      enum: ['active', 'pending', 'previously_joined', 'removed', 'trashed'],
       default: 'active',
       index: true
     },

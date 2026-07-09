@@ -5,7 +5,8 @@ export default function Modal({ children, onClose }) {
   const panelRef = useRef(null)
 
   useEffect(() => {
-    const firstInput = panelRef.current?.querySelector('input, textarea, select') || panelRef.current?.querySelector('button')
+    const firstInput =
+      panelRef.current?.querySelector('input, textarea, select') || panelRef.current?.querySelector('button')
     firstInput?.focus()
 
     const handleKeyDown = (event) => {
