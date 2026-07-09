@@ -2,11 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, Check, CheckCheck, Eye, UserPlus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
-import {
-  NOTIFICATIONS_CHANGED_EVENT,
-  readLocalNotifications,
-  writeLocalNotifications
-} from '../../utils/notifications'
+import { NOTIFICATIONS_CHANGED_EVENT, readLocalNotifications, writeLocalNotifications } from '../utils/notifications'
 
 const NOTIFICATIONS_CACHE_KEY = 'teamora-notifications-cache'
 
@@ -110,13 +106,15 @@ export default function NotificationButton() {
     setNotifications(nextNotifications)
     localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(nextNotifications))
     writeLocalNotifications(nextNotifications.filter((item) => item.local))
-    await Promise.allSettled(unread.filter((item) => !item.local).map((item) => api.patch(`/api/v1/workspaces/notifications/${item._id}/read`)))
+    await Promise.allSettled(
+      unread.filter((item) => !item.local).map((item) => api.patch(`/api/v1/workspaces/notifications/${item._id}/read`))
+    )
   }
 
   const resolveRequest = async (item, action) => {
     setBusyId(item._id)
     try {
-      await api.post(`/api/v1/workspaces/${item.workspaceId}/join-requests/${item.requestId}/${action}`)
+      await api.post(`/api/v1/workspaces/${item.workspaceId}/join-requests/${item.requestId}/${action}`, {})
       await markAsRead(item._id)
       await loadNotifications()
       window.dispatchEvent(new Event('teamora-workspaces-refresh'))
@@ -136,9 +134,7 @@ export default function NotificationButton() {
         aria-label="Notifications"
       >
         <Bell className="h-4 w-4" />
-        {unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5 rounded-full bg-[#7C3AED]" />
-        )}
+        {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5 rounded-full bg-[#7C3AED]" />}
       </button>
 
       {open && (
@@ -165,14 +161,19 @@ export default function NotificationButton() {
                 const isPending = item.requestStatus === 'pending'
 
                 return (
-                  <div key={item._id} className={`rounded-[14px] border p-3 ${!item.read ? 'border-[#DDD6FE] bg-[#F8F5FF]' : 'border-[#E5E7EB] bg-white'}`}>
+                  <div
+                    key={item._id}
+                    className={`rounded-[14px] border p-3 ${!item.read ? 'border-[#DDD6FE] bg-[#F8F5FF]' : 'border-[#E5E7EB] bg-white'}`}
+                  >
                     <div className="flex items-start gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#F3F4F6] text-[#7C3AED]">
                         {isWorkspaceEvent ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-semibold text-[#111827]">{isJoinRequest ? 'Join Request' : 'Workspace Update'}</p>
+                          <p className="truncate text-sm font-semibold text-[#111827]">
+                            {isJoinRequest ? 'Join Request' : 'Workspace Update'}
+                          </p>
                           {!item.read && <span className="h-2.5 w-2.5 rounded-full bg-[#7C3AED]" />}
                         </div>
                         <p className="mt-1 text-sm text-[#6B7280]">
@@ -204,7 +205,11 @@ export default function NotificationButton() {
                             </button>
                           </div>
                         ) : (
-                          <button type="button" onClick={() => markAsRead(item._id)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#7C3AED]">
+                          <button
+                            type="button"
+                            onClick={() => markAsRead(item._id)}
+                            className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#7C3AED]"
+                          >
                             <CheckCheck className="h-3.5 w-3.5" />
                             Mark as read
                           </button>
@@ -217,7 +222,11 @@ export default function NotificationButton() {
             )}
           </div>
 
-          <button type="button" onClick={loadNotifications} className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#E5E7EB] px-3 py-2 text-sm font-semibold text-[#374151]">
+          <button
+            type="button"
+            onClick={loadNotifications}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#E5E7EB] px-3 py-2 text-sm font-semibold text-[#374151]"
+          >
             <Eye className="h-4 w-4" />
             Refresh
           </button>

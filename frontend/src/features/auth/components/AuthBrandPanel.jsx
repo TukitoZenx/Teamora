@@ -25,9 +25,7 @@ export default function AuthBrandPanel() {
             <br />
             Ship faster.
           </p>
-          <p className="mt-6 text-sm leading-6 text-white/55">
-            Everything your team needs in one secure workspace.
-          </p>
+          <p className="mt-6 text-sm leading-6 text-white/55">Everything your team needs in one secure workspace.</p>
         </div>
 
         <div className="space-y-4 text-sm text-white/70">

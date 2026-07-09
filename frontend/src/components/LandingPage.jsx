@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText,
   Paintbrush,
@@ -22,75 +22,109 @@ import {
   Zap,
   Building2,
   Clock,
-  Database,
-  ArrowUpRight,
-  Lock,
-  ChevronDown,
-  Info,
-  Sliders
-} from 'lucide-react';
+  ChevronDown
+} from 'lucide-react'
 
 export default function LandingPage() {
-  const [activeTab, setActiveTab] = useState('docs');
-  const [showDemoModal, setShowDemoModal] = useState(false);
-  const [demoProgress, setDemoProgress] = useState(0);
-  const [demoPlaying, setDemoPlaying] = useState(false);
-  
+  const [activeTab, setActiveTab] = useState('docs')
+  const [showDemoModal, setShowDemoModal] = useState(false)
+  const [demoProgress, setDemoProgress] = useState(0)
+  const [demoPlaying, setDemoPlaying] = useState(false)
+
   // Accordion states for FAQ
-  const [openFaq, setOpenFaq] = useState(null);
+  const [openFaq, setOpenFaq] = useState(null)
 
   // Auto cycle tabs in the showcase section if the user isn't interacting
   useEffect(() => {
-    const tabs = ['docs', 'sheets', 'slides', 'whiteboard'];
+    const tabs = ['docs', 'sheets', 'slides', 'whiteboard']
     const interval = setInterval(() => {
       setActiveTab((prev) => {
-        const nextIndex = (tabs.indexOf(prev) + 1) % tabs.length;
-        return tabs[nextIndex];
-      });
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+        const nextIndex = (tabs.indexOf(prev) + 1) % tabs.length
+        return tabs[nextIndex]
+      })
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Simulating demo video playback
   useEffect(() => {
-    let timer;
+    let timer
     if (showDemoModal && demoPlaying) {
       timer = setInterval(() => {
         setDemoProgress((p) => {
           if (p >= 100) {
-            setDemoPlaying(false);
-            return 0;
+            setDemoPlaying(false)
+            return 0
           }
-          return p + 1;
-        });
-      }, 100);
+          return p + 1
+        })
+      }, 100)
     }
-    return () => clearInterval(timer);
-  }, [showDemoModal, demoPlaying]);
+    return () => clearInterval(timer)
+  }, [showDemoModal, demoPlaying])
 
   const toggleFaq = (index) => {
-    setOpenFaq(openFaq === index ? null : index);
-  };
+    setOpenFaq(openFaq === index ? null : index)
+  }
 
   const features = [
     { id: 'docs', title: 'Documents', desc: 'Create and edit documents together.', icon: FileText },
     { id: 'whiteboard', title: 'Whiteboard', desc: 'Brainstorm with your team.', icon: Paintbrush },
-    { id: 'sheets', title: 'Spreadsheet', desc: 'Analyze data collaboratively.', icon: TableProperties },
-    { id: 'slides', title: 'Presentation', desc: 'Build presentations together.', icon: Presentation },
+    {
+      id: 'sheets',
+      title: 'Spreadsheet',
+      desc: 'Analyze data collaboratively.',
+      icon: TableProperties
+    },
+    {
+      id: 'slides',
+      title: 'Presentation',
+      desc: 'Build presentations together.',
+      icon: Presentation
+    },
     { id: 'meetings', title: 'Meetings', desc: 'Video calls and screen sharing.', icon: Video },
-    { id: 'files', title: 'Shared Files', desc: 'Store and share project resources.', icon: Folder },
+    {
+      id: 'files',
+      title: 'Shared Files',
+      desc: 'Store and share project resources.',
+      icon: Folder
+    },
     { id: 'tasks', title: 'Tasks', desc: 'Manage work across your team.', icon: CheckSquare },
     { id: 'calendar', title: 'Calendar', desc: 'Plan meetings and deadlines.', icon: Calendar }
-  ];
+  ]
 
   const whys = [
-    { title: 'Realtime Collaboration', desc: 'All changes are broadcast instantly with sub-100ms synchronization across all clients.', icon: Zap },
-    { title: 'Autosave Everywhere', desc: 'Every keystroke and cursor stroke is saved to the workspace history automatically.', icon: RefreshCw },
-    { title: 'Secure Access Control', desc: 'Enterprise-grade user identity, role provisioning, and workspace privacy permissions.', icon: Shield },
-    { title: 'Screen & Video Sync', desc: 'Present your workspace or share your screen directly into the active room in one click.', icon: Layers },
-    { title: 'Unified Data Sync', desc: 'Manage files, folders, code templates, and notes together inside single folders.', icon: Folder },
-    { title: 'Granular Version Control', desc: 'Roll back files, cells, and slides to any historical savepoint instantly.', icon: Clock }
-  ];
+    {
+      title: 'Realtime Collaboration',
+      desc: 'All changes are broadcast instantly with sub-100ms synchronization across all clients.',
+      icon: Zap
+    },
+    {
+      title: 'Autosave Everywhere',
+      desc: 'Every keystroke and cursor stroke is saved to the workspace history automatically.',
+      icon: RefreshCw
+    },
+    {
+      title: 'Secure Access Control',
+      desc: 'Enterprise-grade user identity, role provisioning, and workspace privacy permissions.',
+      icon: Shield
+    },
+    {
+      title: 'Screen & Video Sync',
+      desc: 'Present your workspace or share your screen directly into the active room in one click.',
+      icon: Layers
+    },
+    {
+      title: 'Unified Data Sync',
+      desc: 'Manage files, folders, code templates, and notes together inside single folders.',
+      icon: Folder
+    },
+    {
+      title: 'Granular Version Control',
+      desc: 'Roll back files, cells, and slides to any historical savepoint instantly.',
+      icon: Clock
+    }
+  ]
 
   const mockScreenshots = [
     {
@@ -163,7 +197,7 @@ export default function LandingPage() {
         </div>
       )
     }
-  ];
+  ]
 
   const pricing = [
     {
@@ -171,7 +205,13 @@ export default function LandingPage() {
       price: '$0',
       period: 'forever',
       desc: 'Essential real-time features for individual creators.',
-      features: ['Up to 3 workspaces', 'Basic editor tools', 'Realtime sync (100ms)', '7-day version history', 'Up to 3 meeting members'],
+      features: [
+        'Up to 3 workspaces',
+        'Basic editor tools',
+        'Realtime sync (100ms)',
+        '7-day version history',
+        'Up to 3 meeting members'
+      ],
       btnText: 'Get Started',
       accent: false
     },
@@ -180,7 +220,15 @@ export default function LandingPage() {
       price: '$12',
       period: 'per user / month',
       desc: 'Advanced tools and resources for growing collaboration teams.',
-      features: ['Unlimited workspaces', 'Full application suite', 'Sub-50ms sync prioritization', 'Infinite version history', 'Up to 25 meeting members', 'Custom role permissions', 'Priority support'],
+      features: [
+        'Unlimited workspaces',
+        'Full application suite',
+        'Sub-50ms sync prioritization',
+        'Infinite version history',
+        'Up to 25 meeting members',
+        'Custom role permissions',
+        'Priority support'
+      ],
       btnText: 'Start Pro Trial',
       accent: true
     },
@@ -189,34 +237,40 @@ export default function LandingPage() {
       price: 'Custom',
       period: 'tailored pricing',
       desc: 'Deep security and administration tools for organizations.',
-      features: ['Dedicated server hosting', 'SAML & SSO authentication', 'Custom API access integrations', '24/7 designated support team', '99.99% service SLA contract', 'Custom compliance logs'],
+      features: [
+        'Dedicated server hosting',
+        'SAML & SSO authentication',
+        'Custom API access integrations',
+        '24/7 designated support team',
+        '99.99% service SLA contract',
+        'Custom compliance logs'
+      ],
       btnText: 'Contact Sales',
       accent: false
     }
-  ];
+  ]
 
   const faqs = [
     {
-      q: "What is Teamora and how is it organized?",
-      a: "Teamora is a unified digital workspace designed for high-performance multiplayer collaboration. Inside a single space, teams can concurrently build text documents, draw on whiteboards, compile spreadsheet data, compile slide templates, and initiate audio/video calls without context switching."
+      q: 'What is Teamora and how is it organized?',
+      a: 'Teamora is a unified digital workspace designed for high-performance multiplayer collaboration. Inside a single space, teams can concurrently build text documents, draw on whiteboards, compile spreadsheet data, compile slide templates, and initiate audio/video calls without context switching.'
     },
     {
-      q: "Does Teamora support concurrent document edits?",
-      a: "Yes! Every single file in Teamora is completely synchronized in real time using socket streams. You will see cursors, highlights, cells, slides, and vectors update in real-time as other team members make modifications."
+      q: 'Does Teamora support concurrent document edits?',
+      a: 'Yes! Every single file in Teamora is completely synchronized in real time using socket streams. You will see cursors, highlights, cells, slides, and vectors update in real-time as other team members make modifications.'
     },
     {
-      q: "Is there built-in version history for assets?",
-      a: "Absolutely. Teamora records version snapshots of your active sheets, documents, and slides. You can review exact timestamps of edits, identify contributors, and roll back any file to an earlier state in one click."
+      q: 'Is there built-in version history for assets?',
+      a: 'Absolutely. Teamora records version snapshots of your active sheets, documents, and slides. You can review exact timestamps of edits, identify contributors, and roll back any file to an earlier state in one click.'
     },
     {
-      q: "How secure is my team workspace information?",
-      a: "Teamora uses industry-standard authentication systems. All workspace databases, file resources, and socket transmissions are securely hosted, and workspaces can only be joined via explicitly authorized invite structures or secure Room IDs."
+      q: 'How secure is my team workspace information?',
+      a: 'Teamora uses industry-standard authentication systems. All workspace databases, file resources, and socket transmissions are securely hosted, and workspaces can only be joined via explicitly authorized invite structures or secure Room IDs.'
     }
-  ];
+  ]
 
   return (
     <div className="bg-white text-neutral-900 font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300 w-full relative">
-      
       {/* Top Header Navigation - Sticky and translucent */}
       <header className="sticky top-0 inset-x-0 h-16 bg-white/80 backdrop-blur-md border-b border-neutral-100 z-50 flex items-center justify-between px-6 md:px-12 w-full">
         <div className="flex items-center gap-3">
@@ -225,21 +279,39 @@ export default function LandingPage() {
           </div>
           <span className="font-extrabold text-lg tracking-tight">Teamora</span>
         </div>
-        
+
         <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-wider text-neutral-500">
-          <a href="#features" className="hover:text-neutral-950 transition-colors">Features</a>
-          <a href="#collaboration" className="hover:text-neutral-950 transition-colors">Showcase</a>
-          <a href="#why" className="hover:text-neutral-950 transition-colors">Why Teamora</a>
-          <a href="#screenshots" className="hover:text-neutral-950 transition-colors">Previews</a>
-          <a href="#pricing" className="hover:text-neutral-950 transition-colors">Pricing</a>
-          <a href="#faq" className="hover:text-neutral-950 transition-colors">FAQ</a>
+          <a href="#features" className="hover:text-neutral-950 transition-colors">
+            Features
+          </a>
+          <a href="#collaboration" className="hover:text-neutral-950 transition-colors">
+            Showcase
+          </a>
+          <a href="#why" className="hover:text-neutral-950 transition-colors">
+            Why Teamora
+          </a>
+          <a href="#screenshots" className="hover:text-neutral-950 transition-colors">
+            Previews
+          </a>
+          <a href="#pricing" className="hover:text-neutral-950 transition-colors">
+            Pricing
+          </a>
+          <a href="#faq" className="hover:text-neutral-950 transition-colors">
+            FAQ
+          </a>
         </nav>
 
         <div className="flex items-center gap-4">
-          <Link to="/signin" className="text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 hover:bg-neutral-50 rounded-xl transition-colors cursor-pointer text-neutral-600 hover:text-neutral-900">
+          <Link
+            to="/signin"
+            className="text-xs font-extrabold uppercase tracking-wider px-4 py-2.5 hover:bg-neutral-50 rounded-xl transition-colors cursor-pointer text-neutral-600 hover:text-neutral-900"
+          >
             Sign In
           </Link>
-          <Link to="/signup" className="text-xs font-extrabold uppercase tracking-wider text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer">
+          <Link
+            to="/signup"
+            className="text-xs font-extrabold uppercase tracking-wider text-white bg-neutral-900 hover:bg-neutral-800 px-4 py-2.5 rounded-xl transition-all shadow-xs cursor-pointer"
+          >
             Get Started
           </Link>
         </div>
@@ -263,8 +335,11 @@ export default function LandingPage() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="text-4.5xl md:text-7xl font-bold text-neutral-900 tracking-tight leading-[1.05] mb-6"
         >
-          One Workspace.<br />
-          <span className="bg-gradient-to-r from-neutral-950 via-indigo-600 to-indigo-700 bg-clip-text text-transparent">Infinite Collaboration.</span>
+          One Workspace.
+          <br />
+          <span className="bg-gradient-to-r from-neutral-950 via-indigo-600 to-indigo-700 bg-clip-text text-transparent">
+            Infinite Collaboration.
+          </span>
         </motion.h1>
 
         <motion.p
@@ -282,20 +357,26 @@ export default function LandingPage() {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="flex flex-wrap justify-center gap-4"
         >
-          <Link to="/signup" className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md hover:shadow-indigo-600/10 cursor-pointer flex items-center gap-2">
+          <Link
+            to="/signup"
+            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md hover:shadow-indigo-600/10 cursor-pointer flex items-center gap-2"
+          >
             <span>Get Started</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
-          <Link to="/signin" className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-900 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-xl transition-all cursor-pointer">
+          <Link
+            to="/signin"
+            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-900 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-xl transition-all cursor-pointer"
+          >
             Join Workspace
           </Link>
 
           <button
             onClick={() => {
-              setShowDemoModal(true);
-              setDemoPlaying(true);
-              setDemoProgress(0);
+              setShowDemoModal(true)
+              setDemoPlaying(true)
+              setDemoProgress(0)
             }}
             className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-600 hover:text-neutral-950 bg-neutral-50 hover:bg-neutral-100 rounded-xl transition-all cursor-pointer flex items-center gap-2 border border-neutral-150"
           >
@@ -306,15 +387,22 @@ export default function LandingPage() {
       </section>
 
       {/* Feature Section */}
-      <section id="features" className="py-24 px-6 md:px-12 max-w-7xl mx-auto border-t border-neutral-100 w-full scroll-mt-16">
+      <section
+        id="features"
+        className="py-24 px-6 md:px-12 max-w-7xl mx-auto border-t border-neutral-100 w-full scroll-mt-16"
+      >
         <div className="text-center max-w-xl mx-auto mb-16">
-          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Built for modern product teams</h2>
-          <p className="text-neutral-500 mt-2 text-sm">Everything you need in a single platform, styled with minimal elegance.</p>
+          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">
+            Built for modern product teams
+          </h2>
+          <p className="text-neutral-500 mt-2 text-sm">
+            Everything you need in a single platform, styled with minimal elegance.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feat) => {
-            const Icon = feat.icon;
+            const Icon = feat.icon
             return (
               <div
                 key={feat.id}
@@ -326,15 +414,17 @@ export default function LandingPage() {
                 <h3 className="font-bold text-sm text-neutral-900 mb-1.5">{feat.title}</h3>
                 <p className="text-xs text-neutral-500 leading-relaxed">{feat.desc}</p>
               </div>
-            );
+            )
           })}
         </div>
       </section>
 
       {/* Collaboration Section */}
-      <section id="collaboration" className="py-24 bg-neutral-50 border-y border-neutral-100 px-6 md:px-12 w-full scroll-mt-16">
+      <section
+        id="collaboration"
+        className="py-24 bg-neutral-50 border-y border-neutral-100 px-6 md:px-12 w-full scroll-mt-16"
+      >
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
           <div className="lg:col-span-4 flex flex-col justify-center">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100/50 text-[10px] font-bold text-indigo-650 uppercase tracking-wider mb-4 w-fit">
               <Users className="w-3.5 h-3.5" />
@@ -344,7 +434,8 @@ export default function LandingPage() {
               All editing. All at once.
             </h2>
             <p className="text-neutral-500 text-sm leading-relaxed mb-6">
-              Watch teammates collaborate on different assets within the exact same workspace. No context switching, zero latency, total alignment.
+              Watch teammates collaborate on different assets within the exact same workspace. No context switching,
+              zero latency, total alignment.
             </p>
 
             <div className="flex flex-col gap-3.5">
@@ -354,13 +445,20 @@ export default function LandingPage() {
                 { name: 'Charlie', task: 'Pitch Deck.pptx', color: 'bg-purple-500' },
                 { name: 'David', task: 'Whiteboard Canvas', color: 'bg-amber-500' }
               ].map((member, i) => (
-                <div key={i} className="flex items-center gap-3 bg-white border border-neutral-150 p-2.5 rounded-xl shadow-xs">
-                  <div className={`w-8 h-8 rounded-full ${member.color} flex items-center justify-center text-white font-bold text-xs shadow-xs`}>
+                <div
+                  key={i}
+                  className="flex items-center gap-3 bg-white border border-neutral-150 p-2.5 rounded-xl shadow-xs"
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full ${member.color} flex items-center justify-center text-white font-bold text-xs shadow-xs`}
+                  >
                     {member.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-neutral-900">{member.name}</p>
-                    <p className="text-[10px] text-neutral-400">editing <span className="font-semibold text-neutral-600">{member.task}</span></p>
+                    <p className="text-[10px] text-neutral-400">
+                      editing <span className="font-semibold text-neutral-600">{member.task}</span>
+                    </p>
                   </div>
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-650 animate-ping mr-2" />
                 </div>
@@ -371,18 +469,22 @@ export default function LandingPage() {
           <div className="lg:col-span-8">
             {/* Visual Canvas Mockup with Interactive Tabs */}
             <div className="bg-white border border-neutral-200 rounded-2xl shadow-xl overflow-hidden">
-              
               {/* Fake Window Header */}
               <div className="h-12 bg-neutral-900 text-white flex items-center justify-between px-4 border-b border-neutral-850">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
                   <div className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
                   <div className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
-                  <span className="text-[10px] font-semibold text-neutral-400 ml-4 bg-neutral-800 px-3 py-1 rounded-md">teamora.com/workspace/marketing-q3</span>
+                  <span className="text-[10px] font-semibold text-neutral-400 ml-4 bg-neutral-800 px-3 py-1 rounded-md">
+                    teamora.com/workspace/marketing-q3
+                  </span>
                 </div>
                 <div className="flex items-center -space-x-1.5">
                   {['Alice', 'Bob', 'Charlie', 'David'].map((n, i) => (
-                    <div key={i} className="w-6 h-6 rounded-full bg-neutral-850 border border-neutral-900 flex items-center justify-center text-[9px] font-extrabold text-neutral-300">
+                    <div
+                      key={i}
+                      className="w-6 h-6 rounded-full bg-neutral-850 border border-neutral-900 flex items-center justify-center text-[9px] font-extrabold text-neutral-300"
+                    >
                       {n.charAt(0)}
                     </div>
                   ))}
@@ -397,8 +499,8 @@ export default function LandingPage() {
                   { id: 'slides', label: 'Pitch Deck.pptx', icon: Presentation },
                   { id: 'whiteboard', label: 'Whiteboard Canvas', icon: Paintbrush }
                 ].map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
+                  const Icon = tab.icon
+                  const isActive = activeTab === tab.id
                   return (
                     <button
                       key={tab.id}
@@ -412,7 +514,7 @@ export default function LandingPage() {
                       <Icon className="w-3.5 h-3.5" />
                       <span>{tab.label}</span>
                     </button>
-                  );
+                  )
                 })}
               </div>
 
@@ -429,17 +531,22 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="flex items-center gap-2 mb-4">
-                          <span className="text-[10px] font-mono px-2 py-0.5 bg-neutral-100 rounded text-neutral-500">Document Editor</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 bg-neutral-100 rounded text-neutral-500">
+                            Document Editor
+                          </span>
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                         </div>
-                        <h4 className="font-extrabold text-base text-neutral-900 mb-2">Teamora Product Launch Strategy</h4>
+                        <h4 className="font-extrabold text-base text-neutral-900 mb-2">
+                          Teamora Product Launch Strategy
+                        </h4>
                         <div className="text-xs text-neutral-600 space-y-2 leading-relaxed">
                           <p>
-                            We need a minimal B&W design to make our collaboration feel stark, distraction-free, and premium.
+                            We need a minimal B&W design to make our collaboration feel stark, distraction-free, and
+                            premium.
                             <motion.span
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}
-                              transition={{ repeat: Infinity, duration: 0.8, ease: "steps(2)" }}
+                              transition={{ repeat: Infinity, duration: 0.8, ease: 'steps(2)' }}
                               className="inline-block w-1.5 h-4 bg-emerald-500 ml-0.5 align-middle"
                             />
                           </p>
@@ -464,10 +571,12 @@ export default function LandingPage() {
                       className="h-full"
                     >
                       <div className="flex items-center gap-2 mb-4">
-                        <span className="text-[10px] font-mono px-2 py-0.5 bg-neutral-100 rounded text-neutral-500">Spreadsheet Canvas</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 bg-neutral-100 rounded text-neutral-500">
+                          Spreadsheet Canvas
+                        </span>
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
                       </div>
-                      
+
                       <div className="border border-neutral-150 rounded-xl overflow-hidden text-xs">
                         <table className="w-full text-left border-collapse">
                           <thead>
@@ -480,13 +589,17 @@ export default function LandingPage() {
                           </thead>
                           <tbody>
                             <tr className="border-b border-neutral-100">
-                              <td className="p-2 font-mono text-[10px] bg-neutral-50 text-neutral-400 border-r border-neutral-150 text-center">1</td>
+                              <td className="p-2 font-mono text-[10px] bg-neutral-50 text-neutral-400 border-r border-neutral-150 text-center">
+                                1
+                              </td>
                               <td className="p-2 border-r border-neutral-100">Marketing Launch</td>
                               <td className="p-2 border-r border-neutral-100">$25,000</td>
                               <td className="p-2">$23,500</td>
                             </tr>
                             <tr>
-                              <td className="p-2 font-mono text-[10px] bg-neutral-50 text-neutral-400 border-r border-neutral-150 text-center">2</td>
+                              <td className="p-2 font-mono text-[10px] bg-neutral-50 text-neutral-400 border-r border-neutral-150 text-center">
+                                2
+                              </td>
                               <td className="p-2 border-r border-neutral-100">Development Staging</td>
                               <td className="p-2 border-r border-neutral-100 bg-blue-50/50 relative border-2 border-blue-500">
                                 <span>$45,000</span>
@@ -518,12 +631,14 @@ export default function LandingPage() {
                           <div className="w-2 h-2 rounded-full bg-indigo-500" />
                           <span className="text-[8px] text-neutral-400 font-mono">Slide 1 of 8</span>
                         </div>
-                        
+
                         <div className="my-auto">
                           <h5 className="font-extrabold text-xs tracking-tight">Teamora Presentation Deck</h5>
-                          <p className="text-[9px] text-neutral-400 mt-1">Stark design for absolute clarity in alignment.</p>
+                          <p className="text-[9px] text-neutral-400 mt-1">
+                            Stark design for absolute clarity in alignment.
+                          </p>
                         </div>
-                        
+
                         <div className="h-1 w-full bg-neutral-800 rounded-full overflow-hidden">
                           <div className="h-full w-1/3 bg-indigo-500" />
                         </div>
@@ -548,10 +663,10 @@ export default function LandingPage() {
                           strokeLinecap="round"
                           initial={{ pathLength: 0 }}
                           animate={{ pathLength: 1 }}
-                          transition={{ duration: 3, repeat: Infinity, repeatType: "reverse" }}
+                          transition={{ duration: 3, repeat: Infinity, repeatType: 'reverse' }}
                         />
                       </svg>
-                      
+
                       <motion.div
                         animate={{
                           x: [50, 100, -50, 50],
@@ -572,23 +687,25 @@ export default function LandingPage() {
                   )}
                 </AnimatePresence>
               </div>
-
             </div>
           </div>
-
         </div>
       </section>
 
       {/* Why Teamora Section */}
       <section id="why" className="py-24 px-6 md:px-12 max-w-7xl mx-auto w-full scroll-mt-16">
         <div className="text-center max-w-xl mx-auto mb-16">
-          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Why product teams choose Teamora</h2>
-          <p className="text-neutral-500 mt-2 text-sm">Experience smooth animations, cloud sync, and highly secure access control.</p>
+          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">
+            Why product teams choose Teamora
+          </h2>
+          <p className="text-neutral-500 mt-2 text-sm">
+            Experience smooth animations, cloud sync, and highly secure access control.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {whys.map((hl, i) => {
-            const Icon = hl.icon;
+            const Icon = hl.icon
             return (
               <div
                 key={i}
@@ -604,29 +721,39 @@ export default function LandingPage() {
                   <p className="text-xs text-neutral-500 leading-relaxed">{hl.desc}</p>
                 </div>
               </div>
-            );
+            )
           })}
         </div>
       </section>
 
       {/* Screenshots Section */}
-      <section id="screenshots" className="py-24 bg-neutral-50 border-y border-neutral-100 px-6 md:px-12 w-full scroll-mt-16">
+      <section
+        id="screenshots"
+        className="py-24 bg-neutral-50 border-y border-neutral-100 px-6 md:px-12 w-full scroll-mt-16"
+      >
         <div className="max-w-7xl mx-auto w-full">
           <div className="text-center max-w-xl mx-auto mb-16">
-            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Stark design. Unrivaled experience.</h2>
-            <p className="text-neutral-500 mt-2 text-sm">Take a closer look at the minimal, distraction-free workspaces.</p>
+            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">
+              Stark design. Unrivaled experience.
+            </h2>
+            <p className="text-neutral-500 mt-2 text-sm">
+              Take a closer look at the minimal, distraction-free workspaces.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {mockScreenshots.map((snap, i) => (
-              <div key={i} className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group">
+              <div
+                key={i}
+                className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
+              >
                 <div className="mb-6">
-                  <h3 className="font-bold text-sm text-neutral-950 group-hover:text-indigo-650 transition-colors">{snap.title}</h3>
+                  <h3 className="font-bold text-sm text-neutral-950 group-hover:text-indigo-650 transition-colors">
+                    {snap.title}
+                  </h3>
                   <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">{snap.type}</span>
                 </div>
-                <div className="aspect-[4/3] rounded-xl overflow-hidden relative">
-                  {snap.layout}
-                </div>
+                <div className="aspect-[4/3] rounded-xl overflow-hidden relative">{snap.layout}</div>
               </div>
             ))}
           </div>
@@ -636,7 +763,9 @@ export default function LandingPage() {
       {/* Pricing Section */}
       <section id="pricing" className="py-24 px-6 md:px-12 max-w-7xl mx-auto w-full scroll-mt-16">
         <div className="text-center max-w-xl mx-auto mb-16">
-          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Simple, transparent pricing</h2>
+          <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">
+            Simple, transparent pricing
+          </h2>
           <p className="text-neutral-500 mt-2 text-sm">Choose the tier that matches your collaboration volume.</p>
         </div>
 
@@ -655,17 +784,25 @@ export default function LandingPage() {
                   Popular
                 </div>
               )}
-              
+
               <div>
                 <div className="mb-6">
-                  <span className={`text-[10px] font-extrabold uppercase tracking-widest ${card.accent ? 'text-indigo-400' : 'text-neutral-400'}`}>
+                  <span
+                    className={`text-[10px] font-extrabold uppercase tracking-widest ${card.accent ? 'text-indigo-400' : 'text-neutral-400'}`}
+                  >
                     {card.tier}
                   </span>
                   <div className="flex items-baseline gap-1 mt-2">
                     <span className="text-4xl font-bold tracking-tight">{card.price}</span>
-                    <span className={`text-[10px] font-semibold ${card.accent ? 'text-neutral-400' : 'text-neutral-500'}`}>/{card.period}</span>
+                    <span
+                      className={`text-[10px] font-semibold ${card.accent ? 'text-neutral-400' : 'text-neutral-500'}`}
+                    >
+                      /{card.period}
+                    </span>
                   </div>
-                  <p className={`text-xs mt-3 leading-relaxed ${card.accent ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                  <p
+                    className={`text-xs mt-3 leading-relaxed ${card.accent ? 'text-neutral-300' : 'text-neutral-500'}`}
+                  >
                     {card.desc}
                   </p>
                 </div>
@@ -701,13 +838,15 @@ export default function LandingPage() {
       <section id="faq" className="py-24 bg-neutral-50 border-t border-neutral-100 px-6 md:px-12 w-full scroll-mt-16">
         <div className="max-w-3xl mx-auto w-full">
           <div className="text-center mb-16">
-            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">Frequently Asked Questions</h2>
+            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-neutral-900">
+              Frequently Asked Questions
+            </h2>
             <p className="text-neutral-500 mt-2 text-sm">Have details to clarify? Explore typical responses here.</p>
           </div>
 
           <div className="space-y-4">
             {faqs.map((item, idx) => {
-              const isOpen = openFaq === idx;
+              const isOpen = openFaq === idx
               return (
                 <div
                   key={idx}
@@ -718,7 +857,9 @@ export default function LandingPage() {
                     className="w-full flex items-center justify-between p-5 text-left font-bold text-neutral-950 hover:text-indigo-650 transition-colors cursor-pointer"
                   >
                     <span className="text-xs md:text-sm tracking-tight">{item.q}</span>
-                    <ChevronDown className={`w-4.5 h-4.5 text-neutral-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-indigo-650' : ''}`} />
+                    <ChevronDown
+                      className={`w-4.5 h-4.5 text-neutral-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-indigo-650' : ''}`}
+                    />
                   </button>
 
                   <AnimatePresence initial={false}>
@@ -736,7 +877,7 @@ export default function LandingPage() {
                     )}
                   </AnimatePresence>
                 </div>
-              );
+              )
             })}
           </div>
         </div>
@@ -745,7 +886,6 @@ export default function LandingPage() {
       {/* Footer Section */}
       <footer className="bg-neutral-950 border-t border-neutral-900 text-neutral-450 py-16 px-6 md:px-12 w-full">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 border-b border-neutral-900 pb-12 mb-8">
-          
           <div className="md:col-span-4 flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm shrink-0">
@@ -754,31 +894,49 @@ export default function LandingPage() {
               <span className="font-extrabold text-white text-base tracking-tight">Teamora</span>
             </div>
             <p className="text-neutral-500 text-xs leading-relaxed max-w-sm">
-              The premium, minimal collaboration platform designed to keep multiplayer product teams highly focused and aligned.
+              The premium, minimal collaboration platform designed to keep multiplayer product teams highly focused and
+              aligned.
             </p>
           </div>
 
           <div className="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
             <div className="flex flex-col gap-3">
               <span className="text-white text-[10px] font-extrabold uppercase tracking-widest">Product</span>
-              <a href="#features" className="text-xs text-neutral-500 hover:text-white transition-colors">Features</a>
-              <a href="#collaboration" className="text-xs text-neutral-500 hover:text-white transition-colors">Showcase</a>
-              <a href="#pricing" className="text-xs text-neutral-500 hover:text-white transition-colors">Pricing</a>
+              <a href="#features" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Features
+              </a>
+              <a href="#collaboration" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Showcase
+              </a>
+              <a href="#pricing" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Pricing
+              </a>
             </div>
             <div className="flex flex-col gap-3">
               <span className="text-white text-[10px] font-extrabold uppercase tracking-widest">Resources</span>
-              <a href="#faq" className="text-xs text-neutral-500 hover:text-white transition-colors">FAQ</a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">Changelog</a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">Status Logs</a>
+              <a href="#faq" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                FAQ
+              </a>
+              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Changelog
+              </a>
+              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Status Logs
+              </a>
             </div>
             <div className="flex flex-col gap-3">
               <span className="text-white text-[10px] font-extrabold uppercase tracking-widest">Company</span>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">Security</a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">Terms of Use</a>
+              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Security
+              </a>
+              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Privacy Policy
+              </a>
+              <a href="#" className="text-xs text-neutral-500 hover:text-white transition-colors">
+                Terms of Use
+              </a>
             </div>
           </div>
-
         </div>
 
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-neutral-600 font-bold uppercase tracking-wider">
@@ -802,7 +960,7 @@ export default function LandingPage() {
               className="absolute inset-0 bg-neutral-950/60 backdrop-blur-xs"
               onClick={() => setShowDemoModal(false)}
             />
-            
+
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -824,7 +982,6 @@ export default function LandingPage() {
 
               {/* Demo Mock App Interface */}
               <div className="p-6 bg-neutral-50 flex-1 relative min-h-[360px] flex flex-col justify-between">
-                
                 {/* Active Walkthrough visual step */}
                 <div className="flex-1 flex items-center justify-center p-4 text-center">
                   <AnimatePresence mode="wait">
@@ -839,7 +996,8 @@ export default function LandingPage() {
                         <Building2 className="w-12 h-12 text-indigo-650 mx-auto mb-4" />
                         <h4 className="font-extrabold text-lg text-neutral-900 mb-2">1. Dedicated Workspaces</h4>
                         <p className="text-xs text-neutral-500 leading-relaxed">
-                          Workspaces hold your documents, templates, tasks, meetings, and shared resources in one place. Users can create a workspace or join via Room IDs easily.
+                          Workspaces hold your documents, templates, tasks, meetings, and shared resources in one place.
+                          Users can create a workspace or join via Room IDs easily.
                         </p>
                       </motion.div>
                     )}
@@ -853,9 +1011,12 @@ export default function LandingPage() {
                         className="max-w-md"
                       >
                         <Zap className="w-12 h-12 text-indigo-650 mx-auto mb-4" />
-                        <h4 className="font-extrabold text-lg text-neutral-900 mb-2">2. Realtime Multiplayer Collaboration</h4>
+                        <h4 className="font-extrabold text-lg text-neutral-900 mb-2">
+                          2. Realtime Multiplayer Collaboration
+                        </h4>
                         <p className="text-xs text-neutral-500 leading-relaxed">
-                          Watch edits update in real-time as users write, design, and code together. Integrated cursor tracking shows you exactly what your colleagues are editing.
+                          Watch edits update in real-time as users write, design, and code together. Integrated cursor
+                          tracking shows you exactly what your colleagues are editing.
                         </p>
                       </motion.div>
                     )}
@@ -871,7 +1032,8 @@ export default function LandingPage() {
                         <Users className="w-12 h-12 text-indigo-650 mx-auto mb-4" />
                         <h4 className="font-extrabold text-lg text-neutral-900 mb-2">3. Screen Sharing & Meetings</h4>
                         <p className="text-xs text-neutral-500 leading-relaxed">
-                          Host meetings, share screens, plan timelines in calendars, and coordinate tasks within the workspace without jumping between tabs or tools.
+                          Host meetings, share screens, plan timelines in calendars, and coordinate tasks within the
+                          workspace without jumping between tabs or tools.
                         </p>
                       </motion.div>
                     )}
@@ -898,13 +1060,11 @@ export default function LandingPage() {
                     {Math.min(Math.floor(demoProgress / 10), 9)}s / 10s
                   </span>
                 </div>
-
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
-
     </div>
-  );
+  )
 }

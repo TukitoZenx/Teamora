@@ -8,8 +8,30 @@ const normalizeEmail = (email) => email.trim().toLowerCase();
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 const USERNAME_PATTERN = /^[a-z0-9_][a-z0-9_.-]{2,39}$/;
 const MIN_PASSWORD_LENGTH = 8;
+const MAX_AVATAR_LENGTH = 200_000;
 const RESET_TOKEN_EXPIRY_MS = 1000 * 60 * 15;
 const RESET_SUCCESS_MESSAGE = "If an account exists, we've sent a password reset email.";
+
+const sanitizeAvatar = (avatar) => {
+  if (avatar === undefined) return undefined;
+  if (typeof avatar !== 'string') {
+    throw createError('Avatar must be a string');
+  }
+
+  const cleanAvatar = avatar.trim();
+  if (!cleanAvatar) return '';
+
+  if (cleanAvatar.length > MAX_AVATAR_LENGTH) {
+    throw createError('Avatar image is too large. Please use an image under 150 KB.');
+  }
+
+  // Only allow empty, absolute http(s) URLs, or data:image/* URLs (profile crop).
+  if (!/^https?:\/\//i.test(cleanAvatar) && !/^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(cleanAvatar)) {
+    throw createError('Avatar must be an image URL or image data');
+  }
+
+  return cleanAvatar;
+};
 
 const sanitizeUser = (user) => {
   const plainUser = user.toObject ? user.toObject() : user;
@@ -46,7 +68,9 @@ const validateRegistrationInput = ({ fullName, username, email, password }) => {
   }
 
   if (!USERNAME_PATTERN.test(cleanUsername)) {
-    throw createError('Username must be 3-40 characters and contain only letters, numbers, dots, hyphens, or underscores');
+    throw createError(
+      'Username must be 3-40 characters and contain only letters, numbers, dots, hyphens, or underscores'
+    );
   }
 
   if (!EMAIL_PATTERN.test(cleanEmail)) {
@@ -113,7 +137,7 @@ const register = async ({ fullName, username, email, password, avatar }) => {
 
   const user = await User.create({
     ...input,
-    avatar: typeof avatar === 'string' ? avatar.trim() : '',
+    avatar: sanitizeAvatar(typeof avatar === 'string' ? avatar : '') || '',
     provider: 'local'
   });
 
@@ -158,7 +182,7 @@ const findById = async (id) => {
   return user ? sanitizeUser(user) : null;
 };
 
-const updateProfile = async (userId, { fullName, username }) => {
+const updateProfile = async (userId, { fullName, username, avatar }) => {
   const cleanFullName = requireString(fullName, 'Full name');
   const cleanUsername = normalizeUsername(requireString(username, 'Username'));
 
@@ -167,7 +191,9 @@ const updateProfile = async (userId, { fullName, username }) => {
   }
 
   if (!USERNAME_PATTERN.test(cleanUsername)) {
-    throw createError('Username must be 3-40 characters and contain only letters, numbers, dots, hyphens, or underscores');
+    throw createError(
+      'Username must be 3-40 characters and contain only letters, numbers, dots, hyphens, or underscores'
+    );
   }
 
   const usernameOwner = await User.findOne({ username: cleanUsername });
@@ -176,15 +202,17 @@ const updateProfile = async (userId, { fullName, username }) => {
     throw createError('Username is already in use', 409);
   }
 
-  const user = await User.findByIdAndUpdate(
-    userId,
-    {
-      fullName: cleanFullName,
-      username: cleanUsername,
-      profileComplete: true
-    },
-    { new: true, runValidators: true }
-  );
+  const updates = {
+    fullName: cleanFullName,
+    username: cleanUsername,
+    profileComplete: true
+  };
+
+  if (avatar !== undefined) {
+    updates.avatar = sanitizeAvatar(avatar) || '';
+  }
+
+  const user = await User.findByIdAndUpdate(userId, updates, { new: true, runValidators: true });
 
   if (!user) {
     throw createError('User not found', 404);
@@ -251,7 +279,11 @@ const resetPassword = async ({ token, password }) => {
 };
 
 const buildGoogleUsername = async (email) => {
-  const base = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase() || 'user';
+  const base =
+    email
+      .split('@')[0]
+      .replace(/[^a-z0-9_]/gi, '')
+      .toLowerCase() || 'user';
   let candidate = base;
   let suffix = 1;
 
@@ -274,6 +306,22 @@ const findOrCreateGoogleUser = async (profile) => {
   const existingUser = await User.findOne({ email: normalizedEmail });
 
   if (existingUser) {
+    let changed = false;
+    // Google has verified email ownership, so signing in via Google is safe.
+    // Keep any existing local password hash so the user can still use email
+    // login if they had one; only mark the provider when the account was
+    // pure-local and is now also Google-capable.
+    if (existingUser.provider === 'local') {
+      existingUser.provider = 'google';
+      changed = true;
+    }
+    if (!existingUser.avatar && profile.photos?.[0]?.value) {
+      existingUser.avatar = profile.photos[0].value;
+      changed = true;
+    }
+    if (changed) {
+      await existingUser.save({ validateBeforeSave: false });
+    }
     return sanitizeUser(existingUser);
   }
 

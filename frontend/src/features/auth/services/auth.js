@@ -13,7 +13,7 @@ export const login = async (payload) => {
 }
 
 export const logout = async () => {
-  await api.post('/api/auth/logout')
+  await api.post('/api/auth/logout', {})
 }
 
 export const getCurrentUser = async () => {

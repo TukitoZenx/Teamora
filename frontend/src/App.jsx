@@ -14,7 +14,7 @@ import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
 import api from './services/api'
 import { useAuth } from './hooks/useAuth'
 import WorkspaceLayout from './features/workspace/components/WorkspaceLayout'
-import { addWorkspaceNotification } from './utils/notifications'
+import { addWorkspaceNotification } from './components/utils/notifications'
 
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 const LAST_PAGE_KEY = 'teamora-last-page'
@@ -32,7 +32,8 @@ const WORKSPACE_SECTIONS = new Set([
   'meetings',
   'members',
   'shared-files',
-  'settings'
+  'settings',
+  'chat'
 ])
 
 const readJsonCache = (key, fallback) => {
@@ -82,6 +83,26 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const applyAppearance = () => {
+      try {
+        const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')
+        if (!preferences) return
+        document.documentElement.dataset.density = String(preferences.density || 'Comfortable').toLowerCase()
+        document.documentElement.lang =
+          preferences.language === 'Español' ? 'es' : preferences.language === 'Français' ? 'fr' : 'en'
+        document.documentElement.dataset.timeZone = preferences.timeZone || 'UTC'
+        document.documentElement.dataset.dateFormat = preferences.dateFormat || 'MM/DD/YYYY'
+      } catch {
+        // Appearance preferences are optional local UI state.
+      }
+    }
+
+    applyAppearance()
+    window.addEventListener('storage', applyAppearance)
+    return () => window.removeEventListener('storage', applyAppearance)
+  }, [])
+
+  useEffect(() => {
     if (authenticated) {
       localStorage.setItem(LAST_PAGE_KEY, `${location.pathname}${location.search}`)
     }
@@ -110,7 +131,8 @@ export default function App() {
 
     setWorkspacesLoading(true)
 
-    const request = api.get('/api/v1/workspaces')
+    const request = api
+      .get('/api/v1/workspaces')
       .then(({ data }) => {
         const nextWorkspaces = data.workspaces || []
         const nextRecentWorkspaces = data.recentWorkspaces || []
@@ -203,7 +225,9 @@ export default function App() {
     replaceWorkspaces((current) => [data.workspace, ...current])
     replaceRecentWorkspaces((current) => [
       { ...data.workspace, workspaceId: data.workspace._id, status: 'active', statusLabel: 'Active', canOpen: true },
-      ...current.filter((workspace) => workspace.workspaceId !== data.workspace._id && workspace._id !== data.workspace._id)
+      ...current.filter(
+        (workspace) => workspace.workspaceId !== data.workspace._id && workspace._id !== data.workspace._id
+      )
     ])
     setActiveWorkspace(data.workspace)
     cacheWorkspace(data.workspace)
@@ -214,7 +238,7 @@ export default function App() {
 
   const joinWorkspace = async (inviteInput) => {
     const inviteCode = extractInviteCode(inviteInput)
-    const { data } = await api.post(`/api/v1/workspaces/invite/${inviteCode}/request`)
+    const { data } = await api.post(`/api/v1/workspaces/invite/${inviteCode}/request`, {})
     await loadWorkspaces()
     if (data.joined && data.workspace?._id) {
       replaceWorkspaces((current) => [
@@ -223,7 +247,9 @@ export default function App() {
       ])
       replaceRecentWorkspaces((current) => [
         { ...data.workspace, workspaceId: data.workspace._id, status: 'active', statusLabel: 'Active', canOpen: true },
-        ...current.filter((workspace) => workspace.workspaceId !== data.workspace._id && workspace._id !== data.workspace._id)
+        ...current.filter(
+          (workspace) => workspace.workspaceId !== data.workspace._id && workspace._id !== data.workspace._id
+        )
       ])
       setActiveWorkspace(data.workspace)
       cacheWorkspace(data.workspace)
@@ -243,7 +269,9 @@ export default function App() {
   }
 
   const removeRecentWorkspace = async (workspaceId) => {
-    replaceRecentWorkspaces((current) => current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId))
+    replaceRecentWorkspaces((current) =>
+      current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
+    )
     try {
       await api.delete(`/api/v1/workspaces/history/${workspaceId}`)
     } catch (error) {
@@ -255,7 +283,9 @@ export default function App() {
   const updateWorkspace = async (workspaceId, payload) => {
     const { data } = await api.put(`/api/v1/workspaces/${workspaceId}`, payload)
 
-    replaceWorkspaces((current) => current.map((workspace) => (workspace._id === workspaceId ? data.workspace : workspace)))
+    replaceWorkspaces((current) =>
+      current.map((workspace) => (workspace._id === workspaceId ? data.workspace : workspace))
+    )
     setActiveWorkspace((current) => (current?._id === workspaceId ? data.workspace : current))
     cacheWorkspace(data.workspace)
     toast.success('Workspace updated')
@@ -263,102 +293,150 @@ export default function App() {
   }
 
   const deleteWorkspace = async (workspaceId) => {
+    const workspaceToArchive =
+      activeWorkspace?._id === workspaceId
+        ? activeWorkspace
+        : workspaces.find((workspace) => workspace._id === workspaceId)
     await api.delete(`/api/v1/workspaces/${workspaceId}`)
 
     replaceWorkspaces((current) => current.filter((workspace) => workspace._id !== workspaceId))
-    replaceRecentWorkspaces((current) => current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId))
+    replaceRecentWorkspaces((current) => [
+      {
+        ...(workspaceToArchive || {}),
+        _id: workspaceId,
+        workspaceId,
+        name: workspaceToArchive?.name || 'Deleted workspace',
+        status: 'trashed',
+        statusLabel: 'Workspace Trash',
+        canOpen: false,
+        canRequestAccess: false,
+        lastSeenAt: new Date().toISOString(),
+        leftAt: new Date().toISOString()
+      },
+      ...current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
+    ])
     setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
     removeWorkspaceCache(workspaceId)
     if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
       localStorage.removeItem(LAST_WORKSPACE_KEY)
     }
     navigate('/dashboard', { replace: true })
-    toast.success('Workspace deleted successfully.')
+    toast.success('Workspace moved to history.')
   }
 
-  const leaveWorkspace = useCallback(async (workspaceId, payload = {}) => {
-    try {
-      const { data } = await api.post(`/api/v1/workspaces/${workspaceId}/leave`, payload)
+  const leaveWorkspace = useCallback(
+    async (workspaceId, payload = {}) => {
+      try {
+        const { data } = await api.post(`/api/v1/workspaces/${workspaceId}/leave`, payload)
 
-      replaceWorkspaces((current) => current.filter((workspace) => workspace._id !== workspaceId))
-      if (data.workspaceDeleted) {
-        replaceRecentWorkspaces((current) => current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId))
-      } else {
-        replaceRecentWorkspaces((current) => {
-          const existing = current.find((workspace) => workspace.workspaceId === workspaceId || workspace._id === workspaceId)
-          const nextEntry = existing
-            ? { ...existing, status: 'previously_joined', statusLabel: 'Previously Joined', canOpen: false, canRequestAccess: true }
-            : { _id: workspaceId, workspaceId, status: 'previously_joined', statusLabel: 'Previously Joined', canOpen: false, canRequestAccess: true, lastSeenAt: new Date().toISOString() }
+        replaceWorkspaces((current) => current.filter((workspace) => workspace._id !== workspaceId))
+        if (data.workspaceDeleted) {
+          replaceRecentWorkspaces((current) =>
+            current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
+          )
+        } else {
+          replaceRecentWorkspaces((current) => {
+            const existing = current.find(
+              (workspace) => workspace.workspaceId === workspaceId || workspace._id === workspaceId
+            )
+            const nextEntry = existing
+              ? {
+                  ...existing,
+                  status: 'previously_joined',
+                  statusLabel: 'Previously Joined',
+                  canOpen: false,
+                  canRequestAccess: true
+                }
+              : {
+                  _id: workspaceId,
+                  workspaceId,
+                  status: 'previously_joined',
+                  statusLabel: 'Previously Joined',
+                  canOpen: false,
+                  canRequestAccess: true,
+                  lastSeenAt: new Date().toISOString()
+                }
 
-          return [
-            nextEntry,
-            ...current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
-          ]
-        })
-      }
-      setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
-      removeWorkspaceCache(workspaceId)
-
-      if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
-        localStorage.removeItem(LAST_WORKSPACE_KEY)
-      }
-
-      await loadWorkspaces()
-      navigate('/dashboard', { replace: true })
-      if (data.workspaceDeleted) {
-        toast.success('Workspace deleted because no members remained.')
-      } else {
-        addWorkspaceNotification({
-          type: 'workspace_left',
-          message: data.workspaceInactive ? 'You left the workspace. It is inactive because no members remain.' : 'You left the workspace.',
-          workspaceId
-        })
-      }
-    } catch (error) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to leave workspace'
-      toast.error(message)
-      throw error
-    }
-  }, [loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces])
-
-  const fetchWorkspace = useCallback(async (workspaceId) => {
-    const cachedWorkspace = readJsonCache(WORKSPACE_CACHE_KEY, {})[workspaceId]
-    if (cachedWorkspace) {
-      setActiveWorkspace(cachedWorkspace)
-    }
-
-    if (workspaceRequestRef.current.has(workspaceId)) {
-      return workspaceRequestRef.current.get(workspaceId)
-    }
-
-    setWorkspaceLoading(true)
-    const request = api.get(`/api/v1/workspaces/${workspaceId}`)
-      .then(({ data }) => {
-      setActiveWorkspace(data.workspace)
-      cacheWorkspace(data.workspace)
-      localStorage.setItem(LAST_WORKSPACE_KEY, data.workspace._id)
-      return data.workspace
-      })
-      .catch((error) => {
-        if (error.status === 404) {
-          removeWorkspaceCache(workspaceId)
+            return [
+              nextEntry,
+              ...current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
+            ]
+          })
         }
+        setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
+        removeWorkspaceCache(workspaceId)
+
+        if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
+          localStorage.removeItem(LAST_WORKSPACE_KEY)
+        }
+
+        await loadWorkspaces()
+        navigate('/dashboard', { replace: true })
+        if (data.workspaceDeleted) {
+          toast.success('Workspace deleted because no members remained.')
+        } else {
+          addWorkspaceNotification({
+            type: 'workspace_left',
+            message: data.workspaceInactive
+              ? 'You left the workspace. It is inactive because no members remain.'
+              : 'You left the workspace.',
+            workspaceId
+          })
+        }
+      } catch (error) {
+        const message = error?.response?.data?.message || error?.message || 'Failed to leave workspace'
+        toast.error(message)
         throw error
-      })
-      .finally(() => {
-      setWorkspaceLoading(false)
-        workspaceRequestRef.current.delete(workspaceId)
-      })
+      }
+    },
+    [loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
+  )
 
-    workspaceRequestRef.current.set(workspaceId, request)
-    return request
-  }, [cacheWorkspace])
+  const fetchWorkspace = useCallback(
+    async (workspaceId) => {
+      const cachedWorkspace = readJsonCache(WORKSPACE_CACHE_KEY, {})[workspaceId]
+      if (cachedWorkspace) {
+        setActiveWorkspace(cachedWorkspace)
+      }
 
-  const openWorkspace = useCallback(async (workspaceId, section = 'home') => {
-    const workspacePath = section === 'home' ? `/workspace/${workspaceId}` : `/workspace/${workspaceId}/${section}`
-    localStorage.setItem(LAST_WORKSPACE_KEY, workspaceId)
-    navigate(workspacePath)
-  }, [navigate])
+      if (workspaceRequestRef.current.has(workspaceId)) {
+        return workspaceRequestRef.current.get(workspaceId)
+      }
+
+      setWorkspaceLoading(true)
+      const request = api
+        .get(`/api/v1/workspaces/${workspaceId}`)
+        .then(({ data }) => {
+          setActiveWorkspace(data.workspace)
+          cacheWorkspace(data.workspace)
+          localStorage.setItem(LAST_WORKSPACE_KEY, data.workspace._id)
+          return data.workspace
+        })
+        .catch((error) => {
+          if (error.status === 404) {
+            removeWorkspaceCache(workspaceId)
+          }
+          throw error
+        })
+        .finally(() => {
+          setWorkspaceLoading(false)
+          workspaceRequestRef.current.delete(workspaceId)
+        })
+
+      workspaceRequestRef.current.set(workspaceId, request)
+      return request
+    },
+    [cacheWorkspace]
+  )
+
+  const openWorkspace = useCallback(
+    async (workspaceId, section = 'home') => {
+      const workspacePath = section === 'home' ? `/workspace/${workspaceId}` : `/workspace/${workspaceId}/${section}`
+      localStorage.setItem(LAST_WORKSPACE_KEY, workspaceId)
+      navigate(workspacePath)
+    },
+    [navigate]
+  )
 
   const goToDashboard = useCallback(() => {
     setActiveWorkspace(null)
@@ -385,7 +463,10 @@ export default function App() {
             initialActiveItem={workspacePage}
             onWorkspacePageChange={(page) => {
               const nextPage = WORKSPACE_SECTIONS.has(page) ? page : 'home'
-              const nextPath = nextPage === 'home' ? `/workspace/${currentWorkspace._id}` : `/workspace/${currentWorkspace._id}/${nextPage}`
+              const nextPath =
+                nextPage === 'home'
+                  ? `/workspace/${currentWorkspace._id}`
+                  : `/workspace/${currentWorkspace._id}/${nextPage}`
               localStorage.setItem(LAST_WORKSPACE_KEY, currentWorkspace._id)
               navigate(nextPath)
             }}
@@ -409,7 +490,7 @@ export default function App() {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-[#F8FAFC] pt-[72px] text-[#111827] transition-colors">
-        <AppNavbar onDashboard={goToDashboard} />
+          <AppNavbar onDashboard={goToDashboard} />
 
           <Dashboard
             user={user}
@@ -447,12 +528,50 @@ export default function App() {
     <>
       <Toaster position="top-right" />
       <Routes>
-        <Route path="/" element={<RootRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete} />} />
-        <Route path="/signin" element={<PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}><AuthPage mode="signin" /></PublicRoute>} />
-        <Route path="/signup" element={<PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}><AuthPage mode="signup" /></PublicRoute>} />
-        <Route path="/forgot-password" element={<PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}><ForgotPasswordPage /></PublicRoute>} />
-        <Route path="/reset-password/:token" element={<PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}><ResetPasswordPage /></PublicRoute>} />
-        <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfilePage /></ProtectedRoute>} />
+        <Route
+          path="/"
+          element={<RootRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete} />}
+        />
+        <Route
+          path="/signin"
+          element={
+            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+              <AuthPage mode="signin" />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+              <AuthPage mode="signup" />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+              <ForgotPasswordPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/reset-password/:token"
+          element={
+            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+              <ResetPasswordPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/complete-profile"
+          element={
+            <ProtectedRoute>
+              <CompleteProfilePage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/invite/:inviteCode"
           element={
@@ -470,9 +589,9 @@ export default function App() {
           path="/workspace"
           element={
             <WorkspaceRoute
-          authenticated={authenticated}
-          activeWorkspace={activeWorkspace}
-          fetchWorkspace={fetchWorkspace}
+              authenticated={authenticated}
+              activeWorkspace={activeWorkspace}
+              fetchWorkspace={fetchWorkspace}
               goToDashboard={goToDashboard}
               renderAppFrame={renderAppFrame}
             />
@@ -556,7 +675,7 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
   const requestAccess = async () => {
     setSubmitting(true)
     try {
-      const { data } = await api.post(`/api/v1/workspaces/invite/${inviteCode}/request`)
+      const { data } = await api.post(`/api/v1/workspaces/invite/${inviteCode}/request`, {})
       setWorkspace(data.workspace)
       toast.success('Access request sent')
     } catch (error) {
@@ -592,7 +711,9 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
         <section className="w-full rounded-[20px] border border-[#E5E7EB] bg-white p-8 shadow-sm">
           <p className="text-sm font-semibold text-[#7C3AED]">Invite-only workspace</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">{workspace?.name}</h1>
-          <p className="mt-3 text-sm leading-6 text-[#6B7280]">{workspace?.description || 'No description provided.'}</p>
+          <p className="mt-3 text-sm leading-6 text-[#6B7280]">
+            {workspace?.description || 'No description provided.'}
+          </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <InfoTile label="Workspace ID" value={workspace?.workspaceId} />

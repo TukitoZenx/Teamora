@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -7,15 +7,15 @@
   --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
-  --color-primary: #7C3AED;
-  --color-primary-hover: #6D28D9;
-  --color-background: #F8FAFC;
-  --color-card: #FFFFFF;
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-background: #f8fafc;
+  --color-card: #ffffff;
   --color-text: #111827;
-  --color-muted: #6B7280;
-  --color-border: #E5E7EB;
-  --color-danger: #EF4444;
-  --color-success: #10B981;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-danger: #ef4444;
+  --color-success: #10b981;
 
   font-family: var(--sans);
   font-synthesis: none;
@@ -32,6 +32,21 @@ body {
   color: var(--color-text);
   font-family: var(--sans);
   line-height: 1.5;
+}
+
+html[data-density='compact'] body {
+  line-height: 1.35;
+}
+
+html[data-density='compact'] button,
+html[data-density='compact'] input,
+html[data-density='compact'] select,
+html[data-density='compact'] textarea {
+  min-height: unset;
+}
+
+html[data-density='compact'] .teamora-content-fade {
+  font-size: 0.95rem;
 }
 
 #root {
@@ -72,7 +87,7 @@ body {
 }
 
 .skeleton-shimmer {
-  background: linear-gradient(90deg, #F3F4F6 0%, #E5E7EB 50%, #F3F4F6 100%);
+  background: linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%);
   background-size: 200% 100%;
   animation: teamora-skeleton-shimmer 1.2s ease-in-out infinite;
   border-radius: 12px;

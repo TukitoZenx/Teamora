@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar as CalendarIcon, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import {
+  Calendar as CalendarIcon,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
-import { ensureArray } from '../utils/arrayUtils'
+import { ensureArray } from './utils/arrayUtils'
 
 const priorities = ['Low', 'Medium', 'High', 'Urgent']
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -44,7 +54,8 @@ const parseDateInput = (value) => {
       parsedDate.getFullYear() !== Number(year) ||
       parsedDate.getMonth() + 1 !== Number(month) ||
       parsedDate.getDate() !== Number(day)
-    ) return ''
+    )
+      return ''
     return `${year}-${month}-${day}`
   }
 
@@ -57,7 +68,8 @@ const parseDateInput = (value) => {
       parsedDate.getFullYear() !== Number(year) ||
       parsedDate.getMonth() + 1 !== Number(month) ||
       parsedDate.getDate() !== Number(day)
-    ) return ''
+    )
+      return ''
     return `${year}-${month}-${day}`
   }
 
@@ -65,6 +77,28 @@ const parseDateInput = (value) => {
 }
 
 const getTaskId = (task) => task?._id || task?.id
+const getReminderMinutes = (reminder) => {
+  if (reminder === '15 min') return 15
+  if (reminder === '30 min') return 30
+  if (reminder === '1 hour') return 60
+  if (reminder === '1 day') return 1440
+  return 0
+}
+
+const getReminderTriggerTime = (task) => {
+  const minutes = getReminderMinutes(task?.reminder)
+  if (!minutes || !task?.date) return null
+  const dueTime = task.startTime || task.endTime || '09:00'
+  const dueDate = new Date(`${task.date}T${dueTime}`)
+  if (Number.isNaN(dueDate.getTime())) return null
+  return new Date(dueDate.getTime() - minutes * 60 * 1000)
+}
+
+const formatReminderTrigger = (task) => {
+  const trigger = getReminderTriggerTime(task)
+  return trigger ? trigger.toLocaleString() : 'None'
+}
+
 const getTaskBadgeColor = (task) => {
   if (task?.completed || task?.status === 'completed') return 'bg-emerald-100 text-emerald-700'
   if (task?.priority === 'Urgent' || task?.priority === 'High') return 'bg-rose-100 text-rose-700'
@@ -111,9 +145,10 @@ export default function Calendar({
   const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter'
   const todayKey = toDateKey(new Date())
 
-  const monthLabel = useMemo(() => (
-    currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-  ), [currentDate])
+  const monthLabel = useMemo(
+    () => currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+    [currentDate]
+  )
 
   useEffect(() => {
     if (!workspaceId) {
@@ -132,7 +167,8 @@ export default function Calendar({
       }
     })
 
-    api.get(`/api/v1/workspaces/${workspaceId}/tasks`)
+    api
+      .get(`/api/v1/workspaces/${workspaceId}/tasks`)
       .then(({ data }) => {
         if (!cancelled) setTasks(data.tasks || [])
       })
@@ -150,6 +186,25 @@ export default function Calendar({
       cancelled = true
     }
   }, [calendarList, workspaceId])
+
+  useEffect(() => {
+    const timers = tasks
+      .map((task) => {
+        const trigger = getReminderTriggerTime(task)
+        if (!trigger || trigger.getTime() <= Date.now() || task.completed || task.status === 'completed') return null
+        const delay = trigger.getTime() - Date.now()
+        return window.setTimeout(() => {
+          const message = `${task.title} is due ${task.startTime ? `at ${task.startTime}` : `on ${formatDate(task.date)}`}`
+          toast(message)
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Teamora task reminder', { body: message })
+          }
+        }, delay)
+      })
+      .filter(Boolean)
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer))
+  }, [tasks])
 
   const cells = useMemo(() => {
     const year = currentDate.getFullYear()
@@ -180,15 +235,25 @@ export default function Calendar({
     }))
   }, [currentDate, tasks])
 
-  const selectedTasks = useMemo(() => (
-    activeDate ? tasks.filter((task) => task.date === activeDate) : []
-  ), [activeDate, tasks])
+  const selectedTasks = useMemo(
+    () => (activeDate ? tasks.filter((task) => task.date === activeDate) : []),
+    [activeDate, tasks]
+  )
 
   const visibleTasks = useMemo(() => {
     const query = taskSearch.trim().toLowerCase()
     const filtered = tasks.filter((task) => {
-      const matchesSearch = !query || [task.title, task.description, task.assignee, task.workspaceName].some((value) => String(value || '').toLowerCase().includes(query))
-      const matchesStatus = taskFilter === 'all' || task.status === taskFilter || (taskFilter === 'completed' && (task.completed || task.status === 'completed'))
+      const matchesSearch =
+        !query ||
+        [task.title, task.description, task.assignee, task.workspaceName].some((value) =>
+          String(value || '')
+            .toLowerCase()
+            .includes(query)
+        )
+      const matchesStatus =
+        taskFilter === 'all' ||
+        task.status === taskFilter ||
+        (taskFilter === 'completed' && (task.completed || task.status === 'completed'))
       const matchesPriority = taskPriorityFilter === 'all' || task.priority === taskPriorityFilter
       return matchesSearch && matchesStatus && matchesPriority
     })
@@ -331,30 +396,34 @@ export default function Calendar({
             </span>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-[#111827]">All Tasks</h1>
-              <p className="text-sm text-[#6B7280]">{loading ? 'Loading tasks...' : error || `${tasks.length} task${tasks.length === 1 ? '' : 's'}`}</p>
+              <p className="text-sm text-[#6B7280]">
+                {loading ? 'Loading tasks...' : error || `${tasks.length} task${tasks.length === 1 ? '' : 's'}`}
+              </p>
             </div>
           </div>
-
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => openCreateModal(toDateKey(new Date()))}
-              className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-[#7C3AED] px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#6D28D9]"
-            >
-              <Plus className="h-4 w-4" />
-              New Event
-            </button>
-          )}
         </div>
 
         <div className="grid gap-3 border-b border-[#E5E7EB] bg-[#FAFAFB] p-4 md:grid-cols-[1.4fr_0.9fr_0.7fr_0.7fr]">
           <label className="block">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Search</span>
-            <input value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Title, description, assignee..." className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]" />
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+              Search
+            </span>
+            <input
+              value={taskSearch}
+              onChange={(event) => setTaskSearch(event.target.value)}
+              placeholder="Title, description, assignee..."
+              className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+            />
           </label>
           <label className="block">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Status</span>
-            <select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+              Status
+            </span>
+            <select
+              value={taskFilter}
+              onChange={(event) => setTaskFilter(event.target.value)}
+              className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+            >
               <option value="all">All</option>
               <option value="todo">Todo</option>
               <option value="in-progress">In Progress</option>
@@ -363,15 +432,31 @@ export default function Calendar({
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Priority</span>
-            <select value={taskPriorityFilter} onChange={(event) => setTaskPriorityFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+              Priority
+            </span>
+            <select
+              value={taskPriorityFilter}
+              onChange={(event) => setTaskPriorityFilter(event.target.value)}
+              className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+            >
               <option value="all">All</option>
-              {priorities.map((priorityOption) => <option key={priorityOption} value={priorityOption}>{priorityOption}</option>)}
+              {priorities.map((priorityOption) => (
+                <option key={priorityOption} value={priorityOption}>
+                  {priorityOption}
+                </option>
+              ))}
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Sort</span>
-            <select value={taskSort} onChange={(event) => setTaskSort(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+              Sort
+            </span>
+            <select
+              value={taskSort}
+              onChange={(event) => setTaskSort(event.target.value)}
+              className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+            >
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
               <option value="priority">Priority</option>
@@ -381,48 +466,94 @@ export default function Calendar({
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {visibleTasks.length === 0 ? (
-            <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-8 text-center text-sm text-[#6B7280]">No tasks match your current filters.</div>
-          ) : visibleTasks.map((task) => (
-            <article key={getTaskId(task)} className="rounded-[20px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h4 className={`text-base font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}>{task.title}</h4>
-                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTaskBadgeColor(task)}`}>{task.priority || 'Medium'}</span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{task.status || (task.completed ? 'completed' : 'todo')}</span>
+            <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-8 text-center text-sm text-[#6B7280]">
+              No tasks match your current filters.
+            </div>
+          ) : (
+            visibleTasks.map((task) => (
+              <article key={getTaskId(task)} className="rounded-[20px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4
+                        className={`text-base font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}
+                      >
+                        {task.title}
+                      </h4>
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTaskBadgeColor(task)}`}>
+                        {task.priority || 'Medium'}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                        {task.status || (task.completed ? 'completed' : 'todo')}
+                      </span>
+                    </div>
+                    {task.description && <p className="text-sm leading-6 text-[#6B7280]">{task.description}</p>}
+                    <div className="flex flex-wrap gap-3 text-sm text-[#6B7280]">
+                      <span>
+                        <strong>Workspace:</strong> {task.workspaceName || 'Workspace'}
+                      </span>
+                      <span>
+                        <strong>Assigned To:</strong> {task.assignee || 'Unassigned'}
+                      </span>
+                      <span>
+                        <strong>Due Date:</strong> {task.date ? formatDate(task.date) : 'Not set'}
+                      </span>
+                      <span>
+                        <strong>Reminder:</strong>{' '}
+                        {task.reminder ? `${task.reminder} (${formatReminderTrigger(task)})` : 'None'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-xs text-[#9CA3AF]">
+                      <span>
+                        <strong>Created By:</strong>{' '}
+                        {task.creator?.fullName ||
+                          task.creator?.username ||
+                          task.creator?.email ||
+                          userName ||
+                          'Teamora user'}
+                      </span>
+                      <span>
+                        <strong>Created:</strong>{' '}
+                        {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'Unknown'}
+                      </span>
+                      <span>
+                        <strong>Updated:</strong>{' '}
+                        {task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown'}
+                      </span>
+                    </div>
                   </div>
-                  {task.description && <p className="text-sm leading-6 text-[#6B7280]">{task.description}</p>}
-                  <div className="flex flex-wrap gap-3 text-sm text-[#6B7280]">
-                    <span><strong>Workspace:</strong> {task.workspaceName || 'Workspace'}</span>
-                    <span><strong>Assigned To:</strong> {task.assignee || 'Unassigned'}</span>
-                    <span><strong>Due Date:</strong> {task.date ? formatDate(task.date) : 'Not set'}</span>
-                    <span><strong>Reminder:</strong> {task.reminder || 'None'}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-3 text-xs text-[#9CA3AF]">
-                    <span><strong>Created By:</strong> {task.creator?.fullName || task.creator?.username || task.creator?.email || userName || 'Teamora user'}</span>
-                    <span><strong>Created:</strong> {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'Unknown'}</span>
-                    <span><strong>Updated:</strong> {task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown'}</span>
-                  </div>
+                  {canEdit && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleComplete(task)}
+                        className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#D1FAE5] px-3 text-sm font-semibold text-[#059669] transition hover:bg-[#ECFDF5]"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        {task.completed ? 'Completed' : 'Mark Complete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(task)}
+                        className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteTask(task)}
+                        className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#FEE2E2] px-3 text-sm font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {canEdit && (
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => toggleComplete(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#D1FAE5] px-3 text-sm font-semibold text-[#059669] transition hover:bg-[#ECFDF5]">
-                      <CheckCircle2 className="h-4 w-4" />
-                      {task.completed ? 'Completed' : 'Mark Complete'}
-                    </button>
-                    <button type="button" onClick={() => openEditModal(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
-                      <Pencil className="h-4 w-4" />
-                      Edit
-                    </button>
-                    <button type="button" onClick={() => deleteTask(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#FEE2E2] px-3 text-sm font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]">
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            </article>
-          ))}
+              </article>
+            ))
+          )}
         </div>
 
         {modalMode && (
@@ -478,14 +609,6 @@ export default function Calendar({
             <Search className="h-4 w-4" />
             View All Tasks
           </button>
-          <button
-            type="button"
-            onClick={() => openCreateModal(toDateKey(new Date()))}
-            className="inline-flex h-11 items-center gap-2 rounded-[16px] bg-[#7C3AED] px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(124,58,237,0.22)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#6D28D9]"
-          >
-            <Plus className="h-4 w-4" />
-            New Event
-          </button>
         </div>
       </div>
 
@@ -498,7 +621,10 @@ export default function Calendar({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h2 key={monthPulse} className="min-w-40 animate-[teamora-content-fade_180ms_ease-out_both] text-center text-lg font-semibold text-[#111827]">
+        <h2
+          key={monthPulse}
+          className="min-w-40 animate-[teamora-content-fade_180ms_ease-out_both] text-center text-lg font-semibold text-[#111827]"
+        >
           {monthLabel}
         </h2>
         <button
@@ -513,11 +639,16 @@ export default function Calendar({
 
       <div className="grid shrink-0 grid-cols-7 border-y border-[#E5E7EB] bg-[#FAFAFB] text-center text-[11px] font-bold uppercase tracking-[0.08em] text-[#9CA3AF]">
         {weekdays.map((day) => (
-          <div key={day} className="py-2">{day}</div>
+          <div key={day} className="py-2">
+            {day}
+          </div>
         ))}
       </div>
 
-      <div key={`grid-${monthPulse}`} className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1.5 overflow-hidden bg-[#FAFAFB] p-1.5 animate-[teamora-content-fade_180ms_ease-out_both]">
+      <div
+        key={`grid-${monthPulse}`}
+        className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-1.5 overflow-hidden bg-[#FAFAFB] p-1.5 animate-[teamora-content-fade_180ms_ease-out_both]"
+      >
         {cells.map((cell) => {
           const visible = cell.tasks.slice(0, 3)
           const hiddenCount = Math.max(0, cell.tasks.length - visible.length)
@@ -557,9 +688,7 @@ export default function Calendar({
                     title="Task indicator"
                   />
                 ))}
-                {hiddenCount > 0 && (
-                  <span className="text-xs font-semibold text-[#7C3AED]">+{hiddenCount}</span>
-                )}
+                {hiddenCount > 0 && <span className="text-xs font-semibold text-[#7C3AED]">+{hiddenCount}</span>}
               </div>
             </div>
           )
@@ -573,7 +702,11 @@ export default function Calendar({
               <p className="text-sm font-semibold text-[#7C3AED]">Tasks</p>
               <h3 className="mt-1 text-xl font-semibold text-[#111827]">{formatDate(activeDate)}</h3>
             </div>
-            <button type="button" onClick={() => setActiveDate('')} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6]">
+            <button
+              type="button"
+              onClick={() => setActiveDate('')}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6]"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -594,25 +727,53 @@ export default function Calendar({
               </div>
             ) : (
               selectedTasks.map((task) => (
-                <article key={getTaskId(task)} className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+                <article
+                  key={getTaskId(task)}
+                  className="rounded-[18px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h4 className={`text-sm font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}>{task.title}</h4>
+                      <h4
+                        className={`text-sm font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}
+                      >
+                        {task.title}
+                      </h4>
                       {task.description && <p className="mt-1 text-sm leading-5 text-[#6B7280]">{task.description}</p>}
                     </div>
-                    <span className="rounded-full bg-[#F5F3FF] px-2.5 py-1 text-xs font-semibold text-[#7C3AED]">{task.priority}</span>
+                    <span className="rounded-full bg-[#F5F3FF] px-2.5 py-1 text-xs font-semibold text-[#7C3AED]">
+                      {task.priority}
+                    </span>
                   </div>
-                  <p className="mt-3 text-xs text-[#9CA3AF]">Created by {task.creator?.fullName || task.creator?.username || task.creator?.email || userName || 'Teamora user'}</p>
+                  <p className="mt-3 text-xs text-[#9CA3AF]">
+                    Created by{' '}
+                    {task.creator?.fullName ||
+                      task.creator?.username ||
+                      task.creator?.email ||
+                      userName ||
+                      'Teamora user'}
+                  </p>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => toggleComplete(task)} className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#D1FAE5] px-3 text-xs font-semibold text-[#059669] transition hover:bg-[#ECFDF5]">
+                    <button
+                      type="button"
+                      onClick={() => toggleComplete(task)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#D1FAE5] px-3 text-xs font-semibold text-[#059669] transition hover:bg-[#ECFDF5]"
+                    >
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       {task.completed ? 'Completed' : 'Mark Complete'}
                     </button>
-                    <button type="button" onClick={() => openEditModal(task)} className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#E5E7EB] px-3 text-xs font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(task)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#E5E7EB] px-3 text-xs font-semibold text-[#374151] transition hover:bg-[#F3F4F6]"
+                    >
                       <Pencil className="h-3.5 w-3.5" />
                       Edit
                     </button>
-                    <button type="button" onClick={() => deleteTask(task)} className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#FEE2E2] px-3 text-xs font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]">
+                    <button
+                      type="button"
+                      onClick={() => deleteTask(task)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-[#FEE2E2] px-3 text-xs font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                       Delete
                     </button>
@@ -630,21 +791,40 @@ export default function Calendar({
             <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
               <div>
                 <h3 className="text-xl font-semibold tracking-tight text-[#111827]">All Tasks</h3>
-                <p className="mt-1 text-sm text-[#6B7280]">Search, filter, sort, and manage every task in this workspace.</p>
+                <p className="mt-1 text-sm text-[#6B7280]">
+                  Search, filter, sort, and manage every task in this workspace.
+                </p>
               </div>
-              <button type="button" onClick={() => setTaskViewerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]">
+              <button
+                type="button"
+                onClick={() => setTaskViewerOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="grid gap-3 border-b border-[#E5E7EB] bg-[#FAFAFB] p-4 md:grid-cols-[1.4fr_0.9fr_0.7fr_0.7fr]">
               <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Search</span>
-                <input value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="Title, description, assignee..." className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]" />
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  Search
+                </span>
+                <input
+                  value={taskSearch}
+                  onChange={(event) => setTaskSearch(event.target.value)}
+                  placeholder="Title, description, assignee..."
+                  className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+                />
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Status</span>
-                <select value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  Status
+                </span>
+                <select
+                  value={taskFilter}
+                  onChange={(event) => setTaskFilter(event.target.value)}
+                  className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+                >
                   <option value="all">All</option>
                   <option value="todo">Todo</option>
                   <option value="in-progress">In Progress</option>
@@ -653,15 +833,31 @@ export default function Calendar({
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Priority</span>
-                <select value={taskPriorityFilter} onChange={(event) => setTaskPriorityFilter(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  Priority
+                </span>
+                <select
+                  value={taskPriorityFilter}
+                  onChange={(event) => setTaskPriorityFilter(event.target.value)}
+                  className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+                >
                   <option value="all">All</option>
-                  {priorities.map((priorityOption) => <option key={priorityOption} value={priorityOption}>{priorityOption}</option>)}
+                  {priorities.map((priorityOption) => (
+                    <option key={priorityOption} value={priorityOption}>
+                      {priorityOption}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Sort</span>
-                <select value={taskSort} onChange={(event) => setTaskSort(event.target.value)} className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">
+                  Sort
+                </span>
+                <select
+                  value={taskSort}
+                  onChange={(event) => setTaskSort(event.target.value)}
+                  className="h-11 w-full rounded-[14px] border border-[#E5E7EB] bg-white px-3 text-sm text-[#111827] outline-none focus:border-[#7C3AED]"
+                >
                   <option value="newest">Newest</option>
                   <option value="oldest">Oldest</option>
                   <option value="priority">Priority</option>
@@ -671,46 +867,100 @@ export default function Calendar({
 
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               {visibleTasks.length === 0 ? (
-                <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-8 text-center text-sm text-[#6B7280]">No tasks match your current filters.</div>
-              ) : visibleTasks.map((task) => (
-                <article key={getTaskId(task)} className="rounded-[20px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className={`text-base font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}>{task.title}</h4>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTaskBadgeColor(task)}`}>{task.priority || 'Medium'}</span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{task.status || (task.completed ? 'completed' : 'todo')}</span>
+                <div className="rounded-[18px] border border-dashed border-[#E5E7EB] p-8 text-center text-sm text-[#6B7280]">
+                  No tasks match your current filters.
+                </div>
+              ) : (
+                visibleTasks.map((task) => (
+                  <article
+                    key={getTaskId(task)}
+                    className="rounded-[20px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4
+                            className={`text-base font-semibold text-[#111827] ${task.completed ? 'line-through decoration-[#10B981]' : ''}`}
+                          >
+                            {task.title}
+                          </h4>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getTaskBadgeColor(task)}`}
+                          >
+                            {task.priority || 'Medium'}
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                            {task.status || (task.completed ? 'completed' : 'todo')}
+                          </span>
+                        </div>
+                        {task.description && <p className="text-sm leading-6 text-[#6B7280]">{task.description}</p>}
+                        <div className="flex flex-wrap gap-3 text-sm text-[#6B7280]">
+                          <span>
+                            <strong>Workspace:</strong> {task.workspaceName || 'Workspace'}
+                          </span>
+                          <span>
+                            <strong>Assigned To:</strong> {task.assignee || 'Unassigned'}
+                          </span>
+                          <span>
+                            <strong>Due Date:</strong> {task.date ? formatDate(task.date) : 'Not set'}
+                          </span>
+                          <span>
+                            <strong>Reminder:</strong>{' '}
+                            {task.reminder ? `${task.reminder} (${formatReminderTrigger(task)})` : 'None'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-[#9CA3AF]">
+                          <span>
+                            <strong>Created By:</strong>{' '}
+                            {task.creator?.fullName ||
+                              task.creator?.username ||
+                              task.creator?.email ||
+                              userName ||
+                              'Teamora user'}
+                          </span>
+                          <span>
+                            <strong>Created:</strong>{' '}
+                            {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'Unknown'}
+                          </span>
+                          <span>
+                            <strong>Updated:</strong>{' '}
+                            {task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown'}
+                          </span>
+                        </div>
                       </div>
-                      {task.description && <p className="text-sm leading-6 text-[#6B7280]">{task.description}</p>}
-                      <div className="flex flex-wrap gap-3 text-sm text-[#6B7280]">
-                        <span><strong>Workspace:</strong> {task.workspaceName || 'Workspace'}</span>
-                        <span><strong>Assigned To:</strong> {task.assignee || 'Unassigned'}</span>
-                        <span><strong>Due Date:</strong> {task.date ? formatDate(task.date) : 'Not set'}</span>
-                        <span><strong>Reminder:</strong> {task.reminder || 'None'}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-xs text-[#9CA3AF]">
-                        <span><strong>Created By:</strong> {task.creator?.fullName || task.creator?.username || task.creator?.email || userName || 'Teamora user'}</span>
-                        <span><strong>Created:</strong> {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'Unknown'}</span>
-                        <span><strong>Updated:</strong> {task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown'}</span>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleComplete(task)}
+                          className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#D1FAE5] px-3 text-sm font-semibold text-[#059669] transition hover:bg-[#ECFDF5]"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          {task.completed ? 'Completed' : 'Mark Complete'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTaskViewerOpen(false)
+                            openEditModal(task)
+                          }}
+                          className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteTask(task)}
+                          className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#FEE2E2] px-3 text-sm font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </button>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => toggleComplete(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#D1FAE5] px-3 text-sm font-semibold text-[#059669] transition hover:bg-[#ECFDF5]">
-                        <CheckCircle2 className="h-4 w-4" />
-                        {task.completed ? 'Completed' : 'Mark Complete'}
-                      </button>
-                      <button type="button" onClick={() => { setTaskViewerOpen(false); openEditModal(task) }} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
-                        <Pencil className="h-4 w-4" />
-                        Edit
-                      </button>
-                      <button type="button" onClick={() => deleteTask(task)} className="inline-flex h-10 items-center gap-2 rounded-[12px] border border-[#FEE2E2] px-3 text-sm font-semibold text-[#DC2626] transition hover:bg-[#FEF2F2]">
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -721,10 +971,18 @@ export default function Calendar({
           <div className="w-full max-w-2xl rounded-[24px] border border-[#E5E7EB] bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)] animate-[teamora-content-fade_180ms_ease-out_both]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-semibold tracking-tight text-[#111827]">{modalMode === 'edit' ? 'Edit Event' : 'New Event'}</h3>
-                <p className="mt-1 text-sm text-[#6B7280]">Fill in the details below and save the event to your calendar.</p>
+                <h3 className="text-xl font-semibold tracking-tight text-[#111827]">
+                  {modalMode === 'edit' ? 'Edit Task' : 'New Task'}
+                </h3>
+                <p className="mt-1 text-sm text-[#6B7280]">
+                  Fill in the details below and save the task to your calendar.
+                </p>
               </div>
-              <button type="button" onClick={closeModal} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -738,11 +996,15 @@ export default function Calendar({
                   className={`mt-2 h-12 w-full rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !title.trim() ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
                   placeholder="Task title"
                 />
-                {submitted && !title.trim() && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Title is required.</p>}
+                {submitted && !title.trim() && (
+                  <p className="mt-2 text-xs font-semibold text-[#EF4444]">Title is required.</p>
+                )}
               </label>
 
               <label className="block">
-                <span className="text-sm font-semibold text-[#374151]">Description <span className="font-normal text-[#9CA3AF]">(Optional)</span></span>
+                <span className="text-sm font-semibold text-[#374151]">
+                  Description <span className="font-normal text-[#9CA3AF]">(Optional)</span>
+                </span>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
@@ -762,17 +1024,33 @@ export default function Calendar({
                       placeholder="DD/MM/YYYY"
                       className={`h-12 flex-1 rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !parseDateInput(dateInput) ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
                     />
-                    <input ref={datePickerRef} type="date" value={parseDateInput(dateInput) || ''} onChange={(event) => setDateInput(formatDateInput(event.target.value))} className="sr-only" />
-                    <button type="button" onClick={openDatePicker} className="h-12 rounded-[16px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F8FAFC]">
+                    <input
+                      ref={datePickerRef}
+                      type="date"
+                      value={parseDateInput(dateInput) || ''}
+                      onChange={(event) => setDateInput(formatDateInput(event.target.value))}
+                      className="sr-only"
+                    />
+                    <button
+                      type="button"
+                      onClick={openDatePicker}
+                      className="h-12 rounded-[16px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F8FAFC]"
+                    >
                       Pick
                     </button>
                   </div>
-                  {submitted && !parseDateInput(dateInput) && <p className="mt-2 text-xs font-semibold text-[#EF4444]">A valid date is required.</p>}
+                  {submitted && !parseDateInput(dateInput) && (
+                    <p className="mt-2 text-xs font-semibold text-[#EF4444]">A valid date is required.</p>
+                  )}
                 </label>
 
                 <label className="block">
                   <span className="text-sm font-semibold text-[#374151]">Reminder</span>
-                  <select value={reminder} onChange={(event) => setReminder(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10">
+                  <select
+                    value={reminder}
+                    onChange={(event) => setReminder(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+                  >
                     <option value="">None</option>
                     <option value="15 min">15 min before</option>
                     <option value="30 min">30 min before</option>
@@ -785,11 +1063,21 @@ export default function Calendar({
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="text-sm font-semibold text-[#374151]">Start Time</span>
-                  <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(event) => setStartTime(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+                  />
                 </label>
                 <label className="block">
                   <span className="text-sm font-semibold text-[#374151]">End Time</span>
-                  <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(event) => setEndTime(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+                  />
                 </label>
               </div>
 
@@ -808,21 +1096,37 @@ export default function Calendar({
                       </button>
                     ))}
                   </div>
-                  {submitted && !priority && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>}
+                  {submitted && !priority && (
+                    <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>
+                  )}
                 </div>
 
                 <label className="block">
                   <span className="text-sm font-semibold text-[#374151]">Workspace</span>
-                  <input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" placeholder="Workspace name" />
+                  <input
+                    value={workspaceName}
+                    onChange={(event) => setWorkspaceName(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+                    placeholder="Workspace name"
+                  />
                 </label>
               </div>
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#E5E7EB] pt-5">
-              <button type="button" onClick={closeModal} className="h-11 rounded-[16px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="h-11 rounded-[16px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]"
+              >
                 Cancel
               </button>
-              <button type="button" disabled={saving} onClick={saveTask} className="h-11 rounded-[16px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={saveTask}
+                className="h-11 rounded-[16px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60"
+              >
                 {saving ? 'Saving...' : modalMode === 'edit' ? 'Save Event' : 'Save Event'}
               </button>
             </div>
@@ -863,10 +1167,16 @@ function TaskEditorModal({
       <div className="w-full max-w-2xl rounded-[24px] border border-[#E5E7EB] bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)] animate-[teamora-content-fade_180ms_ease-out_both]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-xl font-semibold tracking-tight text-[#111827]">{modalMode === 'edit' ? 'Edit Event' : 'New Event'}</h3>
-            <p className="mt-1 text-sm text-[#6B7280]">Fill in the details below and save the event to your calendar.</p>
+            <h3 className="text-xl font-semibold tracking-tight text-[#111827]">
+              {modalMode === 'edit' ? 'Edit Task' : 'New Task'}
+            </h3>
+            <p className="mt-1 text-sm text-[#6B7280]">Fill in the details below and save the task to your calendar.</p>
           </div>
-          <button type="button" onClick={closeModal} className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]">
+          <button
+            type="button"
+            onClick={closeModal}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[#6B7280] transition hover:bg-[#F3F4F6] hover:text-[#111827]"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -880,7 +1190,9 @@ function TaskEditorModal({
               className={`mt-2 h-12 w-full rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !title.trim() ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
               placeholder="Task title"
             />
-            {submitted && !title.trim() && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Title is required.</p>}
+            {submitted && !title.trim() && (
+              <p className="mt-2 text-xs font-semibold text-[#EF4444]">Title is required.</p>
+            )}
           </label>
 
           <label className="block">
@@ -904,17 +1216,33 @@ function TaskEditorModal({
                   placeholder="DD/MM/YYYY"
                   className={`h-12 flex-1 rounded-[16px] border bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10 ${submitted && !parseDateInput(dateInput) ? 'border-[#EF4444]' : 'border-[#E5E7EB]'}`}
                 />
-                <input ref={datePickerRef} type="date" value={parseDateInput(dateInput) || ''} onChange={(event) => setDateInput(formatDateInput(event.target.value))} className="sr-only" />
-                <button type="button" onClick={openDatePicker} className="h-12 rounded-[16px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F8FAFC]">
+                <input
+                  ref={datePickerRef}
+                  type="date"
+                  value={parseDateInput(dateInput) || ''}
+                  onChange={(event) => setDateInput(formatDateInput(event.target.value))}
+                  className="sr-only"
+                />
+                <button
+                  type="button"
+                  onClick={openDatePicker}
+                  className="h-12 rounded-[16px] border border-[#E5E7EB] px-3 text-sm font-semibold text-[#374151] transition hover:bg-[#F8FAFC]"
+                >
                   Pick
                 </button>
               </div>
-              {submitted && !parseDateInput(dateInput) && <p className="mt-2 text-xs font-semibold text-[#EF4444]">A valid date is required.</p>}
+              {submitted && !parseDateInput(dateInput) && (
+                <p className="mt-2 text-xs font-semibold text-[#EF4444]">A valid date is required.</p>
+              )}
             </label>
 
             <label className="block">
               <span className="text-sm font-semibold text-[#374151]">Reminder</span>
-              <select value={reminder} onChange={(event) => setReminder(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10">
+              <select
+                value={reminder}
+                onChange={(event) => setReminder(event.target.value)}
+                className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+              >
                 <option value="">None</option>
                 <option value="15 min">15 min before</option>
                 <option value="30 min">30 min before</option>
@@ -927,11 +1255,21 @@ function TaskEditorModal({
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
               <span className="text-sm font-semibold text-[#374151]">Start Time</span>
-              <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+              <input
+                type="time"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+                className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+              />
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-[#374151]">End Time</span>
-              <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" />
+              <input
+                type="time"
+                value={endTime}
+                onChange={(event) => setEndTime(event.target.value)}
+                className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+              />
             </label>
           </div>
 
@@ -950,21 +1288,37 @@ function TaskEditorModal({
                   </button>
                 ))}
               </div>
-              {submitted && !priority && <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>}
+              {submitted && !priority && (
+                <p className="mt-2 text-xs font-semibold text-[#EF4444]">Priority is required.</p>
+              )}
             </div>
 
             <label className="block">
               <span className="text-sm font-semibold text-[#374151]">Workspace</span>
-              <input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10" placeholder="Workspace name" />
+              <input
+                value={workspaceName}
+                onChange={(event) => setWorkspaceName(event.target.value)}
+                className="mt-2 h-12 w-full rounded-[16px] border border-[#E5E7EB] bg-white px-4 text-sm text-[#111827] outline-none transition focus:border-[#7C3AED] focus:ring-4 focus:ring-[#7C3AED]/10"
+                placeholder="Workspace name"
+              />
             </label>
           </div>
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#E5E7EB] pt-5">
-          <button type="button" onClick={closeModal} className="h-11 rounded-[16px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]">
+          <button
+            type="button"
+            onClick={closeModal}
+            className="h-11 rounded-[16px] border border-[#E5E7EB] px-5 text-sm font-semibold text-[#374151] transition hover:bg-[#F3F4F6]"
+          >
             Cancel
           </button>
-          <button type="button" disabled={saving} onClick={saveTask} className="h-11 rounded-[16px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={saveTask}
+            className="h-11 rounded-[16px] bg-[#7C3AED] px-5 text-sm font-semibold text-white transition hover:bg-[#6D28D9] disabled:opacity-60"
+          >
             {saving ? 'Saving...' : 'Save Event'}
           </button>
         </div>
