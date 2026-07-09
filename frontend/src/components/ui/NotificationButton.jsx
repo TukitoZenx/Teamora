@@ -170,9 +170,7 @@ export default function NotificationButton() {
 
   const markAllAsRead = async () => {
     const unread = notifications.filter((item) => !item.read)
-    const pendingJoin = notifications.filter(
-      (item) => item.type === 'join_request' && item.requestStatus === 'pending'
-    )
+    const pendingJoin = notifications.filter((item) => item.type === 'join_request' && item.requestStatus === 'pending')
     applyNotifications(pendingJoin)
     await Promise.allSettled(
       unread.filter((item) => !item.local).map((item) => api.patch(`/api/v1/workspaces/notifications/${item._id}/read`))
