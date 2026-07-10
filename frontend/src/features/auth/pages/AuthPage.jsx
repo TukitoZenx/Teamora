@@ -28,12 +28,14 @@ export default function AuthPage({ mode }) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.18 }}
       >
-        <div className="mb-10 text-center">
-          <h2 className="text-4xl font-medium tracking-tight text-text">
+        <div className="mb-8 text-center">
+          <h2 className="text-3xl font-semibold tracking-tight text-text sm:text-4xl">
             {isSignup ? 'Create your account' : 'Welcome back'}
           </h2>
-          <p className="mt-4 text-base text-muted">
-            {isSignup ? 'Get started with Teamora for free.' : 'Welcome back to Teamora.'}
+          <p className="mt-3 text-sm text-muted sm:text-base">
+            {isSignup
+              ? 'Join your team in a unified collaboration workspace.'
+              : 'Sign in to continue to your workspaces.'}
           </p>
         </div>
 

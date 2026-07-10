@@ -544,3 +544,44 @@ textarea {
   background: color-mix(in srgb, var(--tw-primary) 28%, transparent);
   color: var(--tw-text);
 }
+
+/* Equation blocks in documents */
+.eq-math {
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 1.05em;
+  line-height: 1.35;
+}
+.eq-frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.15em;
+  line-height: 1.1;
+}
+.eq-num {
+  border-bottom: 1px solid currentColor;
+  padding: 0 0.25em 0.05em;
+  min-width: 0.9em;
+  text-align: center;
+}
+.eq-den {
+  padding: 0.05em 0.25em 0;
+  min-width: 0.9em;
+  text-align: center;
+}
+.eq-matrix {
+  display: inline-table;
+  border-collapse: collapse;
+  margin: 0 0.25em;
+  vertical-align: middle;
+  border-left: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+.eq-matrix .eq-td {
+  padding: 0.1em 0.35em;
+  text-align: center;
+}
+.eq-block {
+  user-select: all;
+}

@@ -15,6 +15,7 @@ import api from '../services/api'
 import { ensureArray } from './utils/arrayUtils'
 import useLocalCollabChannel from '../hooks/useLocalCollabChannel'
 import { canShowBrowserNotification } from './utils/notificationPreferences'
+import { addWorkspaceNotification } from './utils/notifications'
 
 const priorities = ['Low', 'Medium', 'High', 'Urgent']
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -218,16 +219,41 @@ export default function Calendar({
         const delay = trigger.getTime() - Date.now()
         return window.setTimeout(() => {
           const message = `${task.title} is due ${task.startTime ? `at ${task.startTime}` : `on ${formatDate(task.date)}`}`
-          toast(message)
-          if (canShowBrowserNotification('meeting_reminder')) {
-            new Notification('Teamora task reminder', { body: message })
+          toast(message, { icon: '⏰', duration: 8000 })
+          addWorkspaceNotification({
+            type: 'task_reminder',
+            message,
+            workspaceId,
+            taskId: task.id || task._id,
+            taskTitle: task.title
+          })
+          // Browser notification — task + meeting reminder prefs both accepted
+          if (typeof Notification !== 'undefined') {
+            const prefsOk =
+              canShowBrowserNotification('task_reminder') ||
+              canShowBrowserNotification('meeting_reminder')
+            const fire = () => {
+              if (prefsOk || Notification.permission === 'granted') {
+                try {
+                  new Notification('Teamora task reminder', { body: message })
+                } catch {
+                  // ignore
+                }
+              }
+            }
+            if (Notification.permission === 'granted') fire()
+            else if (Notification.permission === 'default') {
+              Notification.requestPermission().then((perm) => {
+                if (perm === 'granted') fire()
+              })
+            }
           }
         }, delay)
       })
       .filter(Boolean)
 
     return () => timers.forEach((timer) => window.clearTimeout(timer))
-  }, [tasks])
+  }, [tasks, workspaceId])
 
   const cells = useMemo(() => {
     const year = currentDate.getFullYear()

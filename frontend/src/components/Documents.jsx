@@ -25,12 +25,37 @@ import {
 } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 import toast from 'react-hot-toast'
+import {
+  SHAPE_LIBRARY,
+  newTextBox,
+  newShape,
+  renderEquationHtml,
+  shapeCss
+} from './utils/canvasOverlays'
 
 const FONTS = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
 const SIZES = ['12px', '14px', '16px', '18px', '24px', '32px']
 const LINE_SPACINGS = ['1.0', '1.15', '1.5', '2.0']
 const MARGINS = ['0.5 in', '0.75 in', '1.0 in']
 const PAPER_SIZES = ['A4', 'Letter', 'Legal']
+
+/** Print layout page size in CSS px (~96dpi). */
+const PAGE_SIZE_PX = {
+  Letter: { w: 816, h: 1056 },
+  A4: { w: 794, h: 1123 },
+  Legal: { w: 816, h: 1344 }
+}
+
+const getPageDims = (paperSize, orientation) => {
+  const base = PAGE_SIZE_PX[paperSize] || PAGE_SIZE_PX.Letter
+  return orientation === 'landscape' ? { w: base.h, h: base.w } : { ...base }
+}
+
+const marginToInches = (marginLabel) => {
+  if (marginLabel === '0.5 in') return 0.5
+  if (marginLabel === '0.75 in') return 0.75
+  return 1
+}
 
 export default function Documents({
   mountElRef,
@@ -49,8 +74,12 @@ export default function Documents({
   onRenameDocument,
   onDuplicateDocument,
   onForceSave,
+  onSaveAs,
+  onSaveDraft,
   onDirtyChange,
-  onMount
+  onMount,
+  onAddComment,
+  onDeleteComment
 }) {
   const [docTitle, setDocTitle] = useState(initialTitle || 'Untitled Document')
   const [titleSource, setTitleSource] = useState(initialTitle || '')
@@ -68,8 +97,7 @@ export default function Documents({
     if (onMount) onMount()
   }, [onMount])
 
-  // Click-outside / Escape closes ribbon menus. Use `click` (not mousedown) so
-  // menu item onClick still fires before the menu unmounts.
+  // Close File/Insert/Layout when clicking anywhere outside the menu bar.
   useEffect(() => {
     if (!openMenu) return undefined
 
@@ -82,14 +110,36 @@ export default function Documents({
       if (event.key === 'Escape') setOpenMenu(null)
     }
 
-    // Capture phase after the menu button's own click has been handled.
-    document.addEventListener('click', handlePointerDown)
+    // mousedown catches outside clicks before focus shifts; also listen on scroll container.
+    document.addEventListener('mousedown', handlePointerDown, true)
+    document.addEventListener('touchstart', handlePointerDown, true)
     document.addEventListener('keydown', handleKeyDown)
     return () => {
-      document.removeEventListener('click', handlePointerDown)
+      document.removeEventListener('mousedown', handlePointerDown, true)
+      document.removeEventListener('touchstart', handlePointerDown, true)
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [openMenu])
+
+  // Isolate pasted content so later edits don't reformat source (Quill matchVisual quirk).
+  useEffect(() => {
+    const quill = quillRef?.current
+    if (!quill || !editorReady) return undefined
+    const root = quill.root
+    const onPaste = () => {
+      // After paste settles, clear any shared format cache by re-selecting caret only.
+      window.setTimeout(() => {
+        try {
+          const range = quill.getSelection()
+          if (range) quill.setSelection(range.index + range.length, 0, 'silent')
+        } catch {
+          // ignore
+        }
+      }, 0)
+    }
+    root.addEventListener('paste', onPaste)
+    return () => root.removeEventListener('paste', onPaste)
+  }, [quillRef, editorReady])
 
   const toggleMenu = (menuId) => {
     setOpenMenu((current) => (current === menuId ? null : menuId))
@@ -107,29 +157,42 @@ export default function Documents({
   const [pageColor, setPageColor] = useState('#ffffff')
   const [pageBorder, setPageBorder] = useState('none')
   const [zoom, setZoom] = useState(100)
+  const [printLayout, setPrintLayout] = useState(true)
+  const [overlays, setOverlays] = useState([]) // text boxes + shapes
+  const [selectedOverlayId, setSelectedOverlayId] = useState(null)
+  const [showShapePicker, setShowShapePicker] = useState(false)
+  const [pageNumberFormat, setPageNumberFormat] = useState('Page {n} of {total}')
+  const [showPageNumbers, setShowPageNumbers] = useState(true)
+  const [outerPageBorder, setOuterPageBorder] = useState(true)
 
   // Stats
   const [stats, setStats] = useState({ words: 0, characters: 0, readTime: 1, pages: 1 })
   const [currentPage, setCurrentPage] = useState(1)
   const scrollContainerRef = useRef(null)
+  const pageShellRef = useRef(null)
+
+  const pageDims = getPageDims(paperSize, orientation)
+  const pageGap = 24
+  const pageStride = pageDims.h + pageGap
+  const marginIn = marginToInches(pageMargin)
+  const marginPx = Math.round(marginIn * 96)
 
   // Scroll handler to monitor visible page
   useEffect(() => {
     const handleScroll = () => {
       if (scrollContainerRef.current) {
         const scrollTop = scrollContainerRef.current.scrollTop
-        const pageIdx = Math.max(1, Math.ceil((scrollTop + 300) / 1076))
-        setCurrentPage(pageIdx)
+        const scale = zoom / 100
+        const pageIdx = Math.max(1, Math.floor(scrollTop / (pageStride * scale)) + 1)
+        setCurrentPage(Math.min(pageIdx, stats.pages || 1))
       }
     }
     const el = scrollContainerRef.current
-    if (el) {
-      el.addEventListener('scroll', handleScroll)
-    }
+    if (el) el.addEventListener('scroll', handleScroll)
     return () => el?.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [zoom, pageStride, stats.pages])
 
-  // Monitor statistics
+  // Monitor statistics + paginated page count
   useEffect(() => {
     const interval = setInterval(() => {
       const quill = quillRef?.current
@@ -138,14 +201,15 @@ export default function Documents({
         const words = text ? text.split(/\s+/).filter(Boolean).length : 0
         const chars = text.length
         const readTime = Math.max(1, Math.ceil(words / 200))
-        const pages = Math.max(1, Math.ceil(quill.root.scrollHeight / 1076))
+        const contentH = Math.max(quill.root.scrollHeight, pageDims.h)
+        const pages = Math.max(1, Math.ceil(contentH / pageDims.h))
         setStats({ words, characters: chars, readTime, pages })
       }
     }, 800)
     return () => clearInterval(interval)
-  }, [quillRef, editorReady])
+  }, [quillRef, editorReady, pageDims.h])
 
-  // Set page style rules dynamically on the Quill editor root
+  // Print-layout styles on Quill root (true page bounds + repeating page bands)
   useEffect(() => {
     const root = quillRef?.current?.root
     if (!(root instanceof HTMLElement)) return
@@ -158,10 +222,11 @@ export default function Documents({
           : fontFamily === 'Monospace'
             ? 'monospace'
             : fontFamily
-    const marginVal = pageMargin === '0.5 in' ? '0.5in' : pageMargin === '0.75 in' ? '0.75in' : '1in'
     const isDark = document.documentElement.classList.contains('dark')
-    const sheetBg = pageColor || (isDark ? '#020617' : '#ffffff')
-    const gapBg = isDark ? '#0f172a' : '#e2e8f0'
+    const sheetBg = pageColor || (isDark ? '#0b1220' : '#ffffff')
+    const gapBg = isDark ? '#0f172a' : '#cbd5e1'
+    const pageH = pageDims.h
+    const pageW = pageDims.w
 
     root.setAttribute(
       'style',
@@ -172,13 +237,15 @@ export default function Documents({
         `color:${textColor}`,
         `column-count:${columnsCount}`,
         'column-gap:24px',
-        `padding:${marginVal}`,
-        pageBorder === 'none' ? 'border:none' : `border:2px ${pageBorder} #cbd5e1`,
-        `background:repeating-linear-gradient(to bottom,${sheetBg},${sheetBg} 1056px,${gapBg} 1056px,${gapBg} 1076px)`,
-        'background-size:100% 1076px',
-        orientation === 'landscape'
-          ? 'aspect-ratio:1.414;max-width:1056px;min-height:816px'
-          : 'aspect-ratio:0.707;max-width:816px;min-height:1056px'
+        `padding:${marginPx}px`,
+        pageBorder === 'none' ? 'border:none' : `border:2px ${pageBorder} #94a3b8`,
+        printLayout
+          ? `background:repeating-linear-gradient(to bottom,${sheetBg} 0,${sheetBg} ${pageH}px,${gapBg} ${pageH}px,${gapBg} ${pageH + pageGap}px);background-size:100% ${pageH + pageGap}px;background-clip:padding-box`
+          : `background:${sheetBg}`,
+        `width:${pageW}px`,
+        `min-height:${pageH}px`,
+        'box-sizing:border-box',
+        'outline:none'
       ].join(';')
     )
   }, [
@@ -191,6 +258,12 @@ export default function Documents({
     pageMargin,
     pageBorder,
     orientation,
+    paperSize,
+    printLayout,
+    pageDims.w,
+    pageDims.h,
+    marginPx,
+    pageGap,
     editorReady,
     quillRef
   ])
@@ -244,6 +317,8 @@ export default function Documents({
 
   const handleMenuAction = (action) => {
     setOpenMenu(null)
+    setShowShapePicker(false)
+    setOpenMenu(null)
     const quill = quillRef?.current
     if (!quill && action !== 'newDoc') {
       toast.error('Editor is not ready yet. Click in the page and try again.')
@@ -289,25 +364,29 @@ export default function Documents({
         break
       }
       case 'saveDoc': {
-        onForceSave?.()
-        if (socket && quill) {
-          socket.emit('doc-content-sync', { roomId, html: quill.root.innerHTML })
-        }
+        Promise.resolve(onForceSave?.()).catch(() => {})
         onDirtyChange?.(false)
-        toast.success('Document saved successfully!')
+        break
+      }
+      case 'saveAsDoc': {
+        Promise.resolve(onSaveAs?.()).catch(() => {})
         break
       }
       case 'saveDraft': {
-        const draftVersion = {
-          versionId: 'ver-' + Math.random().toString(36).substring(7),
-          timestamp: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString(),
-          user: userName,
-          data: quill.root.innerHTML
+        if (onSaveDraft) {
+          onSaveDraft()
+        } else {
+          const draftVersion = {
+            versionId: 'ver-' + Math.random().toString(36).substring(7),
+            timestamp: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString(),
+            user: userName,
+            data: quill.root.innerHTML
+          }
+          const updatedHistory = [draftVersion, ...ensureArray(versions)]
+          socket?.emit?.('update-document-versions', { roomId, versions: updatedHistory })
+          onForceSave?.()
+          toast.success('Draft saved to Version History!')
         }
-        const updatedHistory = [draftVersion, ...ensureArray(versions)]
-        socket?.emit('update-document-versions', { roomId, versions: updatedHistory })
-        onForceSave?.()
-        toast.success('Draft saved to Version History!')
         break
       }
       case 'renameDoc': {
@@ -473,9 +552,13 @@ export default function Documents({
         break
       }
       case 'insertPageNumber': {
-        quill.focus()
-        const rangePn = quill.getSelection() || { index: quill.getLength() }
-        quill.insertText(rangePn.index, ' [Page Number] ')
+        setShowPageNumbers(true)
+        const fmt = prompt(
+          'Page number format — use {n} for page and {total} for count:',
+          pageNumberFormat
+        )
+        if (fmt?.trim()) setPageNumberFormat(fmt.trim())
+        toast.success('Page numbers shown in footer on each page')
         break
       }
       case 'insertDate': {
@@ -485,16 +568,7 @@ export default function Documents({
         break
       }
       case 'insertShape': {
-        const shape = prompt('Enter shape name (circle, square, triangle):', 'square')
-        if (shape) {
-          quill.focus()
-          const rangeS = quill.getSelection() || { index: quill.getLength() }
-          const shapeStyle = shape === 'circle' ? 'border-radius: 50%;' : ''
-          quill.clipboard.dangerouslyPasteHTML(
-            rangeS.index,
-            `<div style="width: 80px; height: 80px; border: 2px solid #6366f1; background: #6366f120; ${shapeStyle} display: inline-block; margin: 5px;"></div>`
-          )
-        }
+        setShowShapePicker(true)
         break
       }
       case 'insertIcon': {
@@ -504,35 +578,137 @@ export default function Documents({
         break
       }
       case 'insertEquation': {
-        const eq = prompt('Enter math equation (LaTeX style):', 'E = mc^2')
+        const eq = prompt(
+          'Equation (supports ^  _  a/b  \\frac{a}{b}  \\int  \\sum  \\pi  mc^2):',
+          'E = mc^2'
+        )
         if (eq) {
           quill.focus()
           const rangeEq = quill.getSelection() || { index: quill.getLength() }
-          quill.insertText(rangeEq.index, ` f(x) = ${eq} `)
+          const html = `<span class="eq-block" contenteditable="false" style="display:inline-block;padding:2px 6px;margin:0 2px;border-radius:6px;background:var(--tw-card-sunken);border:1px solid var(--tw-border);font-family:serif;">${renderEquationHtml(eq)}</span>&nbsp;`
+          quill.clipboard.dangerouslyPasteHTML(rangeEq.index, html, 'user')
+          toast.success('Equation inserted')
         }
+        break
+      }
+      case 'insertTextBox': {
+        const box = newTextBox({ zIndex: overlays.length + 10 })
+        setOverlays((current) => [...current, box])
+        setSelectedOverlayId(box.id)
+        toast.success('Text box added — drag to move, corner to resize')
+        break
+      }
+      case 'insertPageBorder': {
+        setOuterPageBorder(true)
+        setPageBorder((b) => (b === 'none' ? 'solid' : b))
+        toast.success('Page border enabled — adjust style in Layout')
+        break
+      }
+      case 'togglePrintLayout': {
+        setPrintLayout((v) => !v)
+        toast.success(printLayout ? 'Web layout' : 'Print layout')
         break
       }
     }
   }
 
+  const addShapeFromLibrary = (shapeId) => {
+    const shape = newShape(shapeId, { zIndex: overlays.length + 10 })
+    setOverlays((current) => [...current, shape])
+    setSelectedOverlayId(shape.id)
+    setShowShapePicker(false)
+    toast.success(`${shapeId} added — edit fill, border, and text on selection`)
+  }
+
+  const updateOverlay = (id, patch) => {
+    setOverlays((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
+  }
+
+  const removeOverlay = (id) => {
+    setOverlays((current) => current.filter((item) => item.id !== id))
+    if (selectedOverlayId === id) setSelectedOverlayId(null)
+  }
+
+  const bringOverlayForward = (id) => {
+    setOverlays((current) => {
+      const maxZ = current.reduce((m, o) => Math.max(m, o.zIndex || 0), 0)
+      return current.map((o) => (o.id === id ? { ...o, zIndex: maxZ + 1 } : o))
+    })
+  }
+
+  const startOverlayDrag = (event, item, mode = 'move') => {
+    event.preventDefault()
+    event.stopPropagation()
+    setSelectedOverlayId(item.id)
+    const startX = event.clientX
+    const startY = event.clientY
+    const origin = {
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+      rotation: item.rotation || 0
+    }
+    const scale = zoom / 100
+
+    const onMove = (moveEvent) => {
+      const dx = (moveEvent.clientX - startX) / scale
+      const dy = (moveEvent.clientY - startY) / scale
+      if (mode === 'move') {
+        updateOverlay(item.id, {
+          x: Math.max(0, origin.x + dx),
+          y: Math.max(0, origin.y + dy)
+        })
+      } else if (mode === 'resize') {
+        updateOverlay(item.id, {
+          width: Math.max(48, origin.width + dx),
+          height: Math.max(32, origin.height + dy)
+        })
+      } else if (mode === 'rotate') {
+        updateOverlay(item.id, {
+          rotation: Math.round(origin.rotation + dx)
+        })
+      }
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
   const handleAddComment = () => {
     if (!commentInput.trim()) return
-    const commentObj = {
-      id: 'comment-' + Math.random().toString(36).substring(7),
-      user: userName,
-      text: commentInput,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-    const updated = [...comments, commentObj]
-    socket.emit('update-document-comments', { roomId, comments: updated })
+    const text = commentInput.trim()
     setCommentInput('')
-    toast.success('Comment thread added!')
+    if (onAddComment) {
+      onAddComment(text)
+      return
+    }
+    // Legacy local channel fallback
+    if (socket?.emit) {
+      const commentObj = {
+        id: 'comment-' + Math.random().toString(36).substring(7),
+        user: userName,
+        text,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+      socket.emit('update-document-comments', { roomId, comments: [...ensureArray(comments), commentObj] })
+      toast.success('Comment thread added!')
+    }
   }
 
   const handleDeleteComment = (commentId) => {
-    const updated = comments.filter((c) => c.id !== commentId)
-    socket.emit('update-document-comments', { roomId, comments: updated })
-    toast.success('Comment resolved.')
+    if (onDeleteComment) {
+      onDeleteComment(commentId)
+      return
+    }
+    if (socket?.emit) {
+      const updated = ensureArray(comments).filter((c) => c.id !== commentId)
+      socket.emit('update-document-comments', { roomId, comments: updated })
+      toast.success('Comment resolved.')
+    }
   }
 
   return (
@@ -639,6 +815,15 @@ export default function Documents({
               >
                 <Save className="w-3.5 h-3.5" />
                 Save
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('saveAsDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Save As…
               </button>
               <button
                 type="button"
@@ -753,6 +938,15 @@ export default function Documents({
                 <Link className="w-3.5 h-3.5" />
                 Hyperlink
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertTextBox')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Type className="w-3.5 h-3.5" />
+                Text Box
+              </button>
               <div className="h-px bg-border my-1" />
               <button
                 type="button"
@@ -761,6 +955,14 @@ export default function Documents({
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
               >
                 Page Break
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertPageBorder')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                Page Border
               </button>
               <button
                 type="button"
@@ -1134,25 +1336,262 @@ export default function Documents({
 
       {/* Editor Content Area + Collapsible Side Panel */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Main Editor Page Layout */}
+        {/* Main Editor — paginated print layout */}
         <div
-          className="flex-1 overflow-y-auto flex justify-center bg-card-sunken p-4 shadow-inner"
+          className="flex-1 overflow-y-auto overflow-x-auto flex justify-center bg-card-sunken p-6 shadow-inner"
           ref={scrollContainerRef}
+          onClick={() => {
+            setSelectedOverlayId(null)
+            setShowShapePicker(false)
+          }}
         >
+          {showShapePicker && (
+            <div
+              className="fixed z-50 max-h-72 w-56 overflow-y-auto rounded-xl border border-border bg-card p-2 shadow-dropdown"
+              style={{ top: 140, left: '50%', transform: 'translateX(-50%)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted">Shape library</p>
+              {SHAPE_LIBRARY.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-text hover:bg-primary/10 hover:text-primary"
+                  onClick={() => addShapeFromLibrary(s.id)}
+                >
+                  <Shapes className="h-3.5 w-3.5" />
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div
-            className="w-full bg-card shadow-card transition-all relative flex flex-col my-4 min-h-[1056px] h-max border border-border origin-top"
+            className="relative my-2 origin-top shrink-0"
             style={{
-              maxWidth: orientation === 'landscape' ? '1056px' : '816px',
+              width: pageDims.w,
               transform: `scale(${zoom / 100})`,
-              marginBottom: `${(zoom / 100) * 1056 - 1056 + 16}px`
+              marginBottom: `${Math.max(24, (zoom / 100) * pageDims.h * stats.pages - pageDims.h * stats.pages + 48)}px`
             }}
           >
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
+            {/* Page boundary guides + fixed footers */}
+            {printLayout &&
+              Array.from({ length: stats.pages }).map((_, i) => (
+                <div
+                  key={`page-guide-${i}`}
+                  className={`pointer-events-none absolute left-0 shadow-card ${
+                    outerPageBorder ? 'border-2 border-border' : 'border border-border/60'
+                  }`}
+                  style={{
+                    top: i * (pageDims.h + pageGap),
+                    height: pageDims.h,
+                    width: pageDims.w,
+                    zIndex: 0,
+                    borderStyle: pageBorder === 'none' ? 'solid' : pageBorder
+                  }}
+                >
+                  <div
+                    className="absolute inset-0 border border-dashed border-primary/15"
+                    style={{ margin: marginPx }}
+                  />
+                  {showPageNumbers && (
+                    <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+                      <span className="select-none rounded-full bg-card/90 px-3 py-0.5 text-[10px] font-semibold text-muted shadow-sm">
+                        {pageNumberFormat
+                          .replace(/\{n\}/g, String(i + 1))
+                          .replace(/\{total\}/g, String(stats.pages))}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+
             <div
-              ref={mountElRef}
-              className="flex-1 quill-editor-wrapper min-h-[400px] text-text p-8 outline-none"
-              data-editor-ready={editorReady ? 'true' : 'false'}
-            />
+              ref={pageShellRef}
+              className="relative z-10 bg-card shadow-card"
+              style={{
+                width: pageDims.w,
+                minHeight: Math.max(pageDims.h, stats.pages * pageDims.h + Math.max(0, stats.pages - 1) * pageGap),
+                backgroundColor: pageColor,
+                border: outerPageBorder
+                  ? `2px ${pageBorder === 'none' ? 'solid' : pageBorder} var(--tw-border-strong)`
+                  : '1px solid var(--tw-border)'
+              }}
+            >
+              <div
+                ref={mountElRef}
+                className="quill-editor-wrapper text-text outline-none relative z-10"
+                data-editor-ready={editorReady ? 'true' : 'false'}
+                onClick={(e) => e.stopPropagation()}
+              />
+
+              {/* Movable / resizable text boxes & shapes */}
+              {overlays.map((item) => {
+                const selected = selectedOverlayId === item.id
+                const fontCss =
+                  item.fontFamily === 'Sans-Serif'
+                    ? 'sans-serif'
+                    : item.fontFamily === 'Serif'
+                      ? 'serif'
+                      : item.fontFamily === 'Monospace'
+                        ? 'monospace'
+                        : item.fontFamily
+                const sc = item.kind === 'shape' ? shapeCss(item.shape, selected) : {}
+                return (
+                  <div
+                    key={item.id}
+                    className={`absolute group ${selected ? 'ring-2 ring-primary' : ''}`}
+                    style={{
+                      left: item.x,
+                      top: item.y,
+                      width: item.width,
+                      height: item.shape === 'line' ? Math.max(item.borderWidth || 2, 2) : item.height,
+                      transform: `rotate(${item.rotation || 0}deg)`,
+                      zIndex: item.zIndex || 10,
+                      background: item.fill || 'transparent',
+                      borderColor: item.borderColor,
+                      borderWidth: sc.borderWidth === 0 ? 0 : item.borderWidth ?? 1,
+                      borderStyle: 'solid',
+                      borderRadius: sc.borderRadius,
+                      clipPath: sc.clipPath,
+                      boxShadow: item.kind === 'textbox' ? 'var(--tw-shadow-card)' : undefined
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedOverlayId(item.id)
+                    }}
+                    onMouseDown={(e) => startOverlayDrag(e, item, 'move')}
+                  >
+                    <textarea
+                      value={item.text || ''}
+                      onChange={(e) => updateOverlay(item.id, { text: e.target.value })}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      placeholder={item.kind === 'shape' ? 'Shape text…' : 'Type…'}
+                      className="h-full w-full resize-none border-none bg-transparent p-2 outline-none"
+                      style={{
+                        fontFamily: fontCss,
+                        fontSize: item.fontSize,
+                        color: item.color,
+                        fontWeight: item.bold ? 700 : 400,
+                        fontStyle: item.italic ? 'italic' : 'normal',
+                        textAlign: item.align || 'left'
+                      }}
+                    />
+                    {selected && (
+                      <>
+                        <div className="absolute -top-8 right-0 flex gap-1">
+                          <button
+                            type="button"
+                            className="rounded bg-card border border-border px-1.5 py-0.5 text-[10px] font-semibold text-text"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              bringOverlayForward(item.id)
+                            }}
+                          >
+                            Front
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded bg-danger/90 px-1.5 py-0.5 text-[10px] text-white"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeOverlay(item.id)
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        <div
+                          className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-se-resize rounded-sm border border-card bg-primary"
+                          onMouseDown={(e) => startOverlayDrag(e, item, 'resize')}
+                          title="Resize"
+                        />
+                        <div
+                          className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-card bg-primary"
+                          onMouseDown={(e) => startOverlayDrag(e, item, 'rotate')}
+                          title="Rotate"
+                        />
+                        <div
+                          className="absolute -bottom-10 left-0 flex max-w-[280px] flex-wrap gap-1 rounded-lg border border-border bg-card p-1 shadow-dropdown"
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="rounded px-1.5 text-[10px] font-bold hover:bg-primary/10"
+                            onClick={() => updateOverlay(item.id, { bold: !item.bold })}
+                          >
+                            B
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded px-1.5 text-[10px] italic hover:bg-primary/10"
+                            onClick={() => updateOverlay(item.id, { italic: !item.italic })}
+                          >
+                            I
+                          </button>
+                          <select
+                            className="rounded border border-border bg-card-sunken px-1 text-[10px]"
+                            value={item.fontSize}
+                            onChange={(e) => updateOverlay(item.id, { fontSize: e.target.value })}
+                          >
+                            {SIZES.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                          <label className="flex items-center gap-0.5 text-[9px] text-muted">
+                            Text
+                            <input
+                              type="color"
+                              value={item.color?.startsWith('#') ? item.color : '#0f172a'}
+                              onChange={(e) => updateOverlay(item.id, { color: e.target.value })}
+                              className="h-5 w-5 cursor-pointer"
+                            />
+                          </label>
+                          <label className="flex items-center gap-0.5 text-[9px] text-muted">
+                            Fill
+                            <input
+                              type="color"
+                              value={
+                                typeof item.fill === 'string' && item.fill.startsWith('#')
+                                  ? item.fill
+                                  : '#ffffff'
+                              }
+                              onChange={(e) => updateOverlay(item.id, { fill: e.target.value })}
+                              className="h-5 w-5 cursor-pointer"
+                            />
+                          </label>
+                          <label className="flex items-center gap-0.5 text-[9px] text-muted">
+                            Border
+                            <input
+                              type="color"
+                              value={
+                                typeof item.borderColor === 'string' && item.borderColor.startsWith('#')
+                                  ? item.borderColor
+                                  : '#6366f1'
+                              }
+                              onChange={(e) => updateOverlay(item.id, { borderColor: e.target.value })}
+                              className="h-5 w-5 cursor-pointer"
+                            />
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={12}
+                            value={item.borderWidth ?? 1}
+                            onChange={(e) =>
+                              updateOverlay(item.id, { borderWidth: Number(e.target.value) || 0 })
+                            }
+                            className="w-10 rounded border border-border bg-card-sunken px-1 text-[10px]"
+                            title="Border width"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
 
@@ -1243,17 +1682,31 @@ export default function Documents({
       </div>
 
       {/* Document Metrics Status Bar */}
-      <div className="h-6 border-t border-border bg-card px-4 flex items-center justify-between text-[9px] font-bold text-muted select-none shrink-0">
+      <div className="h-7 border-t border-border bg-card px-4 flex items-center justify-between text-[9px] font-bold text-muted select-none shrink-0">
         <div className="flex items-center gap-3">
           <span>
             PAGE: {currentPage} of {stats.pages}
+          </span>
+          <span>
+            {paperSize} · {orientation} · {pageMargin}
           </span>
           <span>WORDS: {stats.words}</span>
           <span>CHARACTERS: {stats.characters}</span>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPrintLayout((v) => !v)}
+            className={`rounded-full px-2 py-0.5 border text-[9px] font-bold cursor-pointer ${
+              printLayout
+                ? 'border-primary/30 bg-primary/10 text-primary'
+                : 'border-border bg-card-sunken text-muted'
+            }`}
+          >
+            {printLayout ? 'Print layout' : 'Web layout'}
+          </button>
           <span className="flex items-center gap-1">
-            <Sparkles className="w-2.5 h-2.5 text-primary" /> READING TIME: ~{stats.readTime} MIN
+            <Sparkles className="w-2.5 h-2.5 text-primary" /> ~{stats.readTime} MIN
           </span>
           <span>COLLABORATORS: {activeUsersCount}</span>
         </div>

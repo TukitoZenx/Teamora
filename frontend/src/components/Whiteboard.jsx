@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   Type,
   Hand,
+  MousePointer2,
   PenTool,
   Grid3X3,
   StickyNote,
@@ -60,10 +61,12 @@ export default function Whiteboard({
   const [pages, setPages] = useState([{ id: 'page-1', name: 'Page 1' }])
   const [activePageId, setActivePageId] = useState('page-1')
 
-  // Freehand drawing states
+  // Freehand drawing states (strokes persist as path elements per page)
   const [isDrawing, setIsDrawing] = useState(false)
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
   const [brushOpacity, setBrushOpacity] = useState(1.0)
+  const strokePointsRef = useRef([])
+  const strokeMetaRef = useRef(null)
 
   // Selection states
   const [selectedElementId, setSelectedElementId] = useState(null)
@@ -132,6 +135,34 @@ export default function Whiteboard({
     [canvasRef]
   )
 
+  const clearCanvasOnly = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+  }, [canvasRef])
+
+  const redrawPagePaths = useCallback(
+    (pageId, elementsList) => {
+      clearCanvasOnly()
+      const paths = ensureArray(elementsList).filter(
+        (el) => el?.type === 'path' && (el.pageId || 'page-1') === pageId && Array.isArray(el.points) && el.points.length > 1
+      )
+      paths.forEach((path) => {
+        for (let i = 1; i < path.points.length; i += 1) {
+          const a = path.points[i - 1]
+          const b = path.points[i]
+          drawStrokeOnCanvas(a.x, a.y, b.x, b.y, path.color || '#000', path.size || 3, path.opacity ?? 1)
+        }
+      })
+    },
+    [clearCanvasOnly, drawStrokeOnCanvas]
+  )
+
+  // When page changes, show only that page's ink.
+  useEffect(() => {
+    redrawPagePaths(activePageId, elements)
+  }, [activePageId, elements, redrawPagePaths])
+
   // Sync elements with database / socket cache
   useEffect(() => {
     socket.on('receive-clear-board', () => {
@@ -143,7 +174,9 @@ export default function Whiteboard({
       toast.error('Board was cleared by a collaborator')
     })
 
-    socket.on('receive-draw-line', ({ startX, startY, endX, endY, color, size, opacity }) => {
+    socket.on('receive-draw-line', ({ startX, startY, endX, endY, color, size, opacity, pageId }) => {
+      // Only live-ink on the page the peer is drawing; full paths arrive via elements sync.
+      if (pageId && pageId !== activePageId) return
       drawStrokeOnCanvas(startX, startY, endX, endY, color, size, opacity)
     })
 
@@ -156,12 +189,29 @@ export default function Whiteboard({
       }
     })
 
+    const onPages = (payload) => {
+      if (Array.isArray(payload?.pages) && payload.pages.length > 0) {
+        setPages(payload.pages)
+        if (payload.activePageId && payload.pages.some((p) => p.id === payload.activePageId)) {
+          // Don't force remote active page unless we don't have it
+          setActivePageId((current) => {
+            if (payload.pages.some((p) => p.id === current)) return current
+            return payload.activePageId
+          })
+        }
+      } else if (Array.isArray(payload) && payload.length > 0) {
+        setPages(payload)
+      }
+    }
+    socket.on('receive-whiteboard-pages', onPages)
+
     return () => {
       socket.off('receive-clear-board')
       socket.off('receive-draw-line')
       socket.off('receive-whiteboard-elements')
+      socket.off('receive-whiteboard-pages', onPages)
     }
-  }, [socket, canvasRef, drawStrokeOnCanvas])
+  }, [socket, canvasRef, drawStrokeOnCanvas, activePageId])
 
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current
@@ -239,7 +289,19 @@ export default function Whiteboard({
       return
     }
 
-    // Drawing lines (Pen, Marker, Pencil, Highlighter)
+    // Drawing lines (Pen, Marker, Pencil, Highlighter, Eraser)
+    const drawColor = whiteboardTool === 'eraser' ? 'eraser' : myColor
+    let activeOpacity = brushOpacity
+    if (whiteboardTool === 'highlighter') activeOpacity = 0.35
+    else if (whiteboardTool === 'pencil') activeOpacity = 0.6
+
+    strokePointsRef.current = [{ x, y }]
+    strokeMetaRef.current = {
+      color: drawColor,
+      size: whiteboardSize,
+      opacity: activeOpacity,
+      pageId: activePageId
+    }
     setIsDrawing(true)
     setLastPos({ x, y })
   }
@@ -257,18 +319,12 @@ export default function Whiteboard({
     const x = (e.clientX - rect.left) * (canvas.width / rect.width)
     const y = (e.clientY - rect.top) * (canvas.height / rect.height)
 
-    const isLaser = whiteboardTool === 'laser'
-    const drawColor = whiteboardTool === 'eraser' ? 'eraser' : myColor
+    const meta = strokeMetaRef.current || {}
+    const drawColor = meta.color || (whiteboardTool === 'eraser' ? 'eraser' : myColor)
+    const activeOpacity = meta.opacity ?? 1
+    const size = meta.size || whiteboardSize
 
-    // Apply custom opacity per tool
-    let activeOpacity = brushOpacity
-    if (whiteboardTool === 'highlighter') {
-      activeOpacity = 0.35
-    } else if (whiteboardTool === 'pencil') {
-      activeOpacity = 0.6
-    }
-
-    drawStrokeOnCanvas(lastPos.x, lastPos.y, x, y, drawColor, whiteboardSize, activeOpacity)
+    drawStrokeOnCanvas(lastPos.x, lastPos.y, x, y, drawColor, size, activeOpacity)
     socket.emit('draw-line', {
       roomId,
       startX: lastPos.x,
@@ -276,15 +332,41 @@ export default function Whiteboard({
       endX: x,
       endY: y,
       color: drawColor,
-      size: whiteboardSize,
-      isLaser,
-      opacity: activeOpacity
+      size,
+      opacity: activeOpacity,
+      pageId: activePageId
     })
 
+    strokePointsRef.current.push({ x, y })
     setLastPos({ x, y })
   }
 
   const handleMouseUp = () => {
+    if (isDrawing && strokePointsRef.current.length > 1 && strokeMetaRef.current) {
+      const meta = strokeMetaRef.current
+      const pathElem = {
+        id: generateId('path'),
+        type: 'path',
+        points: [...strokePointsRef.current],
+        color: meta.color,
+        size: meta.size,
+        opacity: meta.opacity,
+        pageId: meta.pageId || activePageId,
+        locked: false,
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0
+      }
+      const next = [...(Array.isArray(elementsRef.current) ? elementsRef.current : []), pathElem]
+      setElements(next)
+      elementsRef.current = next
+      onDirtyChange?.(true)
+      socket.emit('update-whiteboard-elements', { roomId, elements: next })
+      window.setTimeout(() => onDirtyChange?.(false), 300)
+    }
+    strokePointsRef.current = []
+    strokeMetaRef.current = null
     setIsDrawing(false)
     setIsPanning(false)
   }
@@ -301,21 +383,27 @@ export default function Whiteboard({
   }
 
   const handleClear = () => {
-    const remaining = elements.filter((element) => (element.pageId || 'page-1') !== activePageId)
+    // Only clear the active page — other pages' elements and strokes stay intact.
+    const remaining = ensureArray(elements).filter((element) => (element.pageId || 'page-1') !== activePageId)
+    setUndoStack((prev) => [...prev, ensureArray(elements)])
+    setRedoStack([])
     setElements(remaining)
     setSelectedElementId(null)
-    const canvas = canvasRef.current
-    if (canvas) {
-      canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
-    }
+    clearCanvasOnly()
     socket.emit('update-whiteboard-elements', { roomId, elements: remaining })
-    toast.success('Brainstorm board cleared!')
+    toast.success('This page was cleared')
   }
 
   const addPage = () => {
     const page = { id: `page-${Date.now()}`, name: `Page ${pages.length + 1}` }
-    setPages((current) => [...current, page])
+    const nextPages = [...pages, page]
+    setPages(nextPages)
     setActivePageId(page.id)
+    // Broadcast page list so collaborators see the new page immediately.
+    socket?.emit?.('update-whiteboard-pages', { roomId, pages: nextPages, activePageId: page.id })
+    // New page starts blank (no elements inherit; canvas redraws empty for new id).
+    clearCanvasOnly()
+    toast.success(`${page.name} added (blank)`)
   }
 
   const handleUndo = () => {
@@ -627,10 +715,10 @@ export default function Whiteboard({
         ))}
       </div>
 
-      {/* Floating Drawing Tools Panel */}
-      <div className="absolute left-4 top-16 bg-card/95 border border-border p-2 rounded-2xl shadow-card flex flex-col gap-1.5 z-20 backdrop-blur-md transition-colors mt-2">
+      {/* Floating Drawing Tools — below page tabs so it never covers Page 1 */}
+      <div className="absolute left-3 top-[7.25rem] z-20 mt-0 flex max-h-[calc(100%-9rem)] flex-col gap-1 overflow-y-auto rounded-2xl border border-border bg-card/95 p-2 shadow-card backdrop-blur-md">
         {[
-          { id: 'select', icon: Hand, label: 'Select' },
+          { id: 'select', icon: MousePointer2, label: 'Select' },
           { id: 'pen', icon: PenTool, label: 'Pen' },
           { id: 'marker', icon: Paintbrush, label: 'Marker' },
           { id: 'pencil', icon: Minus, label: 'Pencil' },
@@ -645,7 +733,7 @@ export default function Whiteboard({
           { id: 'line', icon: Minus, label: 'Line' },
           { id: 'text', icon: Type, label: 'Text Block' },
           { id: 'image', icon: ImageIcon, label: 'Image URL' },
-          { id: 'pan', icon: Hand, label: 'Pan Screen' }
+          { id: 'pan', icon: Hand, label: 'Pan canvas' }
         ].map((tool) => {
           const isActive = whiteboardTool === tool.id
           return (
@@ -762,7 +850,7 @@ export default function Whiteboard({
 
           {/* Interactive Elements Layer */}
           {ensureArray(elements)
-            .filter((elem) => (elem.pageId || 'page-1') === activePageId)
+            .filter((elem) => (elem.pageId || 'page-1') === activePageId && elem.type !== 'path')
             .map((elem) => {
               const isSelected = selectedElementId === elem.id
               const isSticky = elem.type === 'sticky'
@@ -867,34 +955,43 @@ export default function Whiteboard({
                     />
                   )}
 
-                  {isSticky || isText ? (
-                    <textarea
-                      value={elem.text}
-                      disabled={elem.locked}
-                      onChange={(e) => handleElementTextChange(elem.id, e.target.value)}
-                      className="w-full h-full bg-transparent border-none outline-none resize-none text-xs text-center font-bold text-text placeholder-muted/65 focus:ring-0 no-scrollbar"
-                      placeholder="Type..."
-                    />
-                  ) : isImage ? (
+                  {isImage ? (
                     <img
                       src={elem.src}
-                      className="w-full h-full object-cover rounded pointer-events-none"
+                      className="pointer-events-none h-full w-full rounded object-cover"
                       alt="board-insert"
                     />
-                  ) : elem.type === 'rect' || elem.type === 'square' ? (
-                    <div className="w-full h-full rounded border-2 border-primary bg-primary/10 pointer-events-none" />
-                  ) : elem.type === 'circle' ? (
-                    <div className="w-full h-full rounded-full border-2 border-success bg-success/10 pointer-events-none" />
-                  ) : elem.type === 'triangle' ? (
-                    <div className="w-0 h-0 border-l-[40px] border-r-[40px] border-b-[80px] border-l-transparent border-r-transparent border-b-primary/30 relative pointer-events-none">
-                      <div className="absolute -bottom-[-2px] -left-[38px] w-0 h-0 border-l-[38px] border-r-[38px] border-b-[76px] border-l-transparent border-r-transparent border-b-primary" />
-                    </div>
-                  ) : elem.type === 'arrow' ? (
-                    <div className="w-full h-2 bg-primary relative pointer-events-none">
-                      <div className="absolute -right-1.5 -top-1 border-l-8 border-l-primary border-t-4 border-t-transparent border-b-4 border-b-transparent" />
-                    </div>
                   ) : (
-                    <div className="w-full h-0.5 bg-border pointer-events-none" />
+                    <div
+                      className="relative flex h-full w-full items-center justify-center"
+                      style={{
+                        background:
+                          isSticky || isText
+                            ? undefined
+                            : elem.fill || 'color-mix(in srgb, var(--tw-primary) 12%, transparent)',
+                        borderRadius:
+                          elem.type === 'circle' ? '50%' : isSticky ? '12px' : elem.type === 'arrow' ? '2px' : '4px',
+                        border:
+                          isSticky || isText
+                            ? undefined
+                            : `${elem.borderWidth || 2}px solid ${elem.borderColor || elem.color || 'var(--tw-primary)'}`,
+                        clipPath:
+                          elem.type === 'triangle'
+                            ? 'polygon(50% 0%, 0% 100%, 100% 100%)'
+                            : elem.type === 'arrow'
+                              ? 'polygon(0% 30%, 70% 30%, 70% 0%, 100% 50%, 70% 100%, 70% 70%, 0% 70%)'
+                              : undefined
+                      }}
+                    >
+                      <textarea
+                        value={elem.text || ''}
+                        disabled={elem.locked}
+                        onChange={(e) => handleElementTextChange(elem.id, e.target.value)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="no-scrollbar h-full w-full resize-none border-none bg-transparent p-2 text-center text-xs font-bold text-text outline-none placeholder-muted/65 focus:ring-0"
+                        placeholder={isSticky || isText ? 'Type…' : 'Shape text…'}
+                      />
+                    </div>
                   )}
                 </div>
               )

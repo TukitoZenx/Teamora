@@ -1,16 +1,25 @@
+import { useEffect, useMemo } from 'react'
 import Meetings from '../Meetings'
 import useLocalCollabChannel from '../../hooks/useLocalCollabChannel'
+import { createMeetingSocket } from '../../services/meetingSocket'
 
 /**
- * Meetings.jsx manages all of its own state (participants, WebRTC peer
- * connections, host controls) and only needs a socket-shaped channel plus a
- * few scalars. The WebRTC signaling it does over that channel works for real
- * between two browser tabs on the same machine (BroadcastChannel relays the
- * SDP offer/answer/ICE candidates); true cross-device calls need a real
- * signaling server - see PROJECT_IMPROVEMENT_PLAN.md future work.
+ * Hybrid signaling: same-browser BroadcastChannel + WebSocket room fanout
+ * so multiple devices can join the same workspace meeting.
  */
 export default function MeetingsSection({ workspaceId, userName }) {
-  const channel = useLocalCollabChannel(workspaceId, 'meetings')
+  const localChannel = useLocalCollabChannel(workspaceId, 'meetings')
 
-  return <Meetings socket={channel} roomId={workspaceId} userName={userName} />
+  const socket = useMemo(() => {
+    if (!workspaceId) return localChannel
+    return createMeetingSocket(localChannel, { workspaceId, userName })
+  }, [workspaceId, userName, localChannel])
+
+  useEffect(() => {
+    return () => {
+      socket?.destroy?.()
+    }
+  }, [socket])
+
+  return <Meetings socket={socket} roomId={workspaceId} userName={userName} />
 }
