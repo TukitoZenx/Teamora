@@ -44,6 +44,11 @@ const RELAY_MAP = {
     persist: true,
     transform: ({ elements }) => elements
   },
+  'update-whiteboard-pages': {
+    receiveEvent: 'receive-whiteboard-pages',
+    persist: true,
+    transform: (value) => value
+  },
   'file-content-update': {
     receiveEvent: 'receive-file-content-update',
     persist: true,

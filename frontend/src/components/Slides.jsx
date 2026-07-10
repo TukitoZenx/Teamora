@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { ensureArray } from './utils/arrayUtils'
 import {
   Presentation,
@@ -18,10 +18,15 @@ import {
   ArrowUp,
   ArrowDown,
   Table2,
-  Shapes
+  Shapes,
+  Upload,
+  Eye,
+  EyeOff,
+  FolderInput
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { importPptxToSlides } from '../services/pptxImport'
 
 const SLIDE_THEMES = [
   {
@@ -79,8 +84,20 @@ export default function Slides({
 
   // Elements toolbar / states
   const [selectedElemId, setSelectedElemId] = useState(null)
+  const [dragSlideIndex, setDragSlideIndex] = useState(null)
+  const [dropTargetIndex, setDropTargetIndex] = useState(null)
+  const dragIndexRef = useRef(null)
 
   const theme = SLIDE_THEMES.find((t) => t.id === selectedTheme) || SLIDE_THEMES[0]
+
+  const visibleSlideIndexes = useMemo(
+    () =>
+      ensureArray(slides)
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => !s?.hidden)
+        .map(({ i }) => i),
+    [slides]
+  )
 
   // Dynamic slides load from active file content
   useEffect(() => {
@@ -115,25 +132,28 @@ export default function Slides({
     }
   }, [activeFileId, filesList, setSlides])
 
-  // Sync event listener for custom slide lists
-  useEffect(() => {
-    socket.on('receive-slides-list', (syncedSlides) => {
-      if (syncedSlides) {
-        if (Array.isArray(syncedSlides)) {
-          setSlides(syncedSlides)
-        } else {
-          console.warn('Warning: received slides list is not an array:', syncedSlides)
-          setSlides([])
-        }
-      }
-    })
-    return () => {
-      socket.off('receive-slides-list')
-    }
-  }, [socket, setSlides])
+  // Slide list ownership lives in PresentationSection (Yjs / props).
+  // Do not re-apply receive-slides-list via setSlides — that re-emits and loops.
 
-  // Keyboard navigation for presentation
+  const nextVisibleIndex = (from, dir = 1) => {
+    let i = from + dir
+    while (i >= 0 && i < slides.length) {
+      if (!slides[i]?.hidden) return i
+      i += dir
+    }
+    return from
+  }
+
+  // Keyboard navigation for presentation (skips hidden slides)
   useEffect(() => {
+    const step = (from, dir) => {
+      let i = from + dir
+      while (i >= 0 && i < slides.length) {
+        if (!slides[i]?.hidden) return i
+        i += dir
+      }
+      return from
+    }
     const handleKeyDown = (e) => {
       if (isPresenting) {
         if (e.key === 'Escape') {
@@ -141,20 +161,28 @@ export default function Slides({
           setPresenterMode(false)
         } else if (e.key === 'ArrowRight' || e.key === ' ') {
           e.preventDefault()
-          const nextIndex = Math.min(slides.length - 1, activeSlide + 1)
+          const nextIndex = step(activeSlide, 1)
           setActiveSlide(nextIndex)
           socket.emit('change-slide', { roomId, slideIndex: nextIndex })
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault()
-          const prevIndex = Math.max(0, activeSlide - 1)
+          const prevIndex = step(activeSlide, -1)
           setActiveSlide(prevIndex)
           socket.emit('change-slide', { roomId, slideIndex: prevIndex })
+        } else if (e.key === 'F5') {
+          e.preventDefault()
+          setIsPresenting(true)
         }
+      } else if (e.key === 'F5') {
+        e.preventDefault()
+        const first = ensureArray(slides).findIndex((s) => !s?.hidden)
+        if (first >= 0) setActiveSlide(first)
+        setIsPresenting(true)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isPresenting, activeSlide, slides.length, roomId, socket, setActiveSlide, setIsPresenting])
+  }, [isPresenting, activeSlide, slides, roomId, socket, setActiveSlide, setIsPresenting])
 
   const activeSlideData = slides[activeSlide] ||
     slides[0] || { title: '', content: '', notes: '', elements: [], layout: 'title' }
@@ -164,20 +192,20 @@ export default function Slides({
     const slideToDuplicate = activeSlideData
     const newSlides = [...slides]
     newSlides.splice(activeSlide + 1, 0, {
+      id: `slide-${Math.random().toString(36).slice(2, 10)}`,
       title: slideToDuplicate.title,
       content: slideToDuplicate.content,
       notes: slideToDuplicate.notes || '',
       layout: slideToDuplicate.layout || 'title',
-      elements: slideToDuplicate.elements ? [...slideToDuplicate.elements] : []
+      elements: slideToDuplicate.elements
+        ? slideToDuplicate.elements.map((el) => ({
+            ...el,
+            id: el?.id ? `${el.id}-copy-${Math.random().toString(36).slice(2, 6)}` : `elem-${Math.random().toString(36).slice(2, 9)}`
+          }))
+        : []
     })
     setSlides(newSlides)
     setActiveSlide(activeSlide + 1)
-
-    if (activeFileId) {
-      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides })
-    } else {
-      socket.emit('update-slides-list', { roomId, slides: newSlides })
-    }
     socket.emit('change-slide', { roomId, slideIndex: activeSlide + 1 })
     toast.success('Slide duplicated')
   }
@@ -191,12 +219,6 @@ export default function Slides({
     const newActive = Math.max(0, activeSlide - 1)
     setSlides(newSlides)
     setActiveSlide(newActive)
-
-    if (activeFileId) {
-      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides })
-    } else {
-      socket.emit('update-slides-list', { roomId, slides: newSlides })
-    }
     socket.emit('change-slide', { roomId, slideIndex: newActive })
     toast.success('Slide deleted')
   }
@@ -204,19 +226,69 @@ export default function Slides({
   const handleMoveSlide = (currentIndex, direction) => {
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
     if (targetIndex < 0 || targetIndex >= slides.length) return
+    reorderSlide(currentIndex, targetIndex)
+  }
 
+  const reorderSlide = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return
+    if (fromIndex >= slides.length || toIndex >= slides.length) return
     const newSlides = [...slides]
-    const [movedSlide] = newSlides.splice(currentIndex, 1)
-    newSlides.splice(targetIndex, 0, movedSlide)
+    const [moved] = newSlides.splice(fromIndex, 1)
+    newSlides.splice(toIndex, 0, moved)
     setSlides(newSlides)
-    setActiveSlide(targetIndex)
+    setActiveSlide(toIndex)
+    socket.emit('change-slide', { roomId, slideIndex: toIndex })
+  }
 
-    if (activeFileId) {
-      socket.emit('file-content-update', { roomId, fileId: activeFileId, content: newSlides })
-    } else {
-      socket.emit('update-slides-list', { roomId, slides: newSlides })
+  const toggleHideSlide = (index) => {
+    const slide = slides[index]
+    if (!slide) return
+    const next = slides.map((s, i) => (i === index ? { ...s, hidden: !s.hidden } : s))
+    // Don't hide last visible slide
+    const visibleCount = next.filter((s) => !s.hidden).length
+    if (visibleCount === 0) {
+      toast.error('At least one slide must remain visible')
+      return
     }
-    socket.emit('change-slide', { roomId, slideIndex: targetIndex })
+    setSlides(next)
+    toast.success(next[index].hidden ? 'Slide hidden from slideshow' : 'Slide visible in slideshow')
+  }
+
+  const assignSection = (index) => {
+    const current = slides[index]?.section || ''
+    const name = window.prompt('Section name (empty to clear)', current)
+    if (name === null) return
+    const section = name.trim() || null
+    setSlides(slides.map((s, i) => (i === index ? { ...s, section } : s)))
+    toast.success(section ? `Section: ${section}` : 'Section cleared')
+  }
+
+  const onThumbDragStart = (index, e) => {
+    dragIndexRef.current = index
+    setDragSlideIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
+  }
+
+  const onThumbDragOver = (index, e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTargetIndex(index)
+  }
+
+  const onThumbDrop = (index, e) => {
+    e.preventDefault()
+    const from = dragIndexRef.current ?? parseInt(e.dataTransfer.getData('text/plain'), 10)
+    setDragSlideIndex(null)
+    setDropTargetIndex(null)
+    dragIndexRef.current = null
+    if (Number.isFinite(from)) reorderSlide(from, index)
+  }
+
+  const onThumbDragEnd = () => {
+    setDragSlideIndex(null)
+    setDropTargetIndex(null)
+    dragIndexRef.current = null
   }
 
   // Slides Inserts
@@ -254,22 +326,42 @@ export default function Slides({
     setSelectedElemId(null)
   }
 
-  const handleElementDrag = (e, elem) => {
+  const patchElement = (elemId, patch) => {
+    const currentElems = activeSlideData.elements || []
+    handleSlideUpdate(
+      'elements',
+      currentElems.map((el) => (el.id === elemId ? { ...el, ...patch } : el))
+    )
+  }
+
+  const handleElementDrag = (e, elem, mode = 'move') => {
     e.stopPropagation()
+    e.preventDefault()
+    setSelectedElemId(elem.id)
     const startX = e.clientX
     const startY = e.clientY
-    const startElemX = elem.x
-    const startElemY = elem.y
+    const origin = {
+      x: elem.x,
+      y: elem.y,
+      width: elem.width,
+      height: elem.height,
+      rotation: elem.rotation || 0,
+      zIndex: elem.zIndex || 10
+    }
 
     const handleMouseMove = (moveEvent) => {
       const dx = moveEvent.clientX - startX
       const dy = moveEvent.clientY - startY
-      const currentElems = activeSlideData.elements || []
-      const updated = currentElems.map((el) =>
-        el.id === elem.id ? { ...el, x: startElemX + dx, y: startElemY + dy } : el
-      )
-      // Inline visual update, sync on release
-      handleSlideUpdate('elements', updated)
+      if (mode === 'move') {
+        patchElement(elem.id, { x: Math.max(0, origin.x + dx), y: Math.max(0, origin.y + dy) })
+      } else if (mode === 'resize') {
+        patchElement(elem.id, {
+          width: Math.max(40, origin.width + dx),
+          height: Math.max(30, origin.height + dy)
+        })
+      } else if (mode === 'rotate') {
+        patchElement(elem.id, { rotation: Math.round(origin.rotation + dx) })
+      }
     }
 
     const handleMouseUp = () => {
@@ -279,6 +371,54 @@ export default function Slides({
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const addTextBoxToSlide = () => {
+    const newElement = {
+      id: 'elem-' + Math.random().toString(36).substring(7),
+      type: 'textbox',
+      x: 120,
+      y: 140,
+      width: 240,
+      height: 100,
+      rotation: 0,
+      zIndex: 20,
+      text: 'Text box',
+      color: '#0f172a',
+      fontSize: '16px',
+      fill: 'rgba(255,255,255,0.9)',
+      borderColor: '#94a3b8'
+    }
+    handleSlideUpdate('elements', [...(activeSlideData.elements || []), newElement])
+    setSelectedElemId(newElement.id)
+    toast.success('Text box added')
+  }
+
+  /** PPTX import via JSZip — text, notes, and embedded images. */
+  const handleImportPptx = async (file) => {
+    if (!file) return
+    const loading = toast.loading('Importing PPTX…')
+    try {
+      const { slides: imported, warnings } = await importPptxToSlides(file)
+      if (!imported.length) {
+        toast.error(warnings[0] || 'No slides found in file', { id: loading })
+        return
+      }
+      setSlides(imported)
+      setActiveSlide(0)
+      const imgCount = imported.reduce(
+        (n, s) => n + (s.elements || []).filter((e) => e.type === 'image').length,
+        0
+      )
+      toast.success(
+        `Imported ${imported.length} slide(s)${imgCount ? ` · ${imgCount} image(s)` : ''}`,
+        { id: loading }
+      )
+      if (warnings.length) console.warn('[pptxImport]', warnings)
+    } catch (err) {
+      console.error(err)
+      toast.error('PPTX import failed', { id: loading })
+    }
   }
 
   const handleExportDeckOutline = () => {
@@ -471,29 +611,31 @@ export default function Slides({
           {/* Navigation Controls floating panel */}
           <div className="absolute bottom-8 flex items-center gap-4 bg-slate-900/60 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 z-50">
             <button
+              type="button"
               onClick={() => {
-                const prevIndex = Math.max(0, activeSlide - 1)
+                const prevIndex = nextVisibleIndex(activeSlide, -1)
                 setActiveSlide(prevIndex)
                 socket.emit('change-slide', { roomId, slideIndex: prevIndex })
               }}
-              disabled={activeSlide === 0}
-              className="p-1.5 hover:bg-card/15 disabled:opacity-35 text-on-primary/80 hover:text-on-primary rounded-full transition-all cursor-pointer"
+              disabled={nextVisibleIndex(activeSlide, -1) === activeSlide}
+              className="cursor-pointer rounded-full p-1.5 text-on-primary/80 transition-all hover:bg-card/15 hover:text-on-primary disabled:opacity-35"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="h-5 w-5" />
             </button>
-            <span className="text-xs font-bold text-on-primary select-none">
-              {activeSlide + 1} / {slides.length}
+            <span className="select-none text-xs font-bold text-on-primary">
+              {visibleSlideIndexes.indexOf(activeSlide) + 1 || 1} / {visibleSlideIndexes.length || slides.length}
             </span>
             <button
+              type="button"
               onClick={() => {
-                const nextIndex = Math.min(slides.length - 1, activeSlide + 1)
+                const nextIndex = nextVisibleIndex(activeSlide, 1)
                 setActiveSlide(nextIndex)
                 socket.emit('change-slide', { roomId, slideIndex: nextIndex })
               }}
-              disabled={activeSlide === slides.length - 1}
-              className="p-1.5 hover:bg-card/15 disabled:opacity-35 text-on-primary/80 hover:text-on-primary rounded-full transition-all cursor-pointer"
+              disabled={nextVisibleIndex(activeSlide, 1) === activeSlide}
+              className="cursor-pointer rounded-full p-1.5 text-on-primary/80 transition-all hover:bg-card/15 hover:text-on-primary disabled:opacity-35"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="h-5 w-5" />
             </button>
             <div className="w-px h-5 bg-card/10" />
             <button
@@ -570,6 +712,30 @@ export default function Slides({
           >
             <Table2 className="w-4 h-4" />
           </button>
+          <button
+            type="button"
+            onClick={addTextBoxToSlide}
+            className="p-2 text-muted hover:text-primary rounded-lg hover:bg-primary/10 cursor-pointer"
+            title="Insert Text Box"
+          >
+            <StickyNote className="w-4 h-4" />
+          </button>
+          <label
+            className="p-2 text-muted hover:text-primary rounded-lg hover:bg-primary/10 cursor-pointer"
+            title="Import PPTX"
+          >
+            <Upload className="w-4 h-4" />
+            <input
+              type="file"
+              accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleImportPptx(f)
+                e.target.value = ''
+              }}
+            />
+          </label>
 
           <div className="w-px h-5 bg-border mx-0.5" />
 
@@ -651,90 +817,139 @@ export default function Slides({
         </div>
       </div>
 
-      {/* Main slide layout shell */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main slide layout: only thumbnail rail scrolls (PowerPoint-style) */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Thumbnails Sidebar */}
-        <div className="w-52 border-r border-border bg-card flex flex-col shrink-0">
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
+        <div className="flex w-52 shrink-0 flex-col border-r border-border bg-card">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden p-3">
             {ensureArray(slides).map((s, i) => {
               const isActive = activeSlide === i
               const usersHere = getUsersOnSlide(i)
+              const prevSection = i > 0 ? slides[i - 1]?.section : null
+              const showSectionHeader = s.section && s.section !== prevSection
               return (
-                <div key={i} className="flex gap-2 items-start relative group">
-                  <span className="text-[10px] font-bold text-muted mt-2.5 w-4 text-right select-none">{i + 1}</span>
+                <div key={s.id || i}>
+                  {showSectionHeader && (
+                    <div className="mb-1 mt-2 flex items-center gap-1 px-1 text-[9px] font-bold uppercase tracking-wide text-primary">
+                      <FolderInput className="h-3 w-3" />
+                      {s.section}
+                    </div>
+                  )}
+                  <div
+                    className={`group relative flex items-start gap-2 rounded-lg transition ${
+                      dropTargetIndex === i ? 'bg-primary/10 ring-1 ring-primary/40' : ''
+                    } ${dragSlideIndex === i ? 'opacity-50' : ''}`}
+                    draggable
+                    onDragStart={(e) => onThumbDragStart(i, e)}
+                    onDragOver={(e) => onThumbDragOver(i, e)}
+                    onDrop={(e) => onThumbDrop(i, e)}
+                    onDragEnd={onThumbDragEnd}
+                  >
+                    <span className="mt-2.5 w-4 cursor-grab select-none text-right text-[10px] font-bold text-muted active:cursor-grabbing">
+                      {i + 1}
+                    </span>
 
-                  {/* Reorder actions */}
-                  <div className="absolute left-[-2px] top-6 flex flex-col gap-0.5 hidden group-hover:flex z-40 bg-card-sunken border border-border text-text rounded p-0.5">
+                    <div className="absolute -left-0.5 top-5 z-40 hidden flex-col gap-0.5 rounded border border-border bg-card-sunken p-0.5 text-text group-hover:flex">
+                      <button
+                        type="button"
+                        disabled={i === 0}
+                        onClick={() => handleMoveSlide(i, 'up')}
+                        className="p-0.5 hover:text-primary disabled:opacity-30"
+                        title="Move up"
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={i === slides.length - 1}
+                        onClick={() => handleMoveSlide(i, 'down')}
+                        className="p-0.5 hover:text-primary disabled:opacity-30"
+                        title="Move down"
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleHideSlide(i)}
+                        className="p-0.5 hover:text-primary"
+                        title={s.hidden ? 'Show in slideshow' : 'Hide from slideshow'}
+                      >
+                        {s.hidden ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => assignSection(i)}
+                        className="p-0.5 hover:text-primary"
+                        title="Assign section"
+                      >
+                        <FolderInput className="h-3 w-3" />
+                      </button>
+                    </div>
+
                     <button
-                      disabled={i === 0}
-                      onClick={() => handleMoveSlide(i, 'up')}
-                      className="disabled:opacity-30 p-0.5 hover:text-primary"
+                      type="button"
+                      onClick={() => {
+                        setActiveSlide(i)
+                        socket.emit('change-slide', { roomId, slideIndex: i })
+                      }}
+                      className={`relative flex aspect-[16/9] flex-1 cursor-pointer flex-col justify-between overflow-hidden rounded-xl border bg-gradient-to-br p-3 text-left ${theme.gradient} ${
+                        isActive ? 'border-warning ring-2 ring-warning/20' : 'border-border hover:border-muted'
+                      } ${s.hidden ? 'opacity-50 grayscale' : ''}`}
                     >
-                      <ArrowUp className="w-3 h-3" />
-                    </button>
-                    <button
-                      disabled={i === slides.length - 1}
-                      onClick={() => handleMoveSlide(i, 'down')}
-                      className="disabled:opacity-30 p-0.5 hover:text-primary"
-                    >
-                      <ArrowDown className="w-3 h-3" />
+                      <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${theme.accent}`} />
+                      <div className="flex w-full items-start justify-between gap-1">
+                        <div className="truncate text-[9px] font-bold text-text">{s.title || 'Untitled'}</div>
+                        {s.hidden && (
+                          <EyeOff className="h-3 w-3 shrink-0 text-muted" title="Hidden" />
+                        )}
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-[7px] leading-snug text-muted">{s.content}</div>
+
+                      {usersHere.length > 0 && (
+                        <div className="absolute bottom-1 right-1 z-10 flex -space-x-1.5 overflow-hidden p-0.5">
+                          {ensureArray(usersHere).map((u, uIdx) => (
+                            <img
+                              key={uIdx}
+                              className="inline-block h-4 w-4 rounded-full border bg-card object-cover"
+                              src={u.imageUrl || 'https://www.gravatar.com/avatar/?d=mp'}
+                              alt={u.user}
+                              title={u.user}
+                              style={{ borderColor: u.color }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </button>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      setActiveSlide(i)
-                      socket.emit('change-slide', { roomId, slideIndex: i })
-                    }}
-                    className={`flex-1 aspect-[16/9] bg-gradient-to-br ${theme.gradient} rounded-xl p-3 text-left border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
-                      isActive ? 'border-warning ring-2 ring-warning/20' : 'border-border hover:border-muted'
-                    }`}
-                  >
-                    <div className={`absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r ${theme.accent}`} />
-                    <div className="text-[9px] font-bold text-text truncate w-full">{s.title || 'Untitled'}</div>
-                    <div className="text-[7px] text-muted line-clamp-2 mt-1 leading-snug">{s.content}</div>
-
-                    {usersHere.length > 0 && (
-                      <div className="absolute bottom-1 right-1 flex -space-x-1.5 overflow-hidden z-10 p-0.5">
-                        {ensureArray(usersHere).map((u, uIdx) => (
-                          <img
-                            key={uIdx}
-                            className="inline-block h-4 w-4 rounded-full border bg-card object-cover"
-                            src={u.imageUrl || 'https://www.gravatar.com/avatar/?d=mp'}
-                            alt={u.user}
-                            title={u.user}
-                            style={{ borderColor: u.color }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </button>
                 </div>
               )
             })}
           </div>
         </div>
 
-        {/* Editor Screen */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-card-sunken">
-          {/* Layout type selector */}
-          <div className="h-9 border-b border-border px-6 bg-card flex items-center gap-3 shrink-0 select-none">
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Slide Layout:</span>
+        {/* Editor Screen — fixed viewport, no growth/scroll with new slides */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card-sunken">
+          <div className="flex h-9 shrink-0 select-none items-center gap-3 border-b border-border bg-card px-6">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Slide Layout:</span>
             {['title', 'split', 'image-left', 'normal'].map((l) => (
               <button
                 key={l}
+                type="button"
                 onClick={() => handleSlideUpdate('layout', l)}
-                className={`px-3 py-0.5 rounded-lg text-[10px] font-bold border capitalize cursor-pointer ${activeSlideData.layout === l ? 'bg-primary border-primary text-on-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
+                className={`cursor-pointer rounded-lg border px-3 py-0.5 text-[10px] font-bold capitalize ${
+                  activeSlideData.layout === l
+                    ? 'border-primary bg-primary text-on-primary'
+                    : 'border-border bg-card text-muted hover:bg-primary/10 hover:text-primary'
+                }`}
               >
                 {l}
               </button>
             ))}
           </div>
 
-          {/* Slide canvas area */}
-          <div className="flex-1 p-6 flex flex-col items-center justify-center overflow-hidden">
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4 md:p-6">
             <div
-              className={`w-full max-w-4xl aspect-[16/9] bg-gradient-to-br ${theme.gradient} border border-border shadow-card rounded-3xl p-10 flex flex-col justify-center relative overflow-hidden`}
+              className={`relative flex aspect-[16/9] w-full max-w-4xl max-h-full flex-col justify-center overflow-hidden rounded-3xl border border-border bg-gradient-to-br p-6 shadow-card md:p-10 ${theme.gradient}`}
             >
               <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${theme.accent} rounded-t-3xl`} />
 
@@ -830,33 +1045,60 @@ export default function Slides({
                 </div>
               )}
 
-              {/* Absolute elements rendering */}
+              {/* Absolute elements: move / resize / rotate / edit */}
               {ensureArray(slideElements).map((el) => {
                 const isSelected = selectedElemId === el.id
                 return (
                   <div
                     key={el.id}
-                    onMouseDown={(e) => handleElementDrag(e, el)}
+                    onMouseDown={(e) => handleElementDrag(e, el, 'move')}
                     style={{
                       position: 'absolute',
                       left: el.x,
                       top: el.y,
                       width: el.width,
                       height: el.height,
-                      zIndex: isSelected ? 40 : 10
+                      zIndex: isSelected ? 40 : el.zIndex || 10,
+                      transform: `rotate(${el.rotation || 0}deg)`,
+                      background:
+                        el.type === 'textbox' || el.type === 'shape'
+                          ? el.fill || 'rgba(255,255,255,0.85)'
+                          : undefined,
+                      borderColor: el.borderColor || el.color
                     }}
-                    className={`border relative select-none cursor-move ${isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-transparent hover:border-muted'}`}
+                    className={`relative select-none cursor-move border ${isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-transparent hover:border-muted'}`}
                   >
+                    {(el.type === 'textbox' || el.type === 'shape' || el.type === 'text') && (
+                      <textarea
+                        value={el.text || ''}
+                        onChange={(e) => patchElement(el.id, { text: e.target.value })}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="h-full w-full resize-none border-none bg-transparent p-2 text-sm outline-none"
+                        style={{ color: el.color || '#0f172a', fontSize: el.fontSize || '14px' }}
+                        placeholder="Type…"
+                      />
+                    )}
                     {isSelected && (
+                      <>
+                        <div
+                          className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-se-resize rounded-sm bg-primary"
+                          onMouseDown={(e) => handleElementDrag(e, el, 'resize')}
+                        />
+                        <div
+                          className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full bg-primary"
+                          onMouseDown={(e) => handleElementDrag(e, el, 'rotate')}
+                        />
                       <button
+                        type="button"
                         onMouseDown={(e) => {
                           e.stopPropagation()
                           deleteElement(el.id)
                         }}
-                        className="absolute -top-6 -right-6 p-1 bg-danger hover:bg-danger-hover text-on-primary rounded-full z-50 cursor-pointer"
+                        className="absolute -top-6 -right-6 z-50 cursor-pointer rounded-full bg-danger p-1 text-on-primary hover:bg-danger-hover"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
+                      </>
                     )}
 
                     {el.type === 'image' ? (

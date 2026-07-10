@@ -1,12 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const MongoStore = require('connect-mongo');
 const passport = require('passport');
 const authRoutes = require('./routes/auth.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
 const configurePassport = require('./config/passport');
+const { createSessionStore, createSessionMiddleware, isProduction } = require('./config/session');
 const compression = require('compression');
 const morgan = require('morgan');
 const app = express();
@@ -24,16 +23,9 @@ const allowedOrigins = new Set([
   'http://127.0.0.1:3000'
 ]);
 const isAllowedVercelPreview = (origin = '') => /^https:\/\/teamora-[a-z0-9-]+\.vercel\.app$/i.test(origin);
-const isProduction = process.env.NODE_ENV === 'production';
-const sessionStore = process.env.MONGODB_URI
-  ? MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI,
-      collectionName: 'sessions',
-      ttl: 60 * 60 * 24 * 30,
-      autoRemove: 'native',
-      crypto: process.env.SESSION_STORE_SECRET ? { secret: process.env.SESSION_STORE_SECRET } : undefined
-    })
-  : undefined;
+
+const sessionStore = createSessionStore();
+const sessionMiddleware = createSessionMiddleware(sessionStore);
 
 if (isProduction && !process.env.SESSION_SECRET) {
   throw new Error('SESSION_SECRET is required in production');
@@ -87,23 +79,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(requireJsonContentType);
 app.use(cookieParser());
-app.use(
-  session({
-    name: process.env.SESSION_COOKIE_NAME || 'teamora.sid',
-    secret: process.env.SESSION_SECRET || 'development-session-secret',
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    rolling: true,
-    proxy: isProduction,
-    cookie: {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: 1000 * 60 * 60 * 24 * 30
-    }
-  })
-);
+app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -139,3 +115,4 @@ app.use((error, req, res, next) => {
 });
 
 module.exports = app;
+module.exports.sessionMiddleware = sessionMiddleware;

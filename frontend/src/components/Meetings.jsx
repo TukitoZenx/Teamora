@@ -16,6 +16,7 @@ import {
   X
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { describeIceSetup, getMeetingRtcConfiguration } from '../services/webrtcIce'
 
 export default function Meetings({ socket, roomId, userName }) {
   const [inMeeting, setInMeeting] = useState(false)
@@ -37,6 +38,9 @@ export default function Meetings({ socket, roomId, userName }) {
   // WebRTC mesh states
   const [remoteStreams, setRemoteStreams] = useState({}) // { socketId: { stream } }
   const peersRef = useRef({}) // { socketId: RTCPeerConnection }
+  const [speakingMap, setSpeakingMap] = useState({}) // { socketId: boolean }
+  const audioAnalysersRef = useRef({}) // { socketId: { ctx, analyser, data } }
+  const reconnectAttemptsRef = useRef({})
 
   // Panels
   const [activeSidePanel, setActiveSidePanel] = useState(null) // null | 'chat' | 'participants'
@@ -104,15 +108,35 @@ export default function Meetings({ socket, roomId, userName }) {
     return stream
   }
 
+  const attachSpeakingMonitor = (socketId, stream) => {
+    try {
+      if (!stream?.getAudioTracks?.().length) return
+      if (audioAnalysersRef.current[socketId]) return
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const source = ctx.createMediaStreamSource(stream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      audioAnalysersRef.current[socketId] = { ctx, analyser, data }
+    } catch {
+      // Autoplay / audio context restrictions
+    }
+  }
+
   const initiatePeerConnection = async (targetSocketId, isInitiator) => {
+    if (!targetSocketId || targetSocketId === socket.id) return null
+
     if (peersRef.current[targetSocketId]) {
-      peersRef.current[targetSocketId].close()
+      try {
+        peersRef.current[targetSocketId].close()
+      } catch {
+        // ignore
+      }
       delete peersRef.current[targetSocketId]
     }
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
-    })
+    const pc = new RTCPeerConnection(getMeetingRtcConfiguration())
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
@@ -124,13 +148,31 @@ export default function Meetings({ socket, roomId, userName }) {
       }
     }
 
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState
+      if (state === 'failed' || state === 'disconnected') {
+        const attempts = reconnectAttemptsRef.current[targetSocketId] || 0
+        if (attempts < 3 && inMeeting) {
+          reconnectAttemptsRef.current[targetSocketId] = attempts + 1
+          window.setTimeout(() => {
+            if (inMeeting && meetingParticipants[targetSocketId]) {
+              initiatePeerConnection(targetSocketId, true)
+            }
+          }, 800 * (attempts + 1))
+        }
+      }
+      if (state === 'connected') {
+        reconnectAttemptsRef.current[targetSocketId] = 0
+      }
+    }
+
     pc.ontrack = (e) => {
+      const stream = e.streams?.[0] || new MediaStream([e.track])
       setRemoteStreams((prev) => ({
         ...prev,
-        [targetSocketId]: {
-          stream: e.streams[0]
-        }
+        [targetSocketId]: { stream }
       }))
+      attachSpeakingMonitor(targetSocketId, stream)
     }
 
     if (localStreamRef.current) {
@@ -138,12 +180,20 @@ export default function Meetings({ socket, roomId, userName }) {
         pc.addTrack(track, localStreamRef.current)
       })
     }
+    // If screen sharing, prefer screen video track
+    if (screenStreamRef.current) {
+      const screenTrack = screenStreamRef.current.getVideoTracks()[0]
+      if (screenTrack) {
+        const sender = pc.getSenders().find((s) => s.track?.kind === 'video')
+        if (sender) sender.replaceTrack(screenTrack)
+      }
+    }
 
     peersRef.current[targetSocketId] = pc
 
     if (isInitiator) {
       try {
-        const offer = await pc.createOffer()
+        const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true })
         await pc.setLocalDescription(offer)
         socket.emit('meeting-signal', {
           roomId,
@@ -158,27 +208,73 @@ export default function Meetings({ socket, roomId, userName }) {
     return pc
   }
 
+  // Speaking indicators (local + remote)
+  useEffect(() => {
+    if (!inMeeting) return undefined
+    const tick = () => {
+      const next = {}
+      Object.entries(audioAnalysersRef.current).forEach(([id, pack]) => {
+        try {
+          pack.analyser.getByteFrequencyData(pack.data)
+          const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
+          next[id] = avg > 18
+        } catch {
+          next[id] = false
+        }
+      })
+      // Local mic level
+      if (localStreamRef.current && micActive) {
+        try {
+          if (!audioAnalysersRef.current[socket.id]) {
+            attachSpeakingMonitor(socket.id, localStreamRef.current)
+          }
+          const pack = audioAnalysersRef.current[socket.id]
+          if (pack) {
+            pack.analyser.getByteFrequencyData(pack.data)
+            const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
+            next[socket.id] = avg > 18
+          }
+        } catch {
+          // ignore
+        }
+      }
+      setSpeakingMap(next)
+    }
+    const id = window.setInterval(tick, 200)
+    return () => window.clearInterval(id)
+  }, [inMeeting, micActive, socket.id])
+
   const toggleScreenShare = async () => {
     if (!screenSharingActive) {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: 'always', displaySurface: 'monitor' },
+          audio: true
+        })
         screenStreamRef.current = stream
         setScreenSharingActive(true)
 
-        // Replace video track in all WebRTC peers
+        // Replace video track in all WebRTC peers + announce share
         const videoTrack = stream.getVideoTracks()[0]
         Object.values(peersRef.current).forEach((pc) => {
           const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video')
           if (sender) {
             sender.replaceTrack(videoTrack)
+          } else if (localStreamRef.current) {
+            pc.addTrack(videoTrack, stream)
           }
+        })
+
+        socket?.emit?.('meeting-signal', {
+          roomId,
+          signal: { type: 'screen-share-started', from: socket.id }
         })
 
         videoTrack.onended = () => {
           stopScreenShare()
         }
 
-        toast.success('Screen sharing started!')
+        toast.success('Screen sharing started — peers receive your screen stream')
       } catch (err) {
         console.error('Screen share error:', err)
         toast.error('Failed to share screen.')
@@ -186,6 +282,25 @@ export default function Meetings({ socket, roomId, userName }) {
     } else {
       stopScreenShare()
     }
+  }
+
+  /** Request remote control of a peer's shared screen (permission-gated). */
+  const requestScreenControl = (targetSocketId) => {
+    socket?.emit?.('meeting-signal', {
+      roomId,
+      targetSocketId,
+      signal: { type: 'control-request', from: socket.id, user: userName }
+    })
+    toast('Control request sent — host must approve')
+  }
+
+  const respondScreenControl = (requesterId, allowed) => {
+    socket?.emit?.('meeting-signal', {
+      roomId,
+      targetSocketId: requesterId,
+      signal: { type: 'control-response', allowed, from: socket.id }
+    })
+    toast(allowed ? 'You granted remote control' : 'You denied remote control')
   }
 
   const stopScreenShare = () => {
@@ -250,21 +365,34 @@ export default function Meetings({ socket, roomId, userName }) {
       // Attach stream after React mounts the <video> (ref is null until then).
       setInMeeting(true)
       setAdmitted(true)
-      toast.success('Joined meeting grid!', { icon: '📹' })
+      const ice = describeIceSetup()
+      toast.success(
+        ice.hasTurn
+          ? 'Joined meeting (TURN enabled for NAT traversal)'
+          : 'Joined meeting — set VITE_TURN_* for multi-network reliability',
+        { icon: '📹', duration: ice.hasTurn ? 3000 : 5000 }
+      )
 
       if (!hostInfo.hostSocketId) {
         socket.emit('meeting-claim-host', { hostSocketId: socket.id, hostName: userName })
       }
 
+      const selfParticipant = {
+        socketId: socket.id,
+        user: userName,
+        micActive: true,
+        camActive: Boolean(stream?.getVideoTracks?.().length),
+        handRaised: false
+      }
+
       socket.emit('meeting-join', {
         roomId,
-        participant: {
-          socketId: socket.id,
-          user: userName,
-          micActive: true,
-          camActive: Boolean(stream?.getVideoTracks?.().length),
-          handRaised: false
-        }
+        participant: selfParticipant
+      })
+      // Ask existing peers to re-announce so late joiners get full mesh.
+      socket.emit('meeting-signal', {
+        roomId,
+        signal: { type: 'sync-request', from: socket.id, participant: selfParticipant }
       })
 
       setMeetingParticipants((prev) => ({
@@ -547,7 +675,14 @@ export default function Meetings({ socket, roomId, userName }) {
       }))
     }
 
-    const onSignal = async ({ senderSocketId, signal }) => {
+    const onSignal = async (raw) => {
+      const senderSocketId = raw?.senderSocketId
+      const signal = raw?.signal
+      const targetSocketId = raw?.targetSocketId
+      if (!signal) return
+      // Ignore targeted signals not meant for us
+      if (targetSocketId && targetSocketId !== socket.id) return
+
       if (signal.type === 'waiting-room-request' && isHost) {
         setWaitingUsers((prev) => {
           if (prev.some((u) => u.socketId === senderSocketId)) return prev
@@ -585,6 +720,33 @@ export default function Meetings({ socket, roomId, userName }) {
           } catch (err) {
             console.error('Error adding ICE candidate:', err)
           }
+        }
+      } else if (signal.type === 'screen-share-started') {
+        toast(`${signal.from || 'A participant'} is sharing their screen`, { icon: '🖥️' })
+      } else if (signal.type === 'control-request' && screenSharingActive) {
+        const who = signal.user || 'A participant'
+        const allowed = window.confirm(`${who} requests control of your shared screen. Allow?`)
+        respondScreenControl(senderSocketId || signal.from, allowed)
+      } else if (signal.type === 'control-response') {
+        if (signal.allowed) {
+          toast.success('Remote control granted — you can interact with the shared screen (viewer)')
+        } else {
+          toast.error('Remote control request was denied')
+        }
+      } else if (signal.type === 'sync-request' && inMeeting && admitted) {
+        // Re-announce presence so late joiners can mesh with everyone.
+        socket.emit('meeting-join', {
+          roomId,
+          participant: {
+            socketId: socket.id,
+            user: userName,
+            micActive,
+            camActive,
+            handRaised
+          }
+        })
+        if (senderSocketId && senderSocketId !== socket.id) {
+          initiatePeerConnection(senderSocketId, true)
         }
       } else if (signal.type === 'host-action') {
         if (signal.action === 'mute') {
@@ -829,9 +991,15 @@ export default function Meetings({ socket, roomId, userName }) {
                     </div>
                   )}
 
+                  <div
+                    className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-2 transition ${
+                      speakingMap[socketId] ? 'ring-success/80' : 'ring-transparent'
+                    }`}
+                  />
                   <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
                     <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text">
                       {part.user} {isMe && '(You)'}
+                      {speakingMap[socketId] ? ' · Speaking' : ''}
                     </span>
                     <div className="flex gap-1.5">
                       {!part.micActive && (
@@ -876,6 +1044,13 @@ export default function Meetings({ socket, roomId, userName }) {
                 onClick={toggleScreenShare}
                 className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${screenSharingActive ? 'bg-success text-on-primary border-success' : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title={screenSharingActive ? 'Stop Sharing Screen' : 'Share Screen'}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  // Right-click screen button: request control of first remote peer
+                  const peerId = Object.keys(remoteStreams || {})[0]
+                  if (peerId) requestScreenControl(peerId)
+                  else toast('No remote peer available for control request')
+                }}
               >
                 <Tv className="w-4 h-4" />
               </button>

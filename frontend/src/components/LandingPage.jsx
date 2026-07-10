@@ -335,11 +335,11 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-4.5xl md:text-7xl font-bold text-neutral-900 tracking-tight leading-[1.05] mb-6"
+          className="text-4.5xl md:text-7xl font-bold text-text tracking-tight leading-[1.05] mb-6"
         >
           One Workspace.
           <br />
-          <span className="bg-gradient-to-r from-neutral-950 via-indigo-600 to-indigo-700 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-text via-primary to-primary-hover bg-clip-text text-transparent">
             Infinite Collaboration.
           </span>
         </motion.h1>
@@ -348,7 +348,7 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="text-sm md:text-base text-neutral-500 max-w-2xl leading-relaxed mb-10"
+          className="text-sm md:text-base text-muted max-w-2xl leading-relaxed mb-10"
         >
           Collaborate on documents, whiteboards, spreadsheets, presentations, meetings and shared files in real time.
         </motion.p>
@@ -361,7 +361,7 @@ export default function LandingPage() {
         >
           <Link
             to="/signup"
-            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-on-primary bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-md hover:shadow-indigo-600/10 cursor-pointer flex items-center gap-2"
+            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-on-primary bg-primary hover:bg-primary-hover rounded-xl transition-all shadow-md hover:shadow-primary/20 cursor-pointer flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <span>Get Started</span>
             <ArrowRight className="w-4 h-4" />
@@ -369,7 +369,7 @@ export default function LandingPage() {
 
           <Link
             to="/signin"
-            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-neutral-900 bg-card hover:bg-neutral-50 border border-neutral-200 rounded-xl transition-all cursor-pointer"
+            className="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text bg-card hover:bg-primary/10 border border-border rounded-xl transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
             Join Workspace
           </Link>

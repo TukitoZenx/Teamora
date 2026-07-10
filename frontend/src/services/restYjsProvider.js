@@ -1,0 +1,159 @@
+import * as Y from 'yjs'
+import { getWorkspaceContent, putWorkspaceContent } from './workspaceContent'
+import { connectCollabSocket } from './collabSocket'
+
+const toBase64 = (u8) => {
+  let s = ''
+  u8.forEach((b) => {
+    s += String.fromCharCode(b)
+  })
+  return btoa(s)
+}
+
+const fromBase64 = (b64) => {
+  const s = atob(b64)
+  const u8 = new Uint8Array(s.length)
+  for (let i = 0; i < s.length; i += 1) u8[i] = s.charCodeAt(i)
+  return u8
+}
+
+/**
+ * Yjs provider over REST content API + optional WebSocket fanout.
+ * - Pushes local updates (debounced) to REST for durability
+ * - Broadcasts same updates over WS for low latency when available
+ * - Polls server as backup (slower when WS connected)
+ */
+export function connectRestYjsProvider(
+  ydoc,
+  { workspaceId, key, pollMs = 1200, user, onAwareness, onPeerLeave, onWsStatus }
+) {
+  let destroyed = false
+  let pending = []
+  let flushTimer = null
+  let pollTimer = null
+  let pushing = false
+  let lastPushedState = null
+  let wsConnected = false
+
+  const collab =
+    workspaceId && key
+      ? connectCollabSocket(
+          { workspaceId, key, user },
+          {
+            onYjsUpdate: (b64) => {
+              if (destroyed) return
+              try {
+                Y.applyUpdate(ydoc, fromBase64(b64), 'remote')
+              } catch {
+                // ignore malformed
+              }
+            },
+            onAwareness: (msg) => onAwareness?.(msg),
+            onPeerLeave: (clientId) => onPeerLeave?.(clientId),
+            onStatus: (status) => {
+              wsConnected = status === 'joined' || status === 'open'
+              onWsStatus?.(status)
+              // Tighten / loosen poll when WS availability changes.
+              if (pollTimer) {
+                window.clearInterval(pollTimer)
+                pollTimer = window.setInterval(pull, wsConnected ? Math.max(pollMs, 8000) : pollMs)
+              }
+            }
+          }
+        )
+      : null
+
+  const flush = async () => {
+    if (destroyed || pushing || pending.length === 0 || !workspaceId) return
+    pushing = true
+    const batch = pending
+    pending = []
+    try {
+      const merged = Y.mergeUpdates(batch)
+      const updateB64 = toBase64(merged)
+      // Low-latency fanout (best-effort).
+      collab?.sendYjsUpdate?.(updateB64)
+      await putWorkspaceContent(workspaceId, key, {
+        format: 'yjs-v1',
+        update: updateB64
+      })
+      lastPushedState = toBase64(Y.encodeStateAsUpdate(ydoc))
+    } catch {
+      // Re-queue on failure (offline).
+      pending = batch.concat(pending)
+    } finally {
+      pushing = false
+      if (pending.length > 0 && !destroyed) {
+        flushTimer = window.setTimeout(flush, 400)
+      }
+    }
+  }
+
+  const scheduleFlush = () => {
+    if (flushTimer) return
+    flushTimer = window.setTimeout(() => {
+      flushTimer = null
+      flush()
+    }, 350)
+  }
+
+  const onLocalUpdate = (update, origin) => {
+    if (destroyed || origin === 'remote') return
+    pending.push(update)
+    // Immediate WS hint with this update for snappier peers (REST still debounced).
+    try {
+      collab?.sendYjsUpdate?.(toBase64(update))
+    } catch {
+      // ignore
+    }
+    scheduleFlush()
+  }
+
+  ydoc.on('update', onLocalUpdate)
+
+  const pull = async () => {
+    if (destroyed || !workspaceId) return
+    try {
+      const content = await getWorkspaceContent(workspaceId, key)
+      const remote = content?.data
+      if (!remote || remote.format !== 'yjs-v1' || typeof remote.state !== 'string') return
+      if (remote.state === lastPushedState) return
+      Y.applyUpdate(ydoc, fromBase64(remote.state), 'remote')
+    } catch {
+      // Offline — keep local.
+    }
+  }
+
+  pull()
+  pollTimer = window.setInterval(pull, pollMs)
+
+  return {
+    destroy() {
+      destroyed = true
+      ydoc.off('update', onLocalUpdate)
+      if (flushTimer) window.clearTimeout(flushTimer)
+      if (pollTimer) window.clearInterval(pollTimer)
+      collab?.destroy?.()
+      flush()
+    },
+    flush,
+    pull,
+    sendAwareness(cursor) {
+      collab?.sendAwareness?.(cursor)
+    },
+    getClientId: () => collab?.clientId,
+    isWsConnected: () => wsConnected
+  }
+}
+
+/**
+ * Import legacy HTML blob into an empty Y.Doc Quill type once.
+ */
+export function importLegacyHtmlToYdoc(ydoc, html) {
+  if (!html || typeof html !== 'string') return
+  const meta = ydoc.getMap('meta')
+  if (!meta.get('legacyHtmlImported')) {
+    meta.set('legacyHtml', html)
+    meta.set('legacyHtmlImported', true)
+  }
+}

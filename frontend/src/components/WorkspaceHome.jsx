@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   Copy,
@@ -63,6 +63,7 @@ const FILE_TYPES = {
 }
 
 const fileStoreKey = (workspaceId) => `teamora-workspace-files:${workspaceId}`
+const fileRemovedStoreKey = (workspaceId) => `teamora-workspace-files-removed:${workspaceId}`
 const tabsStoreKey = (workspaceId) => `teamora-workspace-tabs:${workspaceId}`
 const activeTabStoreKey = (workspaceId) => `teamora-workspace-active-tab:${workspaceId}`
 
@@ -80,6 +81,36 @@ const writeStoredJson = (key, value) => {
   } catch {
     // Workspace file state is local and best-effort.
   }
+}
+
+/** Client-side merge aligned with backend mergeFilesPayload (files-v1). */
+const mergeFileTreesLocal = (localFiles = [], remoteFiles = [], localRemoved = {}, remoteRemoved = {}) => {
+  const removed = { ...localRemoved }
+  Object.entries(remoteRemoved || {}).forEach(([id, ts]) => {
+    const prev = removed[id]
+    if (!prev || new Date(ts).getTime() >= new Date(prev).getTime()) removed[id] = ts
+  })
+
+  const byId = new Map()
+  ;[...(localFiles || []), ...(remoteFiles || [])].forEach((file) => {
+    if (!file?.id) return
+    const prev = byId.get(file.id)
+    if (!prev) {
+      byId.set(file.id, file)
+      return
+    }
+    const prevT = new Date(prev.updatedAt || 0).getTime()
+    const nextT = new Date(file.updatedAt || 0).getTime()
+    if (nextT >= prevT) byId.set(file.id, { ...prev, ...file })
+  })
+
+  const files = Array.from(byId.values()).filter((file) => {
+    const tomb = removed[file.id]
+    if (!tomb) return true
+    return new Date(file.updatedAt || 0).getTime() > new Date(tomb).getTime()
+  })
+
+  return { files, removed }
 }
 
 const buildWorkspaceFileSeed = (workspaceId) => [
@@ -124,6 +155,9 @@ export default function WorkspaceHome({
     const stored = readStoredJson(fileStoreKey(workspaceId), null)
     return stored || buildWorkspaceFileSeed(workspaceId)
   })
+  const [removedFiles, setRemovedFiles] = useState(() =>
+    workspaceId ? readStoredJson(fileRemovedStoreKey(workspaceId), {}) : {}
+  )
   const [openTabs, setOpenTabs] = useState(() => (workspaceId ? readStoredJson(tabsStoreKey(workspaceId), []) : []))
   const [activeTabId, setActiveTabId] = useState(() =>
     workspaceId ? localStorage.getItem(activeTabStoreKey(workspaceId)) || '' : ''
@@ -131,60 +165,119 @@ export default function WorkspaceHome({
   const [chatMessages, setChatMessages] = useState(() =>
     workspaceId ? readStoredJson(`teamora-workspace-chat:${workspaceId}`, []) : []
   )
+  const [activeFolderId, setActiveFolderId] = useState(null)
   const filesChannel = useLocalCollabChannel(workspaceId, 'files')
   const chatChannel = useLocalCollabChannel(workspaceId, 'chat')
+  const removedFilesRef = useRef(removedFiles)
+  const workspaceFilesRef = useRef(workspaceFiles)
+  const chatMessagesRef = useRef(chatMessages)
+
+  useEffect(() => {
+    removedFilesRef.current = removedFiles
+  }, [removedFiles])
+  useEffect(() => {
+    workspaceFilesRef.current = workspaceFiles
+  }, [workspaceFiles])
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages
+  }, [chatMessages])
 
   useEffect(() => {
     if (!workspaceId) return
     const handleReceiveFiles = (files) => {
       if (Array.isArray(files)) {
-        setWorkspaceFiles(files)
+        setWorkspaceFiles((current) => {
+          const merged = mergeFileTreesLocal(current, files, removedFilesRef.current, {})
+          return merged.files
+        })
       }
     }
     filesChannel.on('receive-files', handleReceiveFiles)
     return () => filesChannel.off('receive-files', handleReceiveFiles)
   }, [filesChannel, workspaceId])
 
-  // Multi-device file tree: hydrate from server when local list is only the seed.
+  // Multi-device file tree: poll + merge-by-id (never blind-replace).
   useEffect(() => {
     if (!workspaceId) return undefined
     let cancelled = false
 
-    getWorkspaceContent(workspaceId, 'files')
-      .then((content) => {
-        if (cancelled) return
-        const remoteFiles = content?.data?.files
-        if (!Array.isArray(remoteFiles) || remoteFiles.length === 0) return
+    const pullFiles = () => {
+      getWorkspaceContent(workspaceId, 'files')
+        .then((content) => {
+          if (cancelled) return
+          const data = content?.data
+          const remoteFiles = Array.isArray(data?.files) ? data.files : []
+          const remoteRemoved = data?.removed && typeof data.removed === 'object' ? data.removed : {}
+          if (remoteFiles.length === 0 && Object.keys(remoteRemoved).length === 0) return
 
-        setWorkspaceFiles((current) => {
-          // Prefer remote when local is empty/seed-only (single default folder).
-          const onlySeed = current.length <= 1 && current.every((item) => item.type === 'folder' || !item.kind)
-          if (onlySeed || current.length === 0) {
-            filesChannel.emit('update-files', { roomId: workspaceId, files: remoteFiles })
-            return remoteFiles
-          }
-          return current
+          const merged = mergeFileTreesLocal(
+            workspaceFilesRef.current,
+            remoteFiles,
+            removedFilesRef.current,
+            remoteRemoved
+          )
+          setRemovedFiles(merged.removed)
+          writeStoredJson(fileRemovedStoreKey(workspaceId), merged.removed)
+          setWorkspaceFiles(merged.files)
+          filesChannel.emit('update-files', { roomId: workspaceId, files: merged.files })
         })
-      })
-      .catch(() => {
-        // Offline — localStorage/channel remains authoritative.
-      })
+        .catch(() => {
+          // Offline — localStorage/channel remains authoritative.
+        })
+    }
 
+    pullFiles()
+    const timer = window.setInterval(pullFiles, 4000)
     return () => {
       cancelled = true
+      window.clearInterval(timer)
     }
   }, [workspaceId, filesChannel])
+
+  const mergeChatMessages = (a = [], b = []) => {
+    const byId = new Map()
+    ;[...a, ...b].forEach((msg) => {
+      if (!msg?.id) return
+      byId.set(msg.id, msg)
+    })
+    return Array.from(byId.values()).sort(
+      (x, y) => new Date(x.createdAt || 0).getTime() - new Date(y.createdAt || 0).getTime()
+    )
+  }
 
   useEffect(() => {
     if (!workspaceId) return
     const handleReceiveChat = (messages) => {
       if (Array.isArray(messages)) {
-        setChatMessages(messages)
+        setChatMessages((local) => mergeChatMessages(local, messages))
       }
     }
     chatChannel.on('chat-messages', handleReceiveChat)
     return () => chatChannel.off('chat-messages', handleReceiveChat)
   }, [chatChannel, workspaceId])
+
+  // Multi-device chat sync via content API
+  useEffect(() => {
+    if (!workspaceId) return undefined
+    let cancelled = false
+    const pullChat = () => {
+      getWorkspaceContent(workspaceId, 'chat')
+        .then((content) => {
+          if (cancelled) return
+          const remote = content?.data?.messages
+          if (Array.isArray(remote)) {
+            setChatMessages((local) => mergeChatMessages(local, remote))
+          }
+        })
+        .catch(() => {})
+    }
+    pullChat()
+    const timer = window.setInterval(pullChat, 3500)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [workspaceId])
   const pendingRequests = useMemo(
     () => (workspace?.joinRequests || []).filter((request) => request.status === 'pending'),
     [workspace]
@@ -214,14 +307,23 @@ export default function WorkspaceHome({
     writeStoredJson(fileStoreKey(workspaceId), workspaceFiles)
   }, [workspaceFiles, workspaceId])
 
-  // Debounced multi-device file tree sync
   useEffect(() => {
-    if (!workspaceId || !workspaceFiles?.length) return undefined
+    if (!workspaceId) return
+    writeStoredJson(fileRemovedStoreKey(workspaceId), removedFiles)
+  }, [removedFiles, workspaceId])
+
+  // Debounced multi-device file tree sync (files-v1 with tombstones)
+  useEffect(() => {
+    if (!workspaceId) return undefined
     const timer = window.setTimeout(() => {
-      putWorkspaceContent(workspaceId, 'files', { files: workspaceFiles }).catch(() => {})
+      putWorkspaceContent(workspaceId, 'files', {
+        format: 'files-v1',
+        files: workspaceFiles,
+        removed: removedFiles
+      }).catch(() => {})
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [workspaceFiles, workspaceId])
+  }, [workspaceFiles, removedFiles, workspaceId])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -288,12 +390,19 @@ export default function WorkspaceHome({
     if (!typeInfo) return null
     const timestamp = new Date().toISOString()
     const sameKindCount = workspaceFiles.filter((file) => file.kind === kind).length + 1
+    // Prefer explicit parent, else active folder selection, else root.
+    const resolvedParent =
+      parentId !== null && parentId !== undefined
+        ? parentId
+        : options.parentId !== undefined
+          ? options.parentId
+          : activeFolderId
     const file = {
       id: `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type: 'file',
       kind,
       name: options.name || `Untitled ${typeInfo.label} ${sameKindCount}.${typeInfo.extension}`,
-      parentId,
+      parentId: resolvedParent || null,
       createdBy: getDisplayName(user),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -330,18 +439,83 @@ export default function WorkspaceHome({
     filesChannel.emit('update-files', { roomId: workspaceId, files: next })
   }
 
+  const collectDescendantIds = (rootId) => {
+    const ids = new Set([rootId])
+    let grew = true
+    while (grew) {
+      grew = false
+      workspaceFiles.forEach((f) => {
+        if (f.parentId && ids.has(f.parentId) && !ids.has(f.id)) {
+          ids.add(f.id)
+          grew = true
+        }
+      })
+    }
+    return ids
+  }
+
   const deleteWorkspaceFile = (fileId) => {
     const file = workspaceFiles.find((f) => f.id === fileId)
     if (!file) return
-    if (!window.confirm(`Delete "${file.name}"?`)) return
-    const next = workspaceFiles.filter((f) => f.id !== fileId)
+
+    const isFolder = file.type === 'folder'
+    const toDelete = isFolder ? collectDescendantIds(fileId) : new Set([fileId])
+    const count = toDelete.size
+    const label = isFolder
+      ? `Delete folder "${file.name}" and ${count - 1} item(s) inside? This cannot be undone.`
+      : `Delete "${file.name}"?`
+    if (!window.confirm(label)) return
+
+    const deletedAt = new Date().toISOString()
+    const next = workspaceFiles.filter((f) => !toDelete.has(f.id))
     setWorkspaceFiles(next)
+    setRemovedFiles((current) => {
+      const nextRemoved = { ...current }
+      toDelete.forEach((id) => {
+        nextRemoved[id] = deletedAt
+      })
+      writeStoredJson(fileRemovedStoreKey(workspaceId), nextRemoved)
+      return nextRemoved
+    })
     filesChannel.emit('update-files', { roomId: workspaceId, files: next })
-    setOpenTabs((current) => current.filter((id) => id !== fileId))
-    if (activeTabId === fileId) {
+    setOpenTabs((current) => current.filter((id) => !toDelete.has(id)))
+    if (toDelete.has(activeTabId)) {
       setActiveTabId('')
     }
-    toast.success(`"${file.name}" deleted.`)
+    if (isFolder && toDelete.has(activeFolderId)) {
+      setActiveFolderId(null)
+    }
+    toast.success(isFolder ? `Folder and ${count - 1} item(s) deleted` : `"${file.name}" deleted.`)
+  }
+
+  const folderLabel = (folderId, files = workspaceFiles) => {
+    if (!folderId) return 'Root'
+    return files.find((f) => f.id === folderId)?.name || 'folder'
+  }
+
+  /** Move existing file into Active Folder (Save when folder changed). */
+  const moveFileToActiveFolder = (fileId, { silent = false } = {}) => {
+    if (!fileId) return false
+    const targetParent = activeFolderId || null
+    const file = workspaceFiles.find((f) => f.id === fileId)
+    if (!file) return false
+    if (file.parentId === targetParent) return false
+    const next = workspaceFiles.map((f) =>
+      f.id === fileId ? { ...f, parentId: targetParent, updatedAt: new Date().toISOString() } : f
+    )
+    setWorkspaceFiles(next)
+    filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+    if (!silent) toast.success(`Saved to ${folderLabel(targetParent, next)}`)
+    return true
+  }
+
+  /** Save As → new file in Active Folder with optional seed content. */
+  const saveAsInActiveFolder = (kind, options = {}) => {
+    return createWorkspaceFile(kind, activeFolderId, {
+      ...options,
+      successMessage:
+        options.successMessage || `Saved as new file in ${folderLabel(activeFolderId)}`
+    })
   }
 
   const closeWorkspaceTab = (fileId) => {
@@ -409,6 +583,10 @@ export default function WorkspaceHome({
           tabs={openTabs}
           activeTabId={activeTabId}
           activeFilePath={activeFilePath}
+          activeFolderId={activeFolderId}
+          onSelectFolder={(folderId) =>
+            setActiveFolderId((current) => (current === folderId ? null : folderId))
+          }
           onOpenFile={openWorkspaceFile}
           onSelectTab={(fileId) => {
             const file = workspaceFiles.find((item) => item.id === fileId)
@@ -416,6 +594,23 @@ export default function WorkspaceHome({
           }}
           onCloseTab={closeWorkspaceTab}
           onReorderTab={reorderWorkspaceTab}
+          onCreateFolder={() => {
+            const name = window.prompt('Folder name', 'New folder')
+            if (!name?.trim()) return
+            const timestamp = new Date().toISOString()
+            const folder = {
+              id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              type: 'folder',
+              name: name.trim(),
+              parentId: activeFolderId || null,
+              updatedAt: timestamp
+            }
+            const next = [...workspaceFiles, folder]
+            setWorkspaceFiles(next)
+            filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+            setActiveFolderId(folder.id)
+            toast.success(`Folder "${folder.name}" selected for new files`)
+          }}
         />
         {loading ? (
           <WorkspaceContentSkeleton activeItem={activeItem} />
@@ -449,18 +644,25 @@ export default function WorkspaceHome({
           <WorkspaceChat
             messages={chatMessages}
             userName={getDisplayName(user)}
-            onSend={(text) => {
-              const next = [
-                ...chatMessages,
-                {
-                  id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                  user: getDisplayName(user),
-                  text,
-                  createdAt: new Date().toISOString()
+            onSend={(payload) => {
+              const message = {
+                id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                user: getDisplayName(user),
+                text: typeof payload === 'string' ? payload : payload?.text || '',
+                attachments: typeof payload === 'object' ? payload?.attachments || [] : [],
+                createdAt: new Date().toISOString()
+              }
+              setChatMessages((current) => {
+                const next = mergeChatMessages(current, [message])
+                chatChannel.emit('chat-messages', next)
+                if (workspaceId) {
+                  putWorkspaceContent(workspaceId, 'chat', {
+                    format: 'messages-v1',
+                    messages: [message]
+                  }).catch(() => {})
                 }
-              ]
-              setChatMessages(next)
-              chatChannel.emit('chat-messages', next)
+                return next
+              })
             }}
           />
         ) : activeItem === 'calendar' ? (
@@ -488,16 +690,20 @@ export default function WorkspaceHome({
                   workspaceId={workspace?._id}
                   userName={getDisplayName(user)}
                   activeFile={activeFile}
-                  onCreateFile={(options) => createWorkspaceFile('document', null, options || {})}
+                  onCreateFile={(options) =>
+                    createWorkspaceFile('document', activeFolderId, options || {})
+                  }
                   onRenameFile={renameWorkspaceFile}
                   onDirtyChange={markActiveFileUnsaved}
+                  onSaveToActiveFolder={() => moveFileToActiveFolder(activeFile.id, { silent: true })}
+                  onSaveAs={(options) => saveAsInActiveFolder('document', options || {})}
                 />
               ) : (
                 <WorkspaceSectionFileList
                   files={workspaceFiles.filter((f) => f.kind === 'document')}
                   icon={FileText}
                   kindLabel="Document"
-                  onCreate={() => createWorkspaceFile('document')}
+                  onCreate={() => createWorkspaceFile('document', activeFolderId)}
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
@@ -509,14 +715,17 @@ export default function WorkspaceHome({
                   workspaceId={workspace?._id}
                   userName={getDisplayName(user)}
                   activeFile={activeFile}
-                  onDirtyChange={markActiveFileUnsaved}
+                  onDirtyChange={(dirty) => {
+                    markActiveFileUnsaved(dirty)
+                    if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
+                  }}
                 />
               ) : (
                 <WorkspaceSectionFileList
                   files={workspaceFiles.filter((f) => f.kind === 'whiteboard')}
                   icon={Paintbrush}
                   kindLabel="Whiteboard"
-                  onCreate={() => createWorkspaceFile('whiteboard')}
+                  onCreate={() => createWorkspaceFile('whiteboard', activeFolderId)}
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
@@ -527,14 +736,17 @@ export default function WorkspaceHome({
                   key={activeFile.id}
                   workspaceId={workspace?._id}
                   activeFile={activeFile}
-                  onDirtyChange={markActiveFileUnsaved}
+                  onDirtyChange={(dirty) => {
+                    markActiveFileUnsaved(dirty)
+                    if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
+                  }}
                 />
               ) : (
                 <WorkspaceSectionFileList
                   files={workspaceFiles.filter((f) => f.kind === 'spreadsheet')}
                   icon={TableProperties}
                   kindLabel="Spreadsheet"
-                  onCreate={() => createWorkspaceFile('spreadsheet')}
+                  onCreate={() => createWorkspaceFile('spreadsheet', activeFolderId)}
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
@@ -545,14 +757,17 @@ export default function WorkspaceHome({
                   key={activeFile.id}
                   workspaceId={workspace?._id}
                   activeFile={activeFile}
-                  onDirtyChange={markActiveFileUnsaved}
+                  onDirtyChange={(dirty) => {
+                    markActiveFileUnsaved(dirty)
+                    if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
+                  }}
                 />
               ) : (
                 <WorkspaceSectionFileList
                   files={workspaceFiles.filter((f) => f.kind === 'presentation')}
                   icon={Presentation}
                   kindLabel="Presentation"
-                  onCreate={() => createWorkspaceFile('presentation')}
+                  onCreate={() => createWorkspaceFile('presentation', activeFolderId)}
                   onOpen={openWorkspaceFile}
                   onDelete={deleteWorkspaceFile}
                 />
@@ -561,7 +776,36 @@ export default function WorkspaceHome({
               <MeetingsSection workspaceId={workspace?._id} userName={getDisplayName(user)} />
             )}
             {activeItem === 'shared-files' && (
-              <SharedFilesSection workspaceId={workspace?._id} userName={getDisplayName(user)} />
+              <SharedFilesSection
+                workspaceId={workspace?._id}
+                userName={getDisplayName(user)}
+                workspaceFiles={workspaceFiles}
+                activeFolderId={activeFolderId}
+                onCreateWorkspaceFile={createWorkspaceFile}
+                onOpenWorkspaceFile={openWorkspaceFile}
+                onSelectFolder={setActiveFolderId}
+                onDeleteFile={deleteWorkspaceFile}
+                onCreateFolder={(name) => {
+                  const timestamp = new Date().toISOString()
+                  const folder = {
+                    id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    type: 'folder',
+                    name: name || 'New folder',
+                    parentId: activeFolderId || null,
+                    updatedAt: timestamp
+                  }
+                  const next = [...workspaceFiles, folder]
+                  setWorkspaceFiles(next)
+                  filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+                  setActiveFolderId(folder.id)
+                  toast.success(`Folder "${folder.name}" ready for uploads`)
+                  return folder
+                }}
+                onFilesChange={(nextFiles) => {
+                  setWorkspaceFiles(nextFiles)
+                  filesChannel.emit('update-files', { roomId: workspaceId, files: nextFiles })
+                }}
+              />
             )}
           </Suspense>
         ) : sectionTitles[activeItem] ? (
@@ -660,10 +904,22 @@ function WorkspaceContentSkeleton({ activeItem }) {
   )
 }
 
-function WorkspaceFileTabs({ files, tabs, activeTabId, activeFilePath, onSelectTab, onCloseTab, onReorderTab }) {
+function WorkspaceFileTabs({
+  files,
+  tabs,
+  activeTabId,
+  activeFilePath,
+  activeFolderId,
+  onSelectFolder,
+  onSelectTab,
+  onCloseTab,
+  onReorderTab,
+  onCreateFolder
+}) {
   const tabFiles = tabs.map((tabId) => files.find((file) => file.id === tabId)).filter(Boolean)
   const folders = files.filter((file) => file.type === 'folder')
   const childFiles = (folderId) => files.filter((file) => file.parentId === folderId && file.type !== 'folder')
+  const activeFolder = folders.find((f) => f.id === activeFolderId)
 
   return (
     <div className="mb-5 rounded-card border border-border bg-card shadow-card">
@@ -720,7 +976,7 @@ function WorkspaceFileTabs({ files, tabs, activeTabId, activeFilePath, onSelectT
         )}
       </div>
 
-      <div className="grid gap-2 px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.7fr)]">
+      <div className="grid gap-2 px-3 py-2 text-xs text-muted lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)]">
         <div className="min-w-0 truncate">
           <span className="font-semibold text-text">Workspace</span>
           {activeFilePath.map((item) => (
@@ -729,19 +985,56 @@ function WorkspaceFileTabs({ files, tabs, activeTabId, activeFilePath, onSelectT
               <span className={item.type === 'folder' ? 'text-muted' : 'font-semibold text-text'}>{item.name}</span>
             </span>
           ))}
+          {activeFolder && (
+            <span className="ml-2 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+              New files → {activeFolder.name}
+            </span>
+          )}
         </div>
 
-        <div className="hidden min-w-0 gap-2 overflow-x-auto lg:flex">
-          <span className="shrink-0 font-semibold text-text">Folders</span>
-          {folders.length === 0 ? (
-            <span>No folders yet</span>
-          ) : (
-            folders.map((folder) => (
-              <span key={folder.id} className="shrink-0 rounded-full bg-card-sunken px-2.5 py-1">
-                {folder.name} ({childFiles(folder.id).length})
-              </span>
-            ))
-          )}
+        <div className="flex min-w-0 max-h-28 flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="shrink-0 font-semibold text-text">Folders</span>
+            <button
+              type="button"
+              onClick={onCreateFolder}
+              className="shrink-0 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-semibold text-muted hover:border-primary hover:text-primary"
+            >
+              + Folder
+            </button>
+          </div>
+          <div className="flex min-h-0 max-h-20 flex-wrap content-start gap-1.5 overflow-y-auto overflow-x-hidden pr-1">
+            <button
+              type="button"
+              onClick={() => onSelectFolder?.(null)}
+              className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                !activeFolderId
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border bg-card-sunken text-muted hover:border-primary/40'
+              }`}
+              title="Save new files at workspace root"
+            >
+              Root
+            </button>
+            {folders.map((folder) => {
+              const selected = folder.id === activeFolderId
+              return (
+                <button
+                  key={folder.id}
+                  type="button"
+                  onClick={() => onSelectFolder?.(folder.id)}
+                  className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                    selected
+                      ? 'border-primary bg-primary text-on-primary shadow-sm'
+                      : 'border-border bg-card-sunken text-text hover:border-primary/40 hover:bg-primary/10'
+                  }`}
+                  title={selected ? 'Click to deselect folder' : 'Select as destination for new files'}
+                >
+                  {folder.name} ({childFiles(folder.id).length})
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -884,11 +1177,45 @@ function WorkspaceSection({ workspace, title }) {
 
 function WorkspaceChat({ messages, userName, onSend }) {
   const [draft, setDraft] = useState('')
+  const [pendingAttachments, setPendingAttachments] = useState([])
+  const fileInputRef = useRef(null)
+  const listRef = useRef(null)
+
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight
+    }
+  }, [messages])
+
+  const addFiles = (fileList) => {
+    const files = Array.from(fileList || [])
+    files.forEach((file) => {
+      if (file.size > 2_000_000) {
+        toast.error(`"${file.name}" is too large (max 2MB for chat)`)
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = () => {
+        setPendingAttachments((current) => [
+          ...current,
+          {
+            id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: file.name,
+            type: file.type || 'application/octet-stream',
+            size: file.size,
+            dataUrl: reader.result
+          }
+        ])
+      }
+      reader.readAsDataURL(file)
+    })
+  }
 
   const send = () => {
-    if (!draft.trim()) return
-    onSend(draft.trim())
+    if (!draft.trim() && pendingAttachments.length === 0) return
+    onSend({ text: draft.trim(), attachments: pendingAttachments })
     setDraft('')
+    setPendingAttachments([])
   }
 
   return (
@@ -899,11 +1226,11 @@ function WorkspaceChat({ messages, userName, onSend }) {
         </span>
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-text">Workspace Chat</h1>
-          <p className="text-sm text-muted">Messages stay available when you switch workspace pages.</p>
+          <p className="text-sm text-muted">Synced across devices · attach images or files (up to 2MB).</p>
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-card-sunken p-5">
+      <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-card-sunken p-5">
         {messages.length === 0 ? (
           <div className="rounded-card border border-dashed border-border bg-card p-8 text-center text-sm text-muted">
             Start a workspace conversation.
@@ -911,10 +1238,11 @@ function WorkspaceChat({ messages, userName, onSend }) {
         ) : (
           messages.map((message) => {
             const mine = message.user === userName
+            const attachments = Array.isArray(message.attachments) ? message.attachments : []
             return (
               <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[72%] rounded-card px-4 py-3 shadow-card ${
+                  className={`max-w-[78%] rounded-card px-4 py-3 shadow-card ${
                     mine ? 'bg-primary text-on-primary' : 'border border-border bg-card text-text'
                   }`}
                 >
@@ -922,7 +1250,36 @@ function WorkspaceChat({ messages, userName, onSend }) {
                     <span>{message.user}</span>
                     <span>{formatTime(message.createdAt)}</span>
                   </div>
-                  <p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p>
+                  {message.text ? <p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p> : null}
+                  {attachments.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {attachments.map((att) => {
+                        const isImage = String(att.type || '').startsWith('image/')
+                        return (
+                          <div key={att.id || att.name} className="rounded-lg border border-white/20 bg-black/10 p-2">
+                            {isImage && att.dataUrl ? (
+                              <a href={att.dataUrl} target="_blank" rel="noreferrer">
+                                <img
+                                  src={att.dataUrl}
+                                  alt={att.name}
+                                  className="max-h-48 max-w-full rounded-md object-contain"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={att.dataUrl}
+                                download={att.name}
+                                className="flex items-center gap-2 text-xs font-semibold underline"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                {att.name || 'Attachment'}
+                              </a>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -930,7 +1287,47 @@ function WorkspaceChat({ messages, userName, onSend }) {
         )}
       </div>
 
-      <div className="flex gap-3 border-t border-border p-4">
+      {pendingAttachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 border-t border-border bg-card-sunken px-4 py-2">
+          {pendingAttachments.map((att) => (
+            <span
+              key={att.id}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-1 text-[11px] font-semibold text-text"
+            >
+              {att.name}
+              <button
+                type="button"
+                className="text-muted hover:text-danger"
+                onClick={() => setPendingAttachments((c) => c.filter((a) => a.id !== att.id))}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-border p-4 sm:flex-nowrap">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          accept="image/*,.pdf,.txt,.doc,.docx,.xlsx,.csv,.json"
+          onChange={(e) => {
+            addFiles(e.target.files)
+            e.target.value = ''
+          }}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-12 shrink-0"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload className="h-4 w-4" />
+          Attach
+        </Button>
         <Input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -940,10 +1337,17 @@ function WorkspaceChat({ messages, userName, onSend }) {
               send()
             }
           }}
+          onPaste={(event) => {
+            const items = event.clipboardData?.files
+            if (items?.length) {
+              event.preventDefault()
+              addFiles(items)
+            }
+          }}
           placeholder="Message the workspace..."
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
-        <Button type="button" onClick={send} className="h-12">
+        <Button type="button" onClick={send} className="h-12 shrink-0">
           Send
         </Button>
       </div>

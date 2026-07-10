@@ -70,6 +70,10 @@ describe('Content Service', () => {
         })
     }));
 
+    mock.method(WorkspaceContent, 'findOne', () => ({
+      lean: async () => null
+    }));
+
     mock.method(WorkspaceContent, 'findOneAndUpdate', async () => ({
       key: 'documents:doc1',
       data: payload,
@@ -82,4 +86,51 @@ describe('Content Service', () => {
     assert.equal(result.key, 'documents:doc1');
     assert.equal(result.data.html, payload.html);
   });
+
+  test('merges concurrent file tree creates as files-v1', async () => {
+    const workspaceId = new mongoose.Types.ObjectId();
+    const userId = new mongoose.Types.ObjectId();
+
+    mock.method(Workspace, 'findById', () => ({
+      select: () =>
+        Promise.resolve({
+          _id: workspaceId,
+          members: [userId],
+          archivedAt: null
+        })
+    }));
+
+    mock.method(WorkspaceContent, 'findOne', () => ({
+      lean: async () => ({
+        data: {
+          format: 'files-v1',
+          files: [{ id: 'a', name: 'A', updatedAt: '2026-06-01T00:00:00.000Z' }],
+          removed: {}
+        }
+      })
+    }));
+
+    let saved = null;
+    mock.method(WorkspaceContent, 'findOneAndUpdate', async (_q, update) => {
+      saved = update.$set.data;
+      return {
+        key: 'files',
+        data: saved,
+        updatedAt: new Date(),
+        updatedBy: userId
+      };
+    });
+
+    const result = await contentService.putContent(userId, workspaceId.toString(), 'files', {
+      format: 'files-v1',
+      files: [{ id: 'b', name: 'B', updatedAt: '2026-06-01T00:00:01.000Z' }],
+      removed: {}
+    });
+
+    assert.equal(result.data.format, 'files-v1');
+    assert.equal(result.data.files.length, 2);
+    assert.ok(result.data.files.some((f) => f.id === 'a'));
+    assert.ok(result.data.files.some((f) => f.id === 'b'));
+  });
 });
+

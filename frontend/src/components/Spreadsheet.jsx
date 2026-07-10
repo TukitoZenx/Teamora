@@ -123,6 +123,120 @@ export default function Spreadsheet({
 
   const cellRefs = useRef({})
   const gridContainerRef = useRef(null)
+  const fillDragRef = useRef(null)
+
+  /** Excel-style autofill: numbers/dates sequences, formula relative adjust, copy otherwise. */
+  const autofillValue = (sourceValue, offset, axis = 'row') => {
+    if (sourceValue == null || sourceValue === '') return ''
+    const str = String(sourceValue)
+
+    if (str.startsWith('=')) {
+      // Shift simple A1-style refs by fill offset.
+      return str.replace(/([A-Z]+)(\d+)/gi, (_, col, row) => {
+        if (axis === 'row') {
+          return `${col}${Math.max(1, parseInt(row, 10) + offset)}`
+        }
+        // column axis: shift letters
+        let colNum = 0
+        for (let i = 0; i < col.length; i += 1) {
+          colNum = colNum * 26 + (col.toUpperCase().charCodeAt(i) - 64)
+        }
+        colNum = Math.max(1, colNum + offset)
+        let label = ''
+        let n = colNum
+        while (n > 0) {
+          const rem = (n - 1) % 26
+          label = String.fromCharCode(65 + rem) + label
+          n = Math.floor((n - 1) / 26)
+        }
+        return `${label}${row}`
+      })
+    }
+
+    if (/^-?\d+(\.\d+)?$/.test(str.trim())) {
+      const num = parseFloat(str)
+      return String(num + offset)
+    }
+
+    const dayMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (dayMatch) {
+      const d = new Date(Date.UTC(+dayMatch[1], +dayMatch[2] - 1, +dayMatch[3]))
+      d.setUTCDate(d.getUTCDate() + offset)
+      return d.toISOString().slice(0, 10)
+    }
+
+    // text123 → text124
+    const trail = str.match(/^(.*?)(\d+)$/)
+    if (trail) {
+      const next = String(parseInt(trail[2], 10) + offset)
+      return `${trail[1]}${next.padStart(trail[2].length, '0')}`
+    }
+
+    return str
+  }
+
+  const startFillHandle = (e, rIdx, cIdx) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const sourceAbsR = sheetOffset + rIdx
+    const sourceVal = grid[sourceAbsR]?.[cIdx] ?? ''
+    fillDragRef.current = { startR: rIdx, startC: cIdx, sourceVal, sourceAbsR }
+
+    const onMove = (moveEvent) => {
+      // visual only via hover — apply on mouseup from cell under cursor
+      fillDragRef.current.clientX = moveEvent.clientX
+      fillDragRef.current.clientY = moveEvent.clientY
+    }
+    const onUp = (upEvent) => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      const drag = fillDragRef.current
+      fillDragRef.current = null
+      if (!drag) return
+
+      // Find target cell from element under cursor
+      const el = document.elementFromPoint(upEvent.clientX, upEvent.clientY)
+      const input = el?.closest?.('td')?.querySelector?.('input') || (el?.tagName === 'INPUT' ? el : null)
+      if (!input) return
+      // Match ref key r-c
+      let targetR = null
+      let targetC = null
+      Object.entries(cellRefs.current).forEach(([key, node]) => {
+        if (node === input) {
+          const [r, c] = key.split('-').map(Number)
+          targetR = r
+          targetC = c
+        }
+      })
+      if (targetR == null || targetC == null) return
+      if (targetR === drag.startR && targetC === drag.startC) return
+
+      const sameCol = targetC === drag.startC
+      const sameRow = targetR === drag.startR
+      if (!sameCol && !sameRow) {
+        // Prefer vertical if both differ
+      }
+
+      if (sameCol || Math.abs(targetR - drag.startR) >= Math.abs(targetC - drag.startC)) {
+        const dir = targetR >= drag.startR ? 1 : -1
+        for (let r = drag.startR + dir; dir > 0 ? r <= targetR : r >= targetR; r += dir) {
+          const offset = r - drag.startR
+          const val = autofillValue(drag.sourceVal, offset, 'row')
+          handleCellChange(sheetOffset + r, drag.startC, val)
+        }
+      } else {
+        const dir = targetC >= drag.startC ? 1 : -1
+        for (let c = drag.startC + dir; dir > 0 ? c <= targetC : c >= targetC; c += dir) {
+          const offset = c - drag.startC
+          const val = autofillValue(drag.sourceVal, offset, 'col')
+          handleCellChange(sheetOffset + drag.startR, c, val)
+        }
+      }
+      toast.success('Autofill applied')
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
 
   // Scroll into view to center active cell on focus
   useEffect(() => {
@@ -578,6 +692,14 @@ export default function Spreadsheet({
                             onKeyDown={(e) => handleCellKeyDown(e, rIdx, cIdx)}
                             className="w-full h-full bg-transparent border-none outline-none px-2 text-xs text-text font-mono focus:ring-0 focus:outline-none"
                           />
+                          {isActive && (
+                            <div
+                              role="presentation"
+                              title="Fill handle — drag to autofill"
+                              onMouseDown={(e) => startFillHandle(e, rIdx, cIdx)}
+                              className="absolute -bottom-1 -right-1 z-20 h-2.5 w-2.5 cursor-crosshair rounded-[1px] border border-card bg-primary shadow-sm"
+                            />
+                          )}
                           {!isActive && hasOtherUsers && (
                             <div
                               className="absolute -top-3.5 left-0 text-[8px] text-on-primary px-1.5 py-0.5 rounded-t-md font-bold z-30 select-none pointer-events-none whitespace-nowrap"

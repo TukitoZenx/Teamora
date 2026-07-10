@@ -33,7 +33,7 @@ export const isNotificationTypeEnabled = (type, preferences = readNotificationPr
     return preferences.workspaceInvitations !== false
   }
 
-  if (type === 'meeting_reminder' || type === 'meeting') {
+  if (type === 'meeting_reminder' || type === 'meeting' || type === 'task_reminder') {
     return preferences.meetingReminders !== false
   }
 

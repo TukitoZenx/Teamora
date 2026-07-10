@@ -61,7 +61,7 @@ npm run build
 
 ## Architectural Highlights
 
-- **Local Collaboration Channel**: Uses `BroadcastChannel` and `localStorage` for cross-tab live sync (Documents, Whiteboard, Spreadsheet, Slides, Files, Meetings).
+- **Collaborative editing**: Yjs CRDT over REST content API for Documents, Spreadsheet, Whiteboard, and Presentation; file tree / comments / versions use merge-by-id lists. Optional WebSocket fanout at `/collab` for low-latency updates and document cursors (session-authenticated). Same-browser `BroadcastChannel` still used for meetings signaling and some ephemeral events.
 - **Server content blobs**: Workspace files and document HTML also persist via `GET/PUT /api/v1/workspaces/:id/content/:key` (last-write-wins) so members can open the same content on another browser/device. Live multi-user OT and cross-device WebRTC still need a future realtime layer.
 - **Workspace visibility**: `invite_only` accepts invite links (with optional join approval); `private` blocks all invite joins.
 - **Security Hardened**: JSON Content-Type CSRF mitigation, production rate limits on auth + workspace create/join/content writes, session cookie hardening.
