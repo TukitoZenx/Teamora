@@ -16,21 +16,11 @@ const MAX_VERSIONS = 50;
  * @param {{ format?: string, comments?: any[], removed?: Record<string, string> }|null} incoming
  */
 const mergeCommentsPayload = (existing, incoming) => {
-  const baseList = Array.isArray(existing?.comments)
-    ? existing.comments
-    : Array.isArray(existing)
-      ? existing
-      : [];
-  const nextList = Array.isArray(incoming?.comments)
-    ? incoming.comments
-    : Array.isArray(incoming)
-      ? incoming
-      : [];
+  const baseList = Array.isArray(existing?.comments) ? existing.comments : Array.isArray(existing) ? existing : [];
+  const nextList = Array.isArray(incoming?.comments) ? incoming.comments : Array.isArray(incoming) ? incoming : [];
 
-  const baseRemoved =
-    existing?.removed && typeof existing.removed === 'object' ? { ...existing.removed } : {};
-  const nextRemoved =
-    incoming?.removed && typeof incoming.removed === 'object' ? incoming.removed : {};
+  const baseRemoved = existing?.removed && typeof existing.removed === 'object' ? { ...existing.removed } : {};
+  const nextRemoved = incoming?.removed && typeof incoming.removed === 'object' ? incoming.removed : {};
 
   const removed = { ...baseRemoved };
   Object.entries(nextRemoved).forEach(([id, ts]) => {
@@ -86,16 +76,8 @@ const mergeCommentsPayload = (existing, incoming) => {
  * @param {{ format?: string, versions?: any[] }|null} incoming
  */
 const mergeVersionsPayload = (existing, incoming) => {
-  const baseList = Array.isArray(existing?.versions)
-    ? existing.versions
-    : Array.isArray(existing)
-      ? existing
-      : [];
-  const nextList = Array.isArray(incoming?.versions)
-    ? incoming.versions
-    : Array.isArray(incoming)
-      ? incoming
-      : [];
+  const baseList = Array.isArray(existing?.versions) ? existing.versions : Array.isArray(existing) ? existing : [];
+  const nextList = Array.isArray(incoming?.versions) ? incoming.versions : Array.isArray(incoming) ? incoming : [];
 
   /** @type {Map<string, any>} */
   const byId = new Map();
@@ -129,20 +111,12 @@ const mergeVersionsPayload = (existing, incoming) => {
  * Append-only chat / message list merge by id (cap length).
  */
 const mergeMessagesPayload = (existing, incoming, max = 500) => {
-  const baseList = Array.isArray(existing?.messages)
-    ? existing.messages
-    : Array.isArray(existing)
-      ? existing
-      : [];
-  const nextList = Array.isArray(incoming?.messages)
-    ? incoming.messages
-    : Array.isArray(incoming)
-      ? incoming
-      : [];
+  const baseList = Array.isArray(existing?.messages) ? existing.messages : Array.isArray(existing) ? existing : [];
+  const nextList = Array.isArray(incoming?.messages) ? incoming.messages : Array.isArray(incoming) ? incoming : [];
 
   /** @type {Map<string, any>} */
   const byId = new Map();
-  ;[...baseList, ...nextList].forEach((raw) => {
+  [...baseList, ...nextList].forEach((raw) => {
     if (!raw || typeof raw !== 'object' || !raw.id) return;
     const id = String(raw.id);
     const prev = byId.get(id);

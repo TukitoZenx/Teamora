@@ -18,3 +18,7 @@ If you are developing a production application, we recommend using TypeScript wi
 ### WebRTC TURN (meetings)
 
 Set `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL` in frontend env for multi-network meetings. See `src/services/webrtcIce.js`.
+
+### Testing from another device on your LAN
+
+Camera and microphone are blocked by Chrome on `http://<LAN-IP>`; use trusted HTTPS instead. Create a certificate that includes your computer's LAN IP (for example with `mkcert`), configure the TLS paths in `frontend/.env` and `backend/.env` from their `.env.example` files, and trust the mkcert root certificate on every test device. Then open `https://<your-computer-LAN-IP>:5173`. The frontend automatically targets `https://<your-computer-LAN-IP>:5000` for the API and meeting signaling. If the device cannot connect, allow TCP ports 5173 and 5000 through the computer firewall.

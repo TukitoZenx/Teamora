@@ -2,27 +2,7 @@
  * Shared WebSocket client for collab fanout (Yjs updates + awareness).
  * REST remains the durable store; this is optional low-latency push.
  */
-
-const getDefaultApiUrl = () => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
-  if (typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')) {
-    return 'https://teamora-3vgk.onrender.com'
-  }
-  return 'http://localhost:5000'
-}
-
-const toWsUrl = (httpUrl) => {
-  try {
-    const u = new URL(httpUrl)
-    u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'
-    u.pathname = '/collab'
-    u.search = ''
-    u.hash = ''
-    return u.toString()
-  } catch {
-    return null
-  }
-}
+import { getCollabWebSocketUrl } from './apiBaseUrl'
 
 const PRESENCE_COLORS = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444', '#0ea5e9']
 
@@ -65,7 +45,7 @@ export function connectCollabSocket(opts, handlers = {}) {
 
   const connect = () => {
     if (destroyed) return
-    const url = toWsUrl(getDefaultApiUrl())
+    const url = getCollabWebSocketUrl()
     if (!url || !workspaceId || !key) {
       status('unavailable')
       return

@@ -53,3 +53,7 @@ VITE_TURN_CREDENTIAL=your-secret
 ```
 
 Meeting join toast indicates whether TURN is configured. Signaling uses WebSocket `/collab` room `meetings` plus same-browser BroadcastChannel.
+
+## Testing from another device on your LAN
+
+For camera and microphone access, use HTTPS—not `http://<LAN-IP>`. Configure `TLS_KEY_PATH` and `TLS_CERT_PATH` in `backend/.env` (paths relative to `backend/`) and the matching `VITE_TLS_*` paths in `frontend/.env`. The certificate must include the computer's LAN IP and be trusted by each test device. In development, the API listens on `0.0.0.0:5000` and accepts credentialed requests from private-network Vite origins on ports 5173 and 3000. Open ports 5173 and 5000 in the computer firewall if needed.

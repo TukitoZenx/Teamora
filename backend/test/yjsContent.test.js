@@ -185,10 +185,7 @@ describe('Yjs spreadsheet cell map merge', () => {
     clientA.getMap('cells').set(cellKey(5, 5), 'A');
     clientB.getMap('cells').set(cellKey(5, 5), 'B');
 
-    const { equal, state1 } = mergeTwoClientUpdates(
-      Y.encodeStateAsUpdate(clientA),
-      Y.encodeStateAsUpdate(clientB)
-    );
+    const { equal, state1 } = mergeTwoClientUpdates(Y.encodeStateAsUpdate(clientA), Y.encodeStateAsUpdate(clientB));
     assert.equal(equal, true);
 
     const check = new Y.Doc();
@@ -219,10 +216,7 @@ describe('Yjs whiteboard element map merge', () => {
       order: 0
     });
 
-    const { equal, state1 } = mergeTwoClientUpdates(
-      Y.encodeStateAsUpdate(clientA),
-      Y.encodeStateAsUpdate(clientB)
-    );
+    const { equal, state1 } = mergeTwoClientUpdates(Y.encodeStateAsUpdate(clientA), Y.encodeStateAsUpdate(clientB));
     assert.equal(equal, true);
 
     const check = new Y.Doc();
@@ -344,10 +338,7 @@ describe('Yjs presentation slide map merge', () => {
       order: 0
     });
 
-    const { equal, state1 } = mergeTwoClientUpdates(
-      Y.encodeStateAsUpdate(clientA),
-      Y.encodeStateAsUpdate(clientB)
-    );
+    const { equal, state1 } = mergeTwoClientUpdates(Y.encodeStateAsUpdate(clientA), Y.encodeStateAsUpdate(clientB));
     assert.equal(equal, true);
 
     const check = new Y.Doc();

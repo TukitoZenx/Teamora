@@ -25,13 +25,7 @@ import {
 } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 import toast from 'react-hot-toast'
-import {
-  SHAPE_LIBRARY,
-  newTextBox,
-  newShape,
-  renderEquationHtml,
-  shapeCss
-} from './utils/canvasOverlays'
+import { SHAPE_LIBRARY, newTextBox, newShape, renderEquationHtml, shapeCss } from './utils/canvasOverlays'
 
 const FONTS = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
 const SIZES = ['12px', '14px', '16px', '18px', '24px', '32px']
@@ -553,10 +547,7 @@ export default function Documents({
       }
       case 'insertPageNumber': {
         setShowPageNumbers(true)
-        const fmt = prompt(
-          'Page number format — use {n} for page and {total} for count:',
-          pageNumberFormat
-        )
+        const fmt = prompt('Page number format — use {n} for page and {total} for count:', pageNumberFormat)
         if (fmt?.trim()) setPageNumberFormat(fmt.trim())
         toast.success('Page numbers shown in footer on each page')
         break
@@ -578,10 +569,7 @@ export default function Documents({
         break
       }
       case 'insertEquation': {
-        const eq = prompt(
-          'Equation (supports ^  _  a/b  \\frac{a}{b}  \\int  \\sum  \\pi  mc^2):',
-          'E = mc^2'
-        )
+        const eq = prompt('Equation (supports ^  _  a/b  \\frac{a}{b}  \\int  \\sum  \\pi  mc^2):', 'E = mc^2')
         if (eq) {
           quill.focus()
           const rangeEq = quill.getSelection() || { index: quill.getLength() }
@@ -712,7 +700,7 @@ export default function Documents({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken">
       {/* Title Bar */}
       <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors">
         <div className="flex items-center gap-2.5">
@@ -1396,9 +1384,7 @@ export default function Documents({
                   {showPageNumbers && (
                     <div className="absolute bottom-3 left-0 right-0 flex justify-center">
                       <span className="select-none rounded-full bg-card/90 px-3 py-0.5 text-[10px] font-semibold text-muted shadow-sm">
-                        {pageNumberFormat
-                          .replace(/\{n\}/g, String(i + 1))
-                          .replace(/\{total\}/g, String(stats.pages))}
+                        {pageNumberFormat.replace(/\{n\}/g, String(i + 1)).replace(/\{total\}/g, String(stats.pages))}
                       </span>
                     </div>
                   )}
@@ -1449,7 +1435,7 @@ export default function Documents({
                       zIndex: item.zIndex || 10,
                       background: item.fill || 'transparent',
                       borderColor: item.borderColor,
-                      borderWidth: sc.borderWidth === 0 ? 0 : item.borderWidth ?? 1,
+                      borderWidth: sc.borderWidth === 0 ? 0 : (item.borderWidth ?? 1),
                       borderStyle: 'solid',
                       borderRadius: sc.borderRadius,
                       clipPath: sc.clipPath,
@@ -1552,11 +1538,7 @@ export default function Documents({
                             Fill
                             <input
                               type="color"
-                              value={
-                                typeof item.fill === 'string' && item.fill.startsWith('#')
-                                  ? item.fill
-                                  : '#ffffff'
-                              }
+                              value={typeof item.fill === 'string' && item.fill.startsWith('#') ? item.fill : '#ffffff'}
                               onChange={(e) => updateOverlay(item.id, { fill: e.target.value })}
                               className="h-5 w-5 cursor-pointer"
                             />
@@ -1579,9 +1561,7 @@ export default function Documents({
                             min={0}
                             max={12}
                             value={item.borderWidth ?? 1}
-                            onChange={(e) =>
-                              updateOverlay(item.id, { borderWidth: Number(e.target.value) || 0 })
-                            }
+                            onChange={(e) => updateOverlay(item.id, { borderWidth: Number(e.target.value) || 0 })}
                             className="w-10 rounded border border-border bg-card-sunken px-1 text-[10px]"
                             title="Border width"
                           />
@@ -1698,9 +1678,7 @@ export default function Documents({
             type="button"
             onClick={() => setPrintLayout((v) => !v)}
             className={`rounded-full px-2 py-0.5 border text-[9px] font-bold cursor-pointer ${
-              printLayout
-                ? 'border-primary/30 bg-primary/10 text-primary'
-                : 'border-border bg-card-sunken text-muted'
+              printLayout ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border bg-card-sunken text-muted'
             }`}
           >
             {printLayout ? 'Print layout' : 'Web layout'}

@@ -2,6 +2,7 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 
 const isProduction = process.env.NODE_ENV === 'production';
+const usesHttps = isProduction || Boolean(process.env.TLS_KEY_PATH && process.env.TLS_CERT_PATH);
 
 const createSessionStore = () => {
   if (!process.env.MONGODB_URI) return undefined;
@@ -28,7 +29,7 @@ const createSessionMiddleware = (store) =>
     proxy: isProduction,
     cookie: {
       httpOnly: true,
-      secure: isProduction,
+      secure: usesHttps,
       sameSite: isProduction ? 'none' : 'lax',
       maxAge: 1000 * 60 * 60 * 24 * 30
     }
@@ -37,5 +38,6 @@ const createSessionMiddleware = (store) =>
 module.exports = {
   createSessionStore,
   createSessionMiddleware,
-  isProduction
+  isProduction,
+  usesHttps
 };

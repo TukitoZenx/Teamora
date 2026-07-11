@@ -1,125 +1,72 @@
 /**
- * Hybrid meeting signaling: localCollabChannel (same-browser tabs) + WebSocket
- * (cross-device) so multiple participants can join the same room.
+ * Hybrid meeting signaling: BroadcastChannel (same browser) + WebSocket (cross-device).
+ * Emits plain JSON-serializable payloads only (SDP/ICE as plain objects).
  */
-import { connectCollabSocket } from './collabSocket'
+import { getCollabWebSocketUrl } from './apiBaseUrl'
+
+const log = (...args) => {
+  if (typeof console !== 'undefined') console.info('[meeting-signal]', ...args)
+}
+
+/** Ensure RTCSessionDescription / RTCIceCandidate are plain JSON. */
+export const serializeSignal = (signal) => {
+  if (!signal || typeof signal !== 'object') return signal
+  const out = { type: signal.type }
+  if (signal.sdp) {
+    const d = signal.sdp
+    out.sdp = typeof d === 'string' ? { type: signal.type, sdp: d } : { type: d.type, sdp: d.sdp }
+  }
+  if (signal.candidate) {
+    const c = signal.candidate
+    out.candidate =
+      typeof c.toJSON === 'function'
+        ? c.toJSON()
+        : {
+            candidate: c.candidate,
+            sdpMid: c.sdpMid,
+            sdpMLineIndex: c.sdpMLineIndex,
+            usernameFragment: c.usernameFragment
+          }
+  }
+  // copy other fields (from, user, action, participant, allowed, …)
+  Object.keys(signal).forEach((k) => {
+    if (k !== 'sdp' && k !== 'candidate' && k !== 'type') out[k] = signal[k]
+  })
+  return out
+}
 
 /**
- * @param {object} localChannel - createLocalCollabChannel result
+ * @param {object} localChannel
  * @param {{ workspaceId: string, userName?: string }} opts
  */
 export function createMeetingSocket(localChannel, { workspaceId, userName }) {
   const listeners = new Map()
   const clientId = localChannel?.id || `meet-${Math.random().toString(36).slice(2, 10)}`
+  const localHandlers = new Map()
+  let meetingWs = null
+  let destroyed = false
+  let reconnectTimer = null
+  let joined = false
+  const pendingEvents = []
 
   const deliver = (event, value) => {
     listeners.get(event)?.forEach((handler) => {
       try {
         handler(value)
       } catch (err) {
-        console.error('[meetingSocket]', event, err)
+        console.error('[meetingSocket] listener error', event, err)
       }
     })
   }
 
-  // Bridge local channel events into our listeners
-  const localHandlers = new Map()
   const bindLocal = (event) => {
-    if (localHandlers.has(event)) return
-    const handler = (value) => deliver(event, value)
+    if (localHandlers.has(event) || !localChannel?.on) return
+    const handler = (value) => {
+      log('local←', event, value?.type || value?.signal?.type || '')
+      deliver(event, value)
+    }
     localHandlers.set(event, handler)
-    localChannel?.on?.(event, handler)
-  }
-
-  const ws = connectCollabSocket(
-    {
-      workspaceId,
-      key: 'meetings',
-      user: { name: userName || 'User', clientId }
-    },
-    {
-      onAwareness: () => {},
-      onYjsUpdate: () => {},
-      onPeerLeave: (peerClientId) => {
-        deliver('receive-meeting-leave', peerClientId)
-      },
-      onStatus: () => {}
-    }
-  )
-
-  // Intercept raw WS messages for meeting protocol by wrapping send/on
-  // collabSocket doesn't expose raw message handlers for custom types beyond
-  // yjs/awareness — so we open a parallel lightweight listener via the same
-  // join room using a second small socket for meeting-only fanout.
-  let meetingWs = null
-  let destroyed = false
-  let reconnectTimer = null
-
-  const getWsUrl = () => {
-    try {
-      const base =
-        import.meta.env.VITE_API_URL ||
-        (typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')
-          ? 'https://teamora-3vgk.onrender.com'
-          : 'http://localhost:5000')
-      const u = new URL(base)
-      u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:'
-      u.pathname = '/collab'
-      return u.toString()
-    } catch {
-      return null
-    }
-  }
-
-  const connectMeetingWs = () => {
-    if (destroyed || !workspaceId) return
-    const url = getWsUrl()
-    if (!url) return
-    try {
-      meetingWs = new WebSocket(url)
-    } catch {
-      scheduleReconnect()
-      return
-    }
-    meetingWs.onopen = () => {
-      meetingWs.send(
-        JSON.stringify({
-          type: 'join',
-          workspaceId,
-          key: 'meetings',
-          user: { name: userName || 'User', clientId }
-        })
-      )
-    }
-    meetingWs.onmessage = (ev) => {
-      let msg
-      try {
-        msg = JSON.parse(String(ev.data))
-      } catch {
-        return
-      }
-      if (!msg || msg.key && msg.key !== 'meetings' && msg.type !== 'joined') return
-
-      if (msg.type === 'meeting-event' && msg.event) {
-        // Avoid double-echo of our own events when clientId matches
-        if (msg.clientId && msg.clientId === clientId) return
-        deliver(msg.event, msg.payload)
-      }
-      if (msg.type === 'peer-leave' && msg.clientId) {
-        deliver('receive-meeting-leave', msg.clientId)
-      }
-    }
-    meetingWs.onclose = () => {
-      meetingWs = null
-      if (!destroyed) scheduleReconnect()
-    }
-    meetingWs.onerror = () => {
-      try {
-        meetingWs?.close()
-      } catch {
-        // ignore
-      }
-    }
+    localChannel.on(event, handler)
   }
 
   const scheduleReconnect = () => {
@@ -130,21 +77,125 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
     }, 1500)
   }
 
+  const sendWsEvent = (message) => {
+    if (!meetingWs || meetingWs.readyState !== WebSocket.OPEN || !joined) return false
+    try {
+      meetingWs.send(JSON.stringify(message))
+      return true
+    } catch (err) {
+      log('WS send failed', err)
+      return false
+    }
+  }
+
+  const flushPendingEvents = () => {
+    while (pendingEvents.length && sendWsEvent(pendingEvents[0])) {
+      pendingEvents.shift()
+    }
+  }
+
+  const connectMeetingWs = () => {
+    if (destroyed || !workspaceId) return
+    const url = getCollabWebSocketUrl()
+    if (!url) {
+      log('WS unavailable — local channel only')
+      return
+    }
+    try {
+      meetingWs = new WebSocket(url)
+    } catch (err) {
+      log('WS construct failed', err)
+      scheduleReconnect()
+      return
+    }
+
+    meetingWs.onopen = () => {
+      log('WS open', url)
+      meetingWs.send(
+        JSON.stringify({
+          type: 'join',
+          workspaceId,
+          key: 'meetings',
+          user: { name: userName || 'User', clientId }
+        })
+      )
+    }
+
+    meetingWs.onmessage = (ev) => {
+      let msg
+      try {
+        msg = JSON.parse(String(ev.data))
+      } catch {
+        return
+      }
+      if (msg.type === 'joined') {
+        joined = true
+        log('WS joined meetings room')
+        flushPendingEvents()
+        return
+      }
+      if (msg.type === 'error') {
+        log('WS rejected', msg.message || 'unknown error')
+        meetingWs?.close()
+        return
+      }
+      if (msg.type === 'meeting-event' && msg.event) {
+        if (msg.clientId && msg.clientId === clientId) return
+        log('WS←', msg.event, msg.payload?.signal?.type || msg.payload?.socketId || '')
+        deliver(msg.event, msg.payload)
+      }
+      if (msg.type === 'peer-leave' && msg.clientId && msg.clientId !== clientId) {
+        log('WS peer-leave', msg.clientId)
+        deliver('receive-meeting-leave', msg.clientId)
+      }
+    }
+
+    meetingWs.onclose = () => {
+      log('WS closed')
+      joined = false
+      meetingWs = null
+      if (!destroyed) scheduleReconnect()
+    }
+
+    meetingWs.onerror = () => {
+      log('WS error')
+      try {
+        meetingWs?.close()
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   connectMeetingWs()
 
   const fanoutWs = (event, payload) => {
-    if (!meetingWs || meetingWs.readyState !== WebSocket.OPEN) return
+    const message = {
+      type: 'meeting-event',
+      workspaceId,
+      key: 'meetings',
+      clientId,
+      event,
+      payload
+    }
+    if (sendWsEvent(message)) return true
+
+    // A participant can click Join before the WebSocket receives its room
+    // acknowledgement. Preserve the state/SDP until the room is ready rather
+    // than silently losing the event.
+    pendingEvents.push(message)
+    if (pendingEvents.length > 200) pendingEvents.shift()
+    return false
+  }
+
+  const clearPendingEvents = () => {
+    pendingEvents.length = 0
+  }
+
+  const closeMeetingWs = () => {
+    clearPendingEvents()
     try {
-      meetingWs.send(
-        JSON.stringify({
-          type: 'meeting-event',
-          workspaceId,
-          key: 'meetings',
-          clientId,
-          event,
-          payload
-        })
-      )
+      meetingWs?.close()
     } catch {
       // ignore
     }
@@ -155,13 +206,18 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
     get readyState() {
       return meetingWs?.readyState
     },
+    isWsJoined: () => joined,
     emit(event, value) {
-      // Local same-browser
-      localChannel?.emit?.(event, value)
+      // Local same-browser path
+      try {
+        localChannel?.emit?.(event, value)
+      } catch (err) {
+        log('local emit failed', event, err)
+      }
 
-      // Map to receive events for WS peers (mirror localCollabChannel transforms lightly)
       let receiveEvent = event
       let payload = value
+
       if (event === 'meeting-join') {
         receiveEvent = 'receive-meeting-join'
         payload = value?.participant || value
@@ -176,16 +232,23 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
         payload = {
           senderSocketId: clientId,
           targetSocketId: value?.targetSocketId,
-          signal: value?.signal
+          signal: serializeSignal(value?.signal)
         }
       } else if (event === 'meeting-claim-host') {
         receiveEvent = 'receive-meeting-host'
+        payload = value
+      } else if (event === 'meeting-started') {
+        receiveEvent = 'receive-meeting-started'
+        payload = { ...value, organizerId: clientId }
+      } else if (event === 'meeting-ended') {
+        receiveEvent = 'receive-meeting-ended'
         payload = value
       } else if (event === 'send-message') {
         receiveEvent = 'receive-message'
         payload = { ...value, senderSocketId: clientId }
       }
 
+      log('→', event, payload?.signal?.type || payload?.user || payload?.socketId || '')
       fanoutWs(receiveEvent, payload)
     },
     on(event, handler) {
@@ -207,12 +270,7 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
         localChannel?.off?.(event, handler)
       }
       localHandlers.clear()
-      try {
-        meetingWs?.close()
-      } catch {
-        // ignore
-      }
-      ws?.destroy?.()
+      closeMeetingWs()
     }
   }
 }

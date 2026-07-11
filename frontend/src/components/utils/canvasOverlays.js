@@ -19,8 +19,7 @@ export const SHAPE_LIBRARY = [
   { id: 'parallelogram', label: 'Parallelogram' }
 ]
 
-export const newOverlayId = (prefix = 'ov') =>
-  `${prefix}-${Math.random().toString(36).slice(2, 10)}`
+export const newOverlayId = (prefix = 'ov') => `${prefix}-${Math.random().toString(36).slice(2, 10)}`
 
 export const newTextBox = (overrides = {}) => ({
   id: newOverlayId('tb'),
@@ -76,10 +75,7 @@ export function renderEquationHtml(raw) {
   let s = raw.trim()
 
   // Escape HTML first
-  s = s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
   // Fractions: a/b or \frac{a}{b}
   s = s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, (_m, a, b) => {
@@ -138,7 +134,13 @@ export function renderEquationHtml(raw) {
           .split(/\],\s*\[/)
           .map((r) => r.replace(/^\[|\]$/g, ''))
         const cells = rows
-          .map((row) => `<tr>${row.split(',').map((c) => `<td class="eq-td">${c.trim()}</td>`).join('')}</tr>`)
+          .map(
+            (row) =>
+              `<tr>${row
+                .split(',')
+                .map((c) => `<td class="eq-td">${c.trim()}</td>`)
+                .join('')}</tr>`
+          )
           .join('')
         return `<table class="eq-matrix"><tbody>${cells}</tbody></table>`
       }
@@ -184,20 +186,35 @@ export function shapeCss(shape, selected) {
     case 'star':
       return {
         ...base,
-        clipPath:
-          'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
+        clipPath: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
         borderWidth: 0
       }
     case 'parallelogram':
       return { ...base, clipPath: 'polygon(20% 0%, 100% 0%, 80% 100%, 0% 100%)', borderWidth: 0 }
     case 'arrow-right':
-      return { ...base, clipPath: 'polygon(0% 25%, 60% 25%, 60% 0%, 100% 50%, 60% 100%, 60% 75%, 0% 75%)', borderWidth: 0 }
+      return {
+        ...base,
+        clipPath: 'polygon(0% 25%, 60% 25%, 60% 0%, 100% 50%, 60% 100%, 60% 75%, 0% 75%)',
+        borderWidth: 0
+      }
     case 'arrow-left':
-      return { ...base, clipPath: 'polygon(40% 0%, 40% 25%, 100% 25%, 100% 75%, 40% 75%, 40% 100%, 0% 50%)', borderWidth: 0 }
+      return {
+        ...base,
+        clipPath: 'polygon(40% 0%, 40% 25%, 100% 25%, 100% 75%, 40% 75%, 40% 100%, 0% 50%)',
+        borderWidth: 0
+      }
     case 'arrow-up':
-      return { ...base, clipPath: 'polygon(50% 0%, 100% 40%, 70% 40%, 70% 100%, 30% 100%, 30% 40%, 0% 40%)', borderWidth: 0 }
+      return {
+        ...base,
+        clipPath: 'polygon(50% 0%, 100% 40%, 70% 40%, 70% 100%, 30% 100%, 30% 40%, 0% 40%)',
+        borderWidth: 0
+      }
     case 'arrow-down':
-      return { ...base, clipPath: 'polygon(30% 0%, 70% 0%, 70% 60%, 100% 60%, 50% 100%, 0% 60%, 30% 60%)', borderWidth: 0 }
+      return {
+        ...base,
+        clipPath: 'polygon(30% 0%, 70% 0%, 70% 60%, 100% 60%, 50% 100%, 0% 60%, 30% 60%)',
+        borderWidth: 0
+      }
     case 'line':
       return { ...base, borderRadius: 0, height: '2px' }
     case 'callout':

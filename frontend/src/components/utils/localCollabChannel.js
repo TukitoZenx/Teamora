@@ -125,7 +125,22 @@ const RELAY_MAP = {
     persist: false,
     targeted: true,
     getTargetId: ({ targetSocketId }) => targetSocketId,
-    transform: ({ signal }, senderId) => ({ senderSocketId: senderId, signal })
+    // Preserve targetSocketId so receivers can filter; serialize signal for structured clone.
+    transform: ({ signal, targetSocketId }, senderId) => ({
+      senderSocketId: senderId,
+      targetSocketId,
+      signal
+    })
+  },
+  'meeting-started': {
+    receiveEvent: 'receive-meeting-started',
+    persist: false,
+    transform: (value, senderId) => ({ ...value, senderSocketId: senderId })
+  },
+  'meeting-ended': {
+    receiveEvent: 'receive-meeting-ended',
+    persist: false,
+    transform: (value, senderId) => ({ ...value, senderSocketId: senderId })
   },
   // Meeting room chat — legacy emit name was `send-message`; deliver as a
   // room broadcast so other tabs mirror the chat transcript.

@@ -3,9 +3,11 @@ const authService = require('../services/auth.service');
 
 const sessionCookieName = () => process.env.SESSION_COOKIE_NAME || 'teamora.sid';
 const clientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+const usesHttps = () =>
+  process.env.NODE_ENV === 'production' || Boolean(process.env.TLS_KEY_PATH && process.env.TLS_CERT_PATH);
 const sessionCookieOptions = () => ({
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: usesHttps(),
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   path: '/'
 });

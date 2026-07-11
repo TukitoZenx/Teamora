@@ -145,7 +145,8 @@ export default function Whiteboard({
     (pageId, elementsList) => {
       clearCanvasOnly()
       const paths = ensureArray(elementsList).filter(
-        (el) => el?.type === 'path' && (el.pageId || 'page-1') === pageId && Array.isArray(el.points) && el.points.length > 1
+        (el) =>
+          el?.type === 'path' && (el.pageId || 'page-1') === pageId && Array.isArray(el.points) && el.points.length > 1
       )
       paths.forEach((path) => {
         for (let i = 1; i < path.points.length; i += 1) {
@@ -620,7 +621,10 @@ export default function Whiteboard({
   }
 
   return (
-    <div ref={containerRef} className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full relative select-none">
+    <div
+      ref={containerRef}
+      className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken select-none"
+    >
       {/* Top Toolbar */}
       <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors z-20">
         <div className="flex items-center gap-3">

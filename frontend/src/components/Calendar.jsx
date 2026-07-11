@@ -230,8 +230,7 @@ export default function Calendar({
           // Browser notification — task + meeting reminder prefs both accepted
           if (typeof Notification !== 'undefined') {
             const prefsOk =
-              canShowBrowserNotification('task_reminder') ||
-              canShowBrowserNotification('meeting_reminder')
+              canShowBrowserNotification('task_reminder') || canShowBrowserNotification('meeting_reminder')
             const fire = () => {
               if (prefsOk || Notification.permission === 'granted') {
                 try {
@@ -360,6 +359,21 @@ export default function Calendar({
     setSaving(false)
     setActiveDate('')
   }
+
+  const closeDatePanel = useCallback(() => {
+    setActiveDate('')
+  }, [])
+
+  useEffect(() => {
+    if (!activeDate || modalMode) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeDatePanel()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [activeDate, modalMode, closeDatePanel])
 
   const openDatePicker = () => {
     datePickerRef.current?.showPicker?.()
@@ -745,89 +759,105 @@ export default function Calendar({
       </div>
 
       {activeDate && !modalMode && (
-        <div className="fixed inset-y-0 right-0 z-[1250] flex w-full max-w-md flex-col border-l border-border bg-card p-5 shadow-card animate-[teamora-content-fade_180ms_ease-out_both]">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-primary">Tasks</p>
-              <h3 className="mt-1 text-xl font-semibold text-text">{formatDate(activeDate)}</h3>
+        <div
+          className="fixed inset-0 z-[1250] bg-overlay/30 backdrop-blur-[1px]"
+          role="presentation"
+          onMouseDown={closeDatePanel}
+        >
+          <aside
+            className="ml-auto flex h-full w-full max-w-md flex-col border-l border-border bg-card p-5 shadow-card animate-[teamora-content-fade_180ms_ease-out_both]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="calendar-task-panel-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-primary">Tasks</p>
+                <h3 id="calendar-task-panel-title" className="mt-1 text-xl font-semibold text-text">
+                  {formatDate(activeDate)}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeDatePanel}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-primary/10 hover:text-primary"
+                aria-label="Close task details"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
+
             <button
               type="button"
-              onClick={() => setActiveDate('')}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-primary/10 hover:text-primary"
+              onClick={() => openCreateModal(activeDate)}
+              className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary transition hover:bg-primary-hover"
             >
-              <X className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
+              Create Task
             </button>
-          </div>
 
-          <button
-            type="button"
-            onClick={() => openCreateModal(activeDate)}
-            className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary transition hover:bg-primary-hover"
-          >
-            <Plus className="h-4 w-4" />
-            Create Task
-          </button>
-
-          <div className="mt-5 flex-1 space-y-3 overflow-y-auto">
-            {selectedTasks.length === 0 ? (
-              <div className="rounded-card border border-dashed border-border p-5 text-sm text-muted">
-                No tasks for this date.
-              </div>
-            ) : (
-              selectedTasks.map((task) => (
-                <article key={getTaskId(task)} className="rounded-card border border-border bg-card p-4 shadow-card">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h4
-                        className={`text-sm font-semibold text-text ${task.completed ? 'line-through decoration-success' : ''}`}
-                      >
-                        {task.title}
-                      </h4>
-                      {task.description && <p className="mt-1 text-sm leading-5 text-muted">{task.description}</p>}
+            <div className="mt-5 flex-1 space-y-3 overflow-y-auto">
+              {selectedTasks.length === 0 ? (
+                <div className="rounded-card border border-dashed border-border p-5 text-sm text-muted">
+                  No tasks for this date.
+                </div>
+              ) : (
+                selectedTasks.map((task) => (
+                  <article key={getTaskId(task)} className="rounded-card border border-border bg-card p-4 shadow-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h4
+                          className={`text-sm font-semibold text-text ${task.completed ? 'line-through decoration-success' : ''}`}
+                        >
+                          {task.title}
+                        </h4>
+                        {task.description && <p className="mt-1 text-sm leading-5 text-muted">{task.description}</p>}
+                      </div>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                        {task.priority}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                      {task.priority}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-xs text-muted/65">
-                    Created by{' '}
-                    {task.creator?.fullName ||
-                      task.creator?.username ||
-                      task.creator?.email ||
-                      userName ||
-                      'Teamora user'}
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleComplete(task)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-control border border-success/30 px-3 text-xs font-semibold text-success transition hover:bg-success-subtle"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {task.completed ? 'Completed' : 'Mark Complete'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(task)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary transition hover:bg-card-sunken"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteTask(task)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-control border border-danger/30 px-3 text-xs font-semibold text-danger transition hover:bg-danger-subtle"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
+                    <p className="mt-3 text-xs text-muted/65">
+                      Created by{' '}
+                      {task.creator?.fullName ||
+                        task.creator?.username ||
+                        task.creator?.email ||
+                        userName ||
+                        'Teamora user'}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleComplete(task)}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-control border border-success/30 px-3 text-xs font-semibold text-success transition hover:bg-success-subtle"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {task.completed ? 'Completed' : 'Mark Complete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(task)}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary transition hover:bg-card-sunken"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteTask(task)}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-control border border-danger/30 px-3 text-xs font-semibold text-danger transition hover:bg-danger-subtle"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </aside>
         </div>
       )}
 
