@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import toast, { Toaster } from 'react-hot-toast'
+import toast, { Toaster, ToastBar } from 'react-hot-toast'
+import { X } from 'lucide-react'
 import AppNavbar from './components/AppNavbar'
 import Dashboard from './components/Dashboard'
 import WorkspaceHome from './components/WorkspaceHome'
@@ -570,7 +571,27 @@ export default function App() {
           duration: 3500
         }}
         containerStyle={{ zIndex: 1300 }}
-      />
+      >
+        {(t) => (
+          <ToastBar toast={t}>
+            {({ icon, message }) => (
+              <>
+                {icon}
+                {message}
+                {t.type !== 'loading' && (
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    className="ml-2 -mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-card-sunken hover:text-text focus:outline-none cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </>
+            )}
+          </ToastBar>
+        )}
+      </Toaster>
       <Routes>
         <Route
           path="/"

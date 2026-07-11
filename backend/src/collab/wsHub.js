@@ -32,9 +32,9 @@ const runSession = (sessionMiddleware, req) =>
 
 /**
  * @param {import('http').Server} server
- * @param {{ sessionMiddleware: Function }} opts
+ * @param {{ sessionMiddleware: Function, isAllowedOrigin?: (origin: string) => boolean }} opts
  */
-const attachCollabWs = (server, { sessionMiddleware }) => {
+const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => true }) => {
   const wss = new WebSocketServer({ noServer: true });
   /** @type {Map<string, Set<import('ws').WebSocket>>} */
   const rooms = new Map();
@@ -77,6 +77,12 @@ const attachCollabWs = (server, { sessionMiddleware }) => {
       const host = req.headers.host || 'localhost';
       const url = new URL(req.url || '/', `http://${host}`);
       if (url.pathname !== '/collab') {
+        return;
+      }
+
+      if (!isAllowedOrigin(req.headers.origin || '')) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
         return;
       }
 

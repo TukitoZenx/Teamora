@@ -65,4 +65,3 @@ describe('Files content merge (files-v1)', () => {
     assert.equal(again.files[0].name, 'Back');
   });
 });
-

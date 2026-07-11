@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, Check, CheckCheck, Eye, UserPlus, X } from 'lucide-react'
+import { Bell, Check, CheckCheck, Eye, UserPlus, Video, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
 import api from '../../services/api'
-import { NOTIFICATIONS_CHANGED_EVENT, readLocalNotifications, writeLocalNotifications } from '../utils/notifications'
+import {
+  dismissMeetingNotifications,
+  NOTIFICATIONS_CHANGED_EVENT,
+  readLocalNotifications,
+  writeLocalNotifications
+} from '../utils/notifications'
 import { isNotificationTypeEnabled, readNotificationPreferences } from '../utils/notificationPreferences'
 
 const NOTIFICATIONS_CACHE_KEY = 'teamora-notifications-cache'
@@ -61,6 +67,7 @@ const formatTime = (value) => {
 }
 
 export default function NotificationButton() {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState(() => keepVisibleNotifications(readNotificationCache()))
   const [busyId, setBusyId] = useState(null)
@@ -192,6 +199,19 @@ export default function NotificationButton() {
     }
   }
 
+  const joinMeetingFromNotification = (item) => {
+    const workspaceId = item.action?.workspaceId || item.workspaceId
+    if (!workspaceId) {
+      toast.error('Meeting workspace not found')
+      return
+    }
+    setOpen(false)
+    // Navigate into workspace meetings section
+    navigate(`/workspace/${workspaceId}/meetings`)
+    window.dispatchEvent(new CustomEvent('teamora-open-meetings', { detail: { workspaceId } }))
+    toast.success('Opening meeting…')
+  }
+
   return (
     <div className="relative" ref={rootRef}>
       <button
@@ -217,9 +237,20 @@ export default function NotificationButton() {
               <p className="text-sm font-semibold text-text">Notifications</p>
               <p className="text-xs text-muted">{unreadCount} unread</p>
             </div>
-            <button type="button" onClick={markAllAsRead} className="text-xs font-semibold text-primary">
-              Clear all
-            </button>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={markAllAsRead} className="px-2 py-1 text-xs font-semibold text-primary">
+                Clear all
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition hover:bg-card-sunken hover:text-text"
+                aria-label="Close notifications"
+                title="Close notifications"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <div className="teamora-scroll max-h-[28rem] space-y-2 overflow-y-auto">
@@ -230,8 +261,19 @@ export default function NotificationButton() {
             ) : (
               notifications.map((item) => {
                 const isJoinRequest = item.type === 'join_request'
+                const isMeeting = item.type === 'meeting_started' || item.action?.type === 'join_meeting'
                 const isWorkspaceEvent = item.local || item.type !== 'join_request'
                 const isPending = item.requestStatus === 'pending'
+                const title = isJoinRequest
+                  ? 'Join Request'
+                  : isMeeting
+                    ? item.meta?.title || 'Meeting started'
+                    : 'Workspace Update'
+                const body = isJoinRequest
+                  ? `${item.requesterName} requested access to ${item.workspaceName}`
+                  : isMeeting
+                    ? `${item.meta?.organizer || 'Someone'} · ${item.message}`
+                    : item.message
 
                 return (
                   <div
@@ -240,20 +282,20 @@ export default function NotificationButton() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-card-sunken text-primary">
-                        {isWorkspaceEvent ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                        {isMeeting ? (
+                          <Video className="h-4 w-4" />
+                        ) : isWorkspaceEvent ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <UserPlus className="h-4 w-4" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-semibold text-text">
-                            {isJoinRequest ? 'Join Request' : 'Workspace Update'}
-                          </p>
+                          <p className="truncate text-sm font-semibold text-text">{title}</p>
                           {!item.read && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
                         </div>
-                        <p className="mt-1 text-sm text-muted">
-                          {isJoinRequest
-                            ? `${item.requesterName} requested access to ${item.workspaceName}`
-                            : item.message}
-                        </p>
+                        <p className="mt-1 text-sm text-muted">{body}</p>
                         <p className="mt-1 text-xs text-muted">{formatTime(item.createdAt)}</p>
 
                         {isJoinRequest && isPending ? (
@@ -275,6 +317,27 @@ export default function NotificationButton() {
                             >
                               <X className="h-3.5 w-3.5" />
                               Decline
+                            </button>
+                          </div>
+                        ) : isMeeting ? (
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => joinMeetingFromNotification(item)}
+                              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-hover"
+                            >
+                              <Video className="h-3.5 w-3.5" />
+                              Join Meeting
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                dismissMeetingNotifications(item.workspaceId)
+                                dismissNotification(item._id)
+                              }}
+                              className="inline-flex h-9 items-center justify-center gap-1 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary hover:bg-card-sunken"
+                            >
+                              Dismiss
                             </button>
                           </div>
                         ) : (

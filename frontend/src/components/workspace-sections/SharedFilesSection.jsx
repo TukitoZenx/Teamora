@@ -67,16 +67,11 @@ export default function SharedFilesSection({
   const [query, setQuery] = useState('')
   const [dragging, setDragging] = useState(false)
 
-  const folders = useMemo(
-    () => (workspaceFiles || []).filter((f) => f?.type === 'folder'),
-    [workspaceFiles]
-  )
+  const folders = useMemo(() => (workspaceFiles || []).filter((f) => f?.type === 'folder'), [workspaceFiles])
 
   const files = useMemo(() => {
     const list = (workspaceFiles || []).filter((f) => f && f.type !== 'folder')
-    const scoped = activeFolderId
-      ? list.filter((f) => f.parentId === activeFolderId)
-      : list.filter((f) => !f.parentId)
+    const scoped = activeFolderId ? list.filter((f) => f.parentId === activeFolderId) : list.filter((f) => !f.parentId)
     if (!query.trim()) return scoped
     const q = query.toLowerCase()
     return list.filter((f) => f.name?.toLowerCase().includes(q))
@@ -113,10 +108,7 @@ export default function SharedFilesSection({
         seedContent(created, kind, reader.result)
       }
       reader.onerror = () => toast.error(`Failed to read ${browserFile.name}`)
-      if (
-        browserFile.type.startsWith('text/') ||
-        /\.(csv|md|html|txt)$/i.test(browserFile.name)
-      ) {
+      if (browserFile.type.startsWith('text/') || /\.(csv|md|html|txt)$/i.test(browserFile.name)) {
         reader.readAsText(browserFile)
       } else {
         reader.readAsDataURL(browserFile)
@@ -150,14 +142,13 @@ export default function SharedFilesSection({
   }
 
   return (
-    <section className="flex h-[calc(100vh-220px)] min-h-[520px] flex-col overflow-hidden rounded-card border border-border bg-card shadow-card">
+    <section className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card shadow-card">
       <div className="flex shrink-0 flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-text">Shared Files</h1>
           <p className="text-sm text-muted">
-            Uploads go to{' '}
-            <span className="font-semibold text-primary">{activeFolder?.name || 'Root'}</span>
-            · hierarchy syncs for all collaborators
+            Uploads go to <span className="font-semibold text-primary">{activeFolder?.name || 'Root'}</span>· hierarchy
+            syncs for all collaborators
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -217,9 +208,7 @@ export default function SharedFilesSection({
                   type="button"
                   onClick={() => onSelectFolder?.(folder.id)}
                   className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold ${
-                    activeFolderId === folder.id
-                      ? 'text-primary'
-                      : 'text-text hover:bg-primary/10'
+                    activeFolderId === folder.id ? 'text-primary' : 'text-text hover:bg-primary/10'
                   }`}
                 >
                   <Folder className="h-3.5 w-3.5 shrink-0" />
@@ -284,11 +273,7 @@ export default function SharedFilesSection({
                       </span>
                     </button>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        type="button"
-                        className="h-8 px-2 text-xs"
-                        onClick={() => onOpenWorkspaceFile?.(file)}
-                      >
+                      <Button type="button" className="h-8 px-2 text-xs" onClick={() => onOpenWorkspaceFile?.(file)}>
                         Open
                       </Button>
                       <button

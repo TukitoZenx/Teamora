@@ -1,19 +1,8 @@
 import axios from 'axios'
-
-const getDefaultApiUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL
-  }
-
-  if (typeof window !== 'undefined' && window.location.hostname.endsWith('vercel.app')) {
-    return 'https://teamora-3vgk.onrender.com'
-  }
-
-  return 'http://localhost:5000'
-}
+import { getApiBaseUrl } from './apiBaseUrl'
 
 const api = axios.create({
-  baseURL: getDefaultApiUrl(),
+  baseURL: getApiBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'

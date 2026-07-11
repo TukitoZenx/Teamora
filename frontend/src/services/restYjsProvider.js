@@ -129,12 +129,16 @@ export function connectRestYjsProvider(
 
   return {
     destroy() {
+      // Start one final durable save before marking the provider as destroyed.
+      // Previously `destroyed` was set first, which made this `flush()` a
+      // no-op and could lose the last debounced document edit on navigation.
+      const finalFlush = flush()
       destroyed = true
       ydoc.off('update', onLocalUpdate)
       if (flushTimer) window.clearTimeout(flushTimer)
       if (pollTimer) window.clearInterval(pollTimer)
       collab?.destroy?.()
-      flush()
+      return finalFlush
     },
     flush,
     pull,

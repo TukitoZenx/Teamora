@@ -200,7 +200,9 @@ export default function Slides({
       elements: slideToDuplicate.elements
         ? slideToDuplicate.elements.map((el) => ({
             ...el,
-            id: el?.id ? `${el.id}-copy-${Math.random().toString(36).slice(2, 6)}` : `elem-${Math.random().toString(36).slice(2, 9)}`
+            id: el?.id
+              ? `${el.id}-copy-${Math.random().toString(36).slice(2, 6)}`
+              : `elem-${Math.random().toString(36).slice(2, 9)}`
           }))
         : []
     })
@@ -406,14 +408,8 @@ export default function Slides({
       }
       setSlides(imported)
       setActiveSlide(0)
-      const imgCount = imported.reduce(
-        (n, s) => n + (s.elements || []).filter((e) => e.type === 'image').length,
-        0
-      )
-      toast.success(
-        `Imported ${imported.length} slide(s)${imgCount ? ` · ${imgCount} image(s)` : ''}`,
-        { id: loading }
-      )
+      const imgCount = imported.reduce((n, s) => n + (s.elements || []).filter((e) => e.type === 'image').length, 0)
+      toast.success(`Imported ${imported.length} slide(s)${imgCount ? ` · ${imgCount} image(s)` : ''}`, { id: loading })
       if (warnings.length) console.warn('[pptxImport]', warnings)
     } catch (err) {
       console.error(err)
@@ -486,7 +482,7 @@ export default function Slides({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full relative">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken">
       {/* Presentation Fullscreen */}
       {isPresenting && (
         <div className="fixed inset-0 bg-slate-950 z-[9999] flex flex-col items-center justify-center">
@@ -819,9 +815,9 @@ export default function Slides({
 
       {/* Main slide layout: only thumbnail rail scrolls (PowerPoint-style) */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Thumbnails Sidebar */}
-        <div className="flex w-52 shrink-0 flex-col border-r border-border bg-card">
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden p-3">
+        {/* Thumbnails Sidebar — fixed width; only this column scrolls */}
+        <div className="flex h-full w-52 shrink-0 flex-col overflow-hidden border-r border-border bg-card">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden overscroll-contain p-3">
             {ensureArray(slides).map((s, i) => {
               const isActive = activeSlide === i
               const usersHere = getUsersOnSlide(i)
@@ -899,9 +895,7 @@ export default function Slides({
                       <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${theme.accent}`} />
                       <div className="flex w-full items-start justify-between gap-1">
                         <div className="truncate text-[9px] font-bold text-text">{s.title || 'Untitled'}</div>
-                        {s.hidden && (
-                          <EyeOff className="h-3 w-3 shrink-0 text-muted" title="Hidden" />
-                        )}
+                        {s.hidden && <EyeOff className="h-3 w-3 shrink-0 text-muted" title="Hidden" />}
                       </div>
                       <div className="mt-1 line-clamp-2 text-[7px] leading-snug text-muted">{s.content}</div>
 
@@ -1061,9 +1055,7 @@ export default function Slides({
                       zIndex: isSelected ? 40 : el.zIndex || 10,
                       transform: `rotate(${el.rotation || 0}deg)`,
                       background:
-                        el.type === 'textbox' || el.type === 'shape'
-                          ? el.fill || 'rgba(255,255,255,0.85)'
-                          : undefined,
+                        el.type === 'textbox' || el.type === 'shape' ? el.fill || 'rgba(255,255,255,0.85)' : undefined,
                       borderColor: el.borderColor || el.color
                     }}
                     className={`relative select-none cursor-move border ${isSelected ? 'border-primary ring-2 ring-primary/25' : 'border-transparent hover:border-muted'}`}
@@ -1088,16 +1080,16 @@ export default function Slides({
                           className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full bg-primary"
                           onMouseDown={(e) => handleElementDrag(e, el, 'rotate')}
                         />
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.stopPropagation()
-                          deleteElement(el.id)
-                        }}
-                        className="absolute -top-6 -right-6 z-50 cursor-pointer rounded-full bg-danger p-1 text-on-primary hover:bg-danger-hover"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                            deleteElement(el.id)
+                          }}
+                          className="absolute -top-6 -right-6 z-50 cursor-pointer rounded-full bg-danger p-1 text-on-primary hover:bg-danger-hover"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </>
                     )}
 

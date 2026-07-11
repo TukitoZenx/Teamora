@@ -60,7 +60,10 @@ const mergeVersionLists = (local, remote) => {
     if (!byId.has(id)) byId.set(id, { ...v, versionId: id })
   })
   return Array.from(byId.values())
-    .sort((a, b) => new Date(b.createdAt || b.timestamp || 0).getTime() - new Date(a.createdAt || a.timestamp || 0).getTime())
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt || b.timestamp || 0).getTime() - new Date(a.createdAt || a.timestamp || 0).getTime()
+    )
     .slice(0, 50)
 }
 

@@ -11,11 +11,7 @@
  * many home/office networks and same-LAN tabs.
  */
 
-const DEFAULT_STUN = [
-  'stun:stun.l.google.com:19302',
-  'stun:stun1.l.google.com:19302',
-  'stun:stun2.l.google.com:19302'
-]
+const DEFAULT_STUN = ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302']
 
 const splitUrls = (value) =>
   String(value || '')

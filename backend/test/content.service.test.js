@@ -133,4 +133,3 @@ describe('Content Service', () => {
     assert.ok(result.data.files.some((f) => f.id === 'b'));
   });
 });
-

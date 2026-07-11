@@ -1,25 +1,19 @@
-import { useEffect, useMemo } from 'react'
 import Meetings from '../Meetings'
-import useLocalCollabChannel from '../../hooks/useLocalCollabChannel'
-import { createMeetingSocket } from '../../services/meetingSocket'
+import useMeetingSignaling from '../../hooks/useMeetingSignaling'
 
 /**
- * Hybrid signaling: same-browser BroadcastChannel + WebSocket room fanout
- * so multiple devices can join the same workspace meeting.
+ * Meetings section — uses shared hybrid signaling (BroadcastChannel + WebSocket).
  */
 export default function MeetingsSection({ workspaceId, userName }) {
-  const localChannel = useLocalCollabChannel(workspaceId, 'meetings')
+  const socket = useMeetingSignaling(workspaceId, userName)
 
-  const socket = useMemo(() => {
-    if (!workspaceId) return localChannel
-    return createMeetingSocket(localChannel, { workspaceId, userName })
-  }, [workspaceId, userName, localChannel])
+  if (!socket?.id) {
+    return (
+      <div className="flex h-full min-h-[200px] flex-1 items-center justify-center rounded-card border border-border bg-card text-sm text-muted">
+        Connecting meeting channel…
+      </div>
+    )
+  }
 
-  useEffect(() => {
-    return () => {
-      socket?.destroy?.()
-    }
-  }, [socket])
-
-  return <Meetings socket={socket} roomId={workspaceId} userName={userName} />
+  return <Meetings socket={socket} roomId={workspaceId} userName={userName || 'User'} />
 }

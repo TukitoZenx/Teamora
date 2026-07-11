@@ -540,7 +540,7 @@ export default function Spreadsheet({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-card-sunken overflow-hidden h-full">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken">
       {/* Menu / Headers */}
       <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors z-20">
         <div className="flex items-center gap-3">

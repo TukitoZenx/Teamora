@@ -71,6 +71,18 @@ export default function WorkspaceLayout({
     })
   }
 
+  // Editor surfaces fill viewport; only internal panes scroll (not the whole page).
+  const fillHeightSections = new Set([
+    'documents',
+    'spreadsheet',
+    'presentation',
+    'whiteboard',
+    'meetings',
+    'shared-files',
+    'chat'
+  ])
+  const isFillHeight = fillHeightSections.has(activeItem)
+
   return (
     <div className="h-screen overflow-hidden bg-background text-text">
       <WorkspaceNavbar
@@ -119,14 +131,16 @@ export default function WorkspaceLayout({
       )}
 
       <main
-        className={`h-full overflow-y-auto pt-navbar transition-[padding-left] duration-slow ease-in-out ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
+        className={`h-full pt-navbar transition-[padding-left] duration-slow ease-in-out ${
+          isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'
+        } ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
       >
         <div
-          className={`mx-auto ${
-            activeItem === 'meetings'
-              ? 'h-full max-w-none px-0 py-0'
-              : `px-5 py-6 ${activeItem === 'calendar' ? 'max-w-none' : 'max-w-7xl'}`
-          }`}
+          className={
+            isFillHeight
+              ? 'flex h-full min-h-0 max-w-none flex-col px-3 py-3 md:px-4'
+              : `mx-auto px-5 py-6 ${activeItem === 'calendar' ? 'max-w-none' : 'max-w-7xl'}`
+          }
         >
           {children}
         </div>

@@ -4,8 +4,7 @@ import Spreadsheet from '../Spreadsheet'
 import useLocalCollabChannel from '../../hooks/useLocalCollabChannel'
 import { connectRestYjsProvider } from '../../services/restYjsProvider'
 
-const gridStorageKey = (workspaceId, fileId = 'default') =>
-  `teamora:collab:${workspaceId}:spreadsheet:${fileId}:grid`
+const gridStorageKey = (workspaceId, fileId = 'default') => `teamora:collab:${workspaceId}:spreadsheet:${fileId}:grid`
 
 const readGridSnapshot = (workspaceId, fileId) => {
   try {
@@ -237,16 +236,13 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
     })
   }, [])
 
-  const setRoomSettings = useCallback(
-    (nextSettings) => {
-      setRoomSettingsState(nextSettings)
-      const meta = metaMapRef.current
-      if (meta && nextSettings?.sheetsMetadata) {
-        meta.set('sheetsMetadata', nextSettings.sheetsMetadata)
-      }
-    },
-    []
-  )
+  const setRoomSettings = useCallback((nextSettings) => {
+    setRoomSettingsState(nextSettings)
+    const meta = metaMapRef.current
+    if (meta && nextSettings?.sheetsMetadata) {
+      meta.set('sheetsMetadata', nextSettings.sheetsMetadata)
+    }
+  }, [])
 
   return (
     <Spreadsheet
