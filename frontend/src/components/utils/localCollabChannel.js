@@ -64,6 +64,11 @@ const RELAY_MAP = {
     persist: false,
     transform: ({ slideIndex }) => ({ slideIndex })
   },
+  'cursor-move': {
+    receiveEvent: 'receive-cursor-move',
+    persist: false,
+    transform: (value, senderId) => ({ ...value, senderSocketId: senderId })
+  },
   // Not part of the recovered legacy protocol (the old server persisted Quill
   // Deltas via a separate 'save-document'/'send-changes' pair intended for
   // character-by-character sync, which needs real operational-transform

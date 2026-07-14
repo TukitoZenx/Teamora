@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
+import { AlertTriangle, RotateCcw, Home } from 'lucide-react' // icon of error , when an app crashes, we can use this icon to show the error message to the user.
 
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 
