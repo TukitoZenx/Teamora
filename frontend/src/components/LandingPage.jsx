@@ -8,7 +8,7 @@ import {
   Presentation,
   Video,
   Folder,
-  CheckSquare,
+
   Calendar,
   Sparkles,
   Shield,

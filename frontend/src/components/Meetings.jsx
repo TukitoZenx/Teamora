@@ -28,7 +28,7 @@ import {
 import toast from 'react-hot-toast'
 import { describeIceSetup } from '../services/webrtcIce'
 import { MeetingPeerManager } from '../services/meetingPeerManager'
-import { addWorkspaceNotification, dismissMeetingNotifications } from './utils/notifications'
+import { dismissMeetingNotifications } from './utils/notifications'
 import api from '../services/api'
 import { useMeeting } from '../contexts/MeetingContext'
 
