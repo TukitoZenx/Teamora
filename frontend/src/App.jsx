@@ -16,6 +16,8 @@ import api from './services/api'
 import { useAuth } from './hooks/useAuth'
 import WorkspaceLayout from './features/workspace/components/WorkspaceLayout'
 import { addWorkspaceNotification } from './components/utils/notifications'
+import GlobalMeetings from './components/GlobalMeetings'
+import { useMeeting } from './contexts/MeetingContext'
 
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 const LAST_PAGE_KEY = 'teamora-last-page'
@@ -61,6 +63,7 @@ const removeWorkspaceCache = (workspaceId) => {
 
 export default function App() {
   const { user, loading, authenticated, profileComplete } = useAuth()
+  const { activeMeetingWorkspace, leaveMeeting } = useMeeting()
   const navigate = useNavigate()
   const location = useLocation()
   const workspacesRequestRef = useRef(null)
@@ -347,6 +350,9 @@ export default function App() {
       current.filter((workspace) => workspace.workspaceId !== workspaceId && workspace._id !== workspaceId)
     )
     setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
+    if (activeMeetingWorkspace?._id === workspaceId) {
+      leaveMeeting()
+    }
     removeWorkspaceCache(workspaceId)
     if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
       localStorage.removeItem(LAST_WORKSPACE_KEY)
@@ -395,6 +401,9 @@ export default function App() {
           })
         }
         setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
+        if (activeMeetingWorkspace?._id === workspaceId) {
+          leaveMeeting()
+        }
         removeWorkspaceCache(workspaceId)
 
         if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
@@ -406,13 +415,7 @@ export default function App() {
         if (data.workspaceDeleted) {
           toast.success('Workspace deleted because no members remained.')
         } else {
-          addWorkspaceNotification({
-            type: 'workspace_left',
-            message: data.workspaceInactive
-              ? 'You left the workspace. It is inactive because no members remain.'
-              : 'You left the workspace.',
-            workspaceId
-          })
+          toast.success('You have left the workspace.')
         }
       } catch (error) {
         const message = error?.response?.data?.message || error?.message || 'Failed to leave workspace'
@@ -420,6 +423,7 @@ export default function App() {
         throw error
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
   )
 
@@ -688,6 +692,7 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to={authenticated ? '/dashboard' : '/'} replace />} />
       </Routes>
+      <GlobalMeetings />
     </>
   )
 }

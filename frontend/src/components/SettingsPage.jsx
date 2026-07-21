@@ -88,6 +88,7 @@ export function SettingsSection() {
 }
 
 function SettingsNav({ onNavigate }) {
+  const lastWorkspaceId = window.localStorage.getItem('teamora-last-workspace-id')
   return (
     <nav className="sticky top-24 rounded-card border border-border bg-card p-3 shadow-sm">
       <div className="space-y-1">
@@ -114,12 +115,12 @@ function SettingsNav({ onNavigate }) {
       <div className="my-3 h-px bg-border" />
 
       <Link
-        to="/dashboard"
+        to={lastWorkspaceId ? `/workspace/${lastWorkspaceId}` : '/dashboard'}
         onClick={onNavigate}
         className="flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-semibold text-muted transition duration-normal hover:bg-primary-subtle hover:text-primary"
       >
         <ChevronLeft className="h-4 w-4" />
-        Back to Dashboard
+        {lastWorkspaceId ? 'Back to Workspace' : 'Back to Dashboard'}
       </Link>
     </nav>
   )

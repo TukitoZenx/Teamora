@@ -212,7 +212,7 @@ const updateProfile = async (userId, { fullName, username, avatar }) => {
     updates.avatar = sanitizeAvatar(avatar) || '';
   }
 
-  const user = await User.findByIdAndUpdate(userId, updates, { new: true, runValidators: true });
+  const user = await User.findByIdAndUpdate(userId, updates, { returnDocument: 'after', runValidators: true });
 
   if (!user) {
     throw createError('User not found', 404);

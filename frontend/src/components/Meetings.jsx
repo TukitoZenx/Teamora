@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Video,
   VideoOff,
@@ -17,16 +18,67 @@ import {
   LayoutGrid,
   Maximize2,
   Pin,
+  Wifi,
+  WifiOff,
   Activity,
-  Smile
+  Smile,
+  Settings,
+  PhoneOff
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { describeIceSetup } from '../services/webrtcIce'
 import { MeetingPeerManager } from '../services/meetingPeerManager'
 import { addWorkspaceNotification, dismissMeetingNotifications } from './utils/notifications'
+import api from '../services/api'
+import { useMeeting } from '../contexts/MeetingContext'
 
 const REACTIONS = ['👍', '👏', '❤️', '😂', '🎉', '👋']
 const MAX_DIAG = 80
+
+function RemoteAudio({ stream, audioOutputDeviceId }) {
+  const audioRef = useRef(null)
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio SinkId] deviceId=${audioOutputDeviceId} hasSetSinkId=${typeof audio.setSinkId === 'function'}`);
+    if (audioOutputDeviceId && typeof audio.setSinkId === 'function') {
+      audio.setSinkId(audioOutputDeviceId)
+        .then(() => console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio SinkId Success] deviceId=${audioOutputDeviceId}`))
+        .catch((e) => console.error(`[RTC-AUDIO-AUDIT] [RemoteAudio SinkId Failure]`, e))
+    }
+  }, [audioOutputDeviceId])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !stream) return
+
+    const audioTracks = stream.getAudioTracks()
+    console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio Attach] streamId=${stream.id} tracks=${audioTracks.length}`);
+    audioTracks.forEach((t, i) => {
+      console.log(`[RTC-AUDIO-AUDIT]   - Remote Audio Track #${i}: id=${t.id} enabled=${t.enabled} readyState=${t.readyState} muted=${t.muted}`);
+    })
+
+    if (audio.srcObject !== stream) {
+      audio.srcObject = stream
+    }
+
+    audio.play?.()
+      .then(() => {
+        console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio Play Success] streamId=${stream.id}`);
+      })
+      .catch((err) => {
+        console.error(`[RTC-AUDIO-AUDIT] [RemoteAudio Play Failed] streamId=${stream.id}:`, err);
+      })
+
+    return () => {
+      console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio Cleanup] detaching streamId=${stream.id}`);
+      if (audio) audio.srcObject = null
+    }
+  }, [stream])
+
+  return <audio ref={audioRef} autoPlay playsInline style={{ display: 'none' }} />
+}
 
 function RemoteVideo({ stream, hidden }) {
   const videoRef = useRef(null)
@@ -34,8 +86,16 @@ function RemoteVideo({ stream, hidden }) {
   useEffect(() => {
     const video = videoRef.current
     if (!video || !stream) return
-    if (video.srcObject !== stream) video.srcObject = stream
-    video.play?.().catch(() => {})
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+    }
+
+    video.play?.().catch(() => { })
+
+    return () => {
+      if (video) video.srcObject = null
+    }
   }, [stream])
 
   return (
@@ -43,8 +103,27 @@ function RemoteVideo({ stream, hidden }) {
       ref={videoRef}
       autoPlay
       playsInline
-      className="h-full w-full object-cover"
-      style={{ display: hidden ? 'none' : 'block' }}
+      muted
+      className={`h-full w-full object-cover ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
+    />
+  )
+}
+
+function MiniVideo({ stream, isMe }) {
+  const videoRef = useRef(null)
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream
+      videoRef.current.play?.().catch(()=>{})
+    }
+  }, [stream])
+  return (
+    <video 
+      ref={videoRef} 
+      autoPlay 
+      playsInline 
+      muted={isMe} 
+      className={`w-full h-full object-cover ${isMe ? 'scale-x-[-1]' : ''}`} 
     />
   )
 }
@@ -53,9 +132,17 @@ function RemoteVideo({ stream, hidden }) {
  * Production Teamora meeting room: mesh WebRTC via MeetingPeerManager,
  * hybrid signaling, host controls, chat, views, diagnostics.
  */
-export default function Meetings({ socket, roomId, userName }) {
+export default function Meetings({ socket, roomId, userName, isMaximized = true }) {
+  const navigate = useNavigate()
+  const { isMinimized, toggleMinimize, leaveMeeting: globalLeaveMeeting, joinMeeting: globalJoinMeeting } = useMeeting()
   const [inMeeting, setInMeeting] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
+  const [position, setPosition] = useState(() => {
+    const x = Math.max(16, window.innerWidth - 340)
+    const y = Math.max(16, window.innerHeight - 280)
+    return { x, y }
+  })
+  const dragRef = useRef(null)
   const [micActive, setMicActive] = useState(true)
   const [camActive, setCamActive] = useState(true)
   const [blurActive, setBlurActive] = useState(false)
@@ -81,7 +168,13 @@ export default function Meetings({ socket, roomId, userName }) {
   const [peerStates, setPeerStates] = useState({})
   const [reactions, setReactions] = useState([])
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [networkQuality, setNetworkQuality] = useState({}) // peerId -> 'good' | 'fair' | 'poor'
   const [diagnostics, setDiagnostics] = useState(null)
+  const [devices, setDevices] = useState([])
+  const [selectedMic, setSelectedMic] = useState('')
+  const [selectedCam, setSelectedCam] = useState('')
+  const [selectedSpeaker, setSelectedSpeaker] = useState('')
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false)
 
   const screenStreamRef = useRef(null)
   const localVideoRef = useRef(null)
@@ -92,6 +185,7 @@ export default function Meetings({ socket, roomId, userName }) {
   const mediaRecorderRef = useRef(null)
   const recordedChunksRef = useRef([])
   const audioAnalysersRef = useRef({})
+  const speakingScoresRef = useRef({})
   const peerManagerRef = useRef(null)
   const inMeetingRef = useRef(false)
   const admittedRef = useRef(false)
@@ -101,7 +195,7 @@ export default function Meetings({ socket, roomId, userName }) {
   const isHostRef = useRef(false)
   const micCamHandRef = useRef({ micActive: true, camActive: true, handRaised: false })
   const screenSharingRef = useRef(false)
-  const handleLeaveRef = useRef(() => {})
+  const handleLeaveRef = useRef(() => { })
   const waitingRoomResolverRef = useRef(null)
 
   const socketId = socket?.id
@@ -132,10 +226,181 @@ export default function Meetings({ socket, roomId, userName }) {
     screenSharingRef.current = screenSharingActive
   }, [screenSharingActive])
 
+  // WebRTC Stats Polling for Network Quality
+  useEffect(() => {
+    if (!inMeeting) return
+    const interval = setInterval(async () => {
+      if (!peerManagerRef.current) return
+      const pcs = peerManagerRef.current.pcs
+      const newQual = {}
+      for (const [peerId, pc] of pcs.entries()) {
+        try {
+          const stats = await pc.getStats()
+          let isGood = true
+          let isFair = false
+          stats.forEach((report) => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              const rtt = report.currentRoundTripTime || 0 // in seconds
+              if (rtt > 0.5) isGood = false
+              else if (rtt > 0.15) isFair = true
+            }
+          })
+          newQual[peerId] = !isGood ? 'poor' : isFair ? 'fair' : 'good'
+        } catch {
+          newQual[peerId] = 'good'
+        }
+      }
+      setNetworkQuality(newQual)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [inMeeting])
+
   const pushDiag = useCallback((line) => {
     const stamped = `${new Date().toLocaleTimeString()} ${line}`
     setDiagLines((prev) => [...prev.slice(-(MAX_DIAG - 1)), stamped])
   }, [])
+
+  const loadDevices = useCallback(async () => {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices()
+      setDevices(list)
+
+      const defaultMic = list.find(d => d.kind === 'audioinput')?.deviceId || ''
+      const defaultCam = list.find(d => d.kind === 'videoinput')?.deviceId || ''
+      const defaultSpeaker = list.find(d => d.kind === 'audiooutput')?.deviceId || ''
+
+      setSelectedMic(prev => prev || defaultMic)
+      setSelectedCam(prev => prev || defaultCam)
+      setSelectedSpeaker(prev => prev || defaultSpeaker)
+    } catch (err) {
+      console.error('[RTC-AUDIO-AUDIT] Failed to list devices:', err)
+    }
+  }, [])
+  const attachSpeakingMonitor = useCallback((socketId, stream) => {
+    try {
+      if (!stream || !stream.getAudioTracks?.().length) return
+      if (audioAnalysersRef.current[socketId]) return
+
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext
+      const ctx = new AudioContextClass()
+      const source = ctx.createMediaStreamSource(stream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 256
+      source.connect(analyser)
+
+      // Connect to a GainNode with 0 gain connected to destination
+      // This keeps the Web Audio API graph active and prevents browsers from silencing or garbage-collecting the audio tracks!
+      const gainNode = ctx.createGain()
+      gainNode.gain.value = 0
+      analyser.connect(gainNode)
+      gainNode.connect(ctx.destination)
+
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      audioAnalysersRef.current[socketId] = { ctx, analyser, data }
+      console.log(`[RTC-AUDIO-AUDIT] Speaking monitor attached: socketId=${socketId}`);
+    } catch (err) {
+      console.warn('[RTC-AUDIO-AUDIT] Speaking monitor attachment failed:', err)
+    }
+  }, [])
+
+  const clearSpeakingMonitor = useCallback((socketId) => {
+    const pack = audioAnalysersRef.current[socketId]
+    if (!pack) return
+    try {
+      pack.ctx?.close?.()
+    } catch {
+      // ignore
+    }
+    delete audioAnalysersRef.current[socketId]
+  }, [])
+
+  const changeDevice = useCallback(async (kind, deviceId) => {
+    console.log(`[RTC-AUDIO-AUDIT] Changing device kind=${kind} to deviceId=${deviceId}`);
+    if (kind === 'audioinput') {
+      if (localStreamRef.current) {
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              deviceId: deviceId ? { exact: deviceId } : undefined,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          })
+          const newTrack = newStream.getAudioTracks()[0]
+          
+          // Stop old tracks only after success
+          const oldTracks = localStreamRef.current.getAudioTracks()
+          oldTracks.forEach(t => {
+            t.stop()
+            localStreamRef.current.removeTrack(t)
+          })
+
+          localStreamRef.current.addTrack(newTrack)
+          newTrack.enabled = micActive
+
+          setSelectedMic(deviceId)
+
+          if (peerManagerRef.current) {
+            peerManagerRef.current.setLocalStream(localStreamRef.current)
+          }
+          
+          if (socketId) {
+            clearSpeakingMonitor(socketId)
+            attachSpeakingMonitor(socketId, localStreamRef.current)
+          }
+
+          toast.success('Microphone switched')
+        } catch (err) {
+          console.error('[RTC-AUDIO-AUDIT] Failed to switch microphone:', err)
+          toast.error('Failed to switch microphone')
+        }
+      }
+    } else if (kind === 'videoinput') {
+      setSelectedCam(deviceId)
+      if (localStreamRef.current) {
+        try {
+          localStreamRef.current.getVideoTracks().forEach(t => t.stop())
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: deviceId ? { exact: deviceId } : undefined
+            }
+          })
+          const newTrack = newStream.getVideoTracks()[0]
+          const oldTrack = localStreamRef.current.getVideoTracks()[0]
+          if (oldTrack) {
+            localStreamRef.current.removeTrack(oldTrack)
+          }
+          localStreamRef.current.addTrack(newTrack)
+          newTrack.enabled = camActive
+
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current
+          }
+          if (peerManagerRef.current) {
+            peerManagerRef.current.setLocalStream(localStreamRef.current)
+          }
+          toast.success('Camera switched')
+        } catch (err) {
+          console.error('[RTC-AUDIO-AUDIT] Failed to switch camera:', err)
+          toast.error('Failed to switch camera')
+        }
+      }
+    } else if (kind === 'audiooutput') {
+      setSelectedSpeaker(deviceId)
+      toast.success('Speaker output device updated')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micActive, camActive])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadDevices()
+    navigator.mediaDevices.addEventListener?.('devicechange', loadDevices)
+    return () => {
+      navigator.mediaDevices.removeEventListener?.('devicechange', loadDevices)
+    }
+  }, [loadDevices])
 
   const emitSignal = useCallback(
     (targetSocketId, signal) => {
@@ -165,46 +430,11 @@ export default function Meetings({ socket, roomId, userName }) {
     })
   }, [socketId, emitSignal])
 
-  const attachSpeakingMonitor = useCallback((socketId, stream) => {
-    try {
-      if (!stream?.getAudioTracks?.().length) return
-      if (audioAnalysersRef.current[socketId]) return
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const source = ctx.createMediaStreamSource(stream)
-      const analyser = ctx.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      audioAnalysersRef.current[socketId] = { ctx, analyser, data }
-    } catch {
-      // Autoplay / audio context restrictions
-    }
-  }, [])
 
-  const clearSpeakingMonitor = useCallback((socketId) => {
-    const pack = audioAnalysersRef.current[socketId]
-    if (!pack) return
-    try {
-      pack.ctx?.close?.()
-    } catch {
-      // ignore
-    }
-    delete audioAnalysersRef.current[socketId]
-  }, [])
 
   const attachRemoteStream = useCallback(
     (peerId, stream) => {
-      setRemoteStreams((prev) => {
-        const existing = prev[peerId]?.stream
-        let nextStream = stream
-        if (existing && stream && existing !== stream) {
-          nextStream = existing
-          stream.getTracks().forEach((t) => {
-            if (!nextStream.getTracks().some((x) => x.id === t.id)) nextStream.addTrack(t)
-          })
-        }
-        return { ...prev, [peerId]: { stream: nextStream } }
-      })
+      setRemoteStreams((prev) => ({ ...prev, [peerId]: { stream } }))
       attachSpeakingMonitor(peerId, stream)
     },
     [attachSpeakingMonitor]
@@ -314,32 +544,55 @@ export default function Meetings({ socket, roomId, userName }) {
   useEffect(() => {
     if (!inMeeting) return undefined
     const tick = () => {
-      const next = {}
-      Object.entries(audioAnalysersRef.current).forEach(([id, pack]) => {
-        try {
-          pack.analyser.getByteFrequencyData(pack.data)
-          const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
-          next[id] = avg > 18
-        } catch {
-          next[id] = false
-        }
+      setSpeakingMap(prev => {
+        const next = { ...prev }
+        let changed = false
+        
+        const allIds = new Set([...Object.keys(audioAnalysersRef.current), socketId])
+        allIds.forEach(id => {
+          let isLoud = false
+          if (id === socketId && localStreamRef.current && micActive) {
+            try {
+              if (!audioAnalysersRef.current[socketId]) {
+                attachSpeakingMonitor(socketId, localStreamRef.current)
+              }
+              const pack = audioAnalysersRef.current[socketId]
+              if (pack) {
+                pack.analyser.getByteFrequencyData(pack.data)
+                const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
+                isLoud = avg > 25
+              }
+            } catch {
+              // ignore
+            }
+          } else if (audioAnalysersRef.current[id]) {
+            try {
+              const pack = audioAnalysersRef.current[id]
+              pack.analyser.getByteFrequencyData(pack.data)
+              const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
+              isLoud = avg > 25
+            } catch {
+              // ignore
+            }
+          }
+
+          const score = speakingScoresRef.current[id] || 0
+          const newScore = isLoud ? Math.min(score + 2, 6) : Math.max(score - 1, 0)
+          speakingScoresRef.current[id] = newScore
+
+          const wasSpeaking = prev[id] || false
+          let nowSpeaking = wasSpeaking
+          if (newScore >= 4) nowSpeaking = true
+          if (newScore <= 0) nowSpeaking = false
+
+          if (wasSpeaking !== nowSpeaking) {
+            next[id] = nowSpeaking
+            changed = true
+          }
+        })
+        
+        return changed ? next : prev
       })
-      if (localStreamRef.current && micActive && socketId) {
-        try {
-          if (!audioAnalysersRef.current[socketId]) {
-            attachSpeakingMonitor(socketId, localStreamRef.current)
-          }
-          const pack = audioAnalysersRef.current[socketId]
-          if (pack) {
-            pack.analyser.getByteFrequencyData(pack.data)
-            const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
-            next[socketId] = avg > 18
-          }
-        } catch {
-          // ignore
-        }
-      }
-      setSpeakingMap(next)
     }
     const id = window.setInterval(tick, 200)
     return () => window.clearInterval(id)
@@ -351,7 +604,7 @@ export default function Meetings({ socket, roomId, userName }) {
       screenStreamRef.current = null
     }
     setScreenSharingActive(false)
-    peerManagerRef.current?.setScreenTrack(null)
+    peerManagerRef.current?.setScreenStream(null)
     toast('Screen sharing stopped.')
   }, [])
 
@@ -365,7 +618,7 @@ export default function Meetings({ socket, roomId, userName }) {
         screenStreamRef.current = stream
         setScreenSharingActive(true)
         const videoTrack = stream.getVideoTracks()[0]
-        peerManagerRef.current?.setScreenTrack(videoTrack)
+        peerManagerRef.current?.setScreenStream(stream)
         emitSignal(undefined, { type: 'screen-share-started', from: socketId })
         videoTrack.onended = () => stopScreenShare()
         toast.success('Screen sharing started')
@@ -379,9 +632,14 @@ export default function Meetings({ socket, roomId, userName }) {
     }
   }
 
-  const requestScreenControl = (targetSocketId) => {
-    emitSignal(targetSocketId, { type: 'control-request', from: socketId, user: userName })
-    toast('Control request sent — peer must approve')
+  const toggleFullscreen = (targetSocketId) => {
+    const tile = document.getElementById(`participant-tile-${targetSocketId}`)
+    if (!tile) return
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(console.error)
+    } else {
+      tile.requestFullscreen().catch(console.error)
+    }
   }
 
   const respondScreenControl = useCallback(
@@ -393,11 +651,16 @@ export default function Meetings({ socket, roomId, userName }) {
   )
 
   const handleLeaveMeeting = useCallback(() => {
+    console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Starting cleanup. isRecording=${isRecording}`);
     setInMeeting(false)
     setAdmitted(false)
 
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop())
+      console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Stopping localStream tracks`);
+      localStreamRef.current.getTracks().forEach((track) => {
+        console.log(`[RTC-AUDIO-AUDIT]   - Stopping track id=${track.id} kind=${track.kind}`);
+        track.stop();
+      })
       localStreamRef.current = null
     }
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
@@ -412,6 +675,7 @@ export default function Meetings({ socket, roomId, userName }) {
     setScreenSharingActive(false)
     if (localVideoRef.current) localVideoRef.current.srcObject = null
 
+    console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Destroying peer manager and remote streams`);
     destroyPeerManager()
     setRemoteStreams({})
     setPeerStates({})
@@ -442,7 +706,14 @@ export default function Meetings({ socket, roomId, userName }) {
     setActiveSidePanel(null)
     setShowReactionPicker(false)
     toast('Left the call', { icon: '🛑' })
-  }, [socket, socketId, roomId, isRecording, destroyPeerManager, clearSpeakingMonitor])
+    try {
+      sessionStorage.removeItem('teamora-in-call')
+    } catch {
+      // ignore
+    }
+    globalLeaveMeeting?.()
+    console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Cleanup finished`);
+  }, [socket, socketId, roomId, isRecording, destroyPeerManager, clearSpeakingMonitor, globalLeaveMeeting])
 
   useEffect(() => {
     handleLeaveRef.current = handleLeaveMeeting
@@ -451,32 +722,37 @@ export default function Meetings({ socket, roomId, userName }) {
   const handleJoinMeeting = async () => {
     if (inMeeting || isJoining) return
     setIsJoining(true)
+    console.log(`[RTC-AUDIO-AUDIT] [Join Meeting] Requesting WAITING room status.`);
     try {
-      // Ask an existing host before joining. This avoids bypassing a waiting
-      // room when a participant opens the meeting page after it was enabled.
       const waitingRoomStatus = await requestWaitingRoomStatus()
       let stream = null
       try {
+        console.log(`[RTC-AUDIO-AUDIT] [GetUserMedia] Requesting getUserMedia with video=true and full audio settings.`);
         stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: selectedCam ? { deviceId: { exact: selectedCam } } : true,
           audio: {
+            deviceId: selectedMic ? { exact: selectedMic } : undefined,
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true
           }
         })
+        console.log(`[RTC-AUDIO-AUDIT] [GetUserMedia Success] streamId=${stream.id}`);
+        stream.getTracks().forEach((track, idx) => {
+          console.log(`[RTC-AUDIO-AUDIT]   - Track #${idx}: id=${track.id} kind=${track.kind} enabled=${track.enabled} readyState=${track.readyState}`);
+        });
         localStreamRef.current = stream
       } catch (err) {
-        console.error('Real media devices fail, using fallback:', err)
+        console.error('[RTC-AUDIO-AUDIT] [GetUserMedia Failure] Real media devices fail, using fallback:', err)
         stream = startMockVideoStream()
         localStreamRef.current = stream
       }
 
       const host = waitingRoomStatus.hostSocketId
         ? {
-            hostSocketId: waitingRoomStatus.hostSocketId,
-            hostName: waitingRoomStatus.hostName || ''
-          }
+          hostSocketId: waitingRoomStatus.hostSocketId,
+          hostName: waitingRoomStatus.hostName || ''
+        }
         : hostInfoRef.current
       const hostUserObj = host.hostSocketId ? { socketId: host.hostSocketId, user: host.hostName } : null
       const hostIsMe = hostUserObj && hostUserObj.socketId === socketId
@@ -500,6 +776,7 @@ export default function Meetings({ socket, roomId, userName }) {
       setInMeeting(true)
       setAdmitted(true)
       const ice = describeIceSetup()
+      console.log(`[RTC-AUDIO-AUDIT] Joined call: hasTurn=${ice.hasTurn} turnCount=${ice.turnCount}`);
       toast.success(
         ice.hasTurn ? 'Joined meeting (TURN enabled)' : 'Joined — set VITE_TURN_* for multi-network reliability',
         { icon: '📹', duration: ice.hasTurn ? 3000 : 5000 }
@@ -537,15 +814,11 @@ export default function Meetings({ socket, roomId, userName }) {
         organizer: userName,
         startedAt: new Date().toISOString()
       })
-      addWorkspaceNotification({
-        type: 'meeting_started',
-        message: `${userName || 'Someone'} started a meeting`,
-        workspaceId: roomId,
-        workspaceName: meetingTitle,
-        action: { type: 'join_meeting', workspaceId: roomId },
-        meta: { meetingId: `meet-${roomId}`, organizer: userName, title: meetingTitle },
-        dedupeKey: `meeting-started:${roomId}`
-      })
+      // Intentionally NOT calling addWorkspaceNotification here so the organizer doesn't get notified of their own meeting
+      api.post(`/chat/workspace/${roomId}/messages`, {
+        content: `🎥 **${userName || 'Someone'}** started a meeting. Join now!`,
+        isSystem: true
+      }).catch(err => console.error('Failed to post meeting start chat message:', err))
 
       setMeetingParticipants((prev) => ({
         ...prev,
@@ -565,9 +838,15 @@ export default function Meetings({ socket, roomId, userName }) {
       requestAnimationFrame(() => {
         if (localVideoRef.current && localStreamRef.current) {
           localVideoRef.current.srcObject = localStreamRef.current
-          localVideoRef.current.play?.().catch(() => {})
+          localVideoRef.current.play?.().catch(() => { })
         }
       })
+      try {
+        sessionStorage.setItem('teamora-in-call', roomId)
+        globalJoinMeeting?.({ _id: roomId })
+      } catch {
+        // ignore
+      }
     } catch (err) {
       console.error('Error joining meeting:', err)
       toast.error('Initialization failed.')
@@ -576,13 +855,25 @@ export default function Meetings({ socket, roomId, userName }) {
     }
   }
 
+  useEffect(() => {
+    if (sessionStorage.getItem('teamora-in-call') === roomId && !inMeeting && !isJoining) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleJoinMeeting()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, inMeeting, isJoining])
+
   const toggleMic = () => {
     const nextState = !micActive
+    console.log(`[RTC-AUDIO-AUDIT] [Toggle Mic] current=${micActive} next=${nextState}`);
     setMicActive(nextState)
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach((track) => {
+        console.log(`[RTC-AUDIO-AUDIT]   - Setting audio track enabled state: trackId=${track.id} enabled=${nextState}`);
         track.enabled = nextState
       })
+    } else {
+      console.warn(`[RTC-AUDIO-AUDIT] [Toggle Mic] No localStream available to toggle!`);
     }
     socket.emit('meeting-state-change', {
       roomId,
@@ -596,6 +887,7 @@ export default function Meetings({ socket, roomId, userName }) {
 
   const toggleCam = () => {
     const nextState = !camActive
+    console.log(`[RTC-AUDIO-AUDIT] [Toggle Cam] current=${camActive} next=${nextState}`);
     setCamActive(nextState)
     if (localStreamRef.current) {
       localStreamRef.current.getVideoTracks().forEach((track) => {
@@ -1014,14 +1306,18 @@ export default function Meetings({ socket, roomId, userName }) {
     if (video.srcObject !== stream) video.srcObject = stream
     video.muted = true
     video.playsInline = true
-    video.play?.().catch(() => {})
+    video.play?.().catch(() => { })
   }, [inMeeting, admitted, meetingParticipants, camActive])
-
   // Cleanup unmount
   useEffect(() => {
     const analysers = audioAnalysersRef.current
     return () => {
       destroyPeerManager()
+      try {
+        sessionStorage.removeItem('teamora-in-call')
+      } catch {
+        // ignore
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop())
       }
@@ -1057,12 +1353,13 @@ export default function Meetings({ socket, roomId, userName }) {
 
   const iceInfo = useMemo(() => describeIceSetup(), [])
 
-  const renderParticipantTile = (participantId, part, { large = false } = {}) => {
+  const renderParticipantTile = (participantId, part, { large = false, small = false } = {}) => {
     const isMe = participantId === socketId
-    const heightClass = large ? 'h-full min-h-[280px]' : 'h-48 md:h-56'
+    const heightClass = large ? 'h-full min-h-[280px]' : small ? 'h-32 md:h-40' : 'h-48 md:h-56'
     return (
       <div
         key={participantId}
+        id={`participant-tile-${participantId}`}
         className={`bg-card rounded-2xl border border-border overflow-hidden relative ${heightClass} group flex items-center justify-center shadow-card transition-transform`}
       >
         {isMe ? (
@@ -1092,6 +1389,12 @@ export default function Meetings({ socket, roomId, userName }) {
               stream={remoteStreams[participantId]?.stream}
               hidden={!remoteStreams[participantId]?.stream || part.camActive === false}
             />
+            {remoteStreams[participantId]?.stream && (
+              <RemoteAudio
+                stream={remoteStreams[participantId].stream}
+                audioOutputDeviceId={selectedSpeaker}
+              />
+            )}
             {(!remoteStreams[participantId]?.stream || part.camActive === false) && (
               <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-lg font-bold text-primary shadow-md">
@@ -1108,26 +1411,34 @@ export default function Meetings({ socket, roomId, userName }) {
         )}
 
         <div
-          className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-2 transition ${
-            speakingMap[participantId] ? 'ring-success/80' : 'ring-transparent'
-          }`}
+          className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-[3px] transition-all duration-300 ${speakingMap[participantId] ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)] scale-[0.98]' : 'ring-transparent'
+            }`}
         />
         <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
-          <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text pointer-events-none">
-            {part.user} {isMe && '(You)'}
-            {speakingMap[participantId] ? ' · Speaking' : ''}
-            {pinnedId === participantId ? ' · Pinned' : ''}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text pointer-events-none flex items-center gap-1.5 shadow-sm">
+              {part.user} {isMe && '(You)'}
+              {pinnedId === participantId && <span className="text-primary">• Pinned</span>}
+            </span>
+            {!isMe && networkQuality[participantId] && (
+              <div
+                className={`p-1 rounded-full bg-card/85 border border-border backdrop-blur-sm ${networkQuality[participantId] === 'good' ? 'text-success' : networkQuality[participantId] === 'fair' ? 'text-warning' : 'text-danger'
+                  }`}
+                title={`Network: ${networkQuality[participantId]}`}
+              >
+                {networkQuality[participantId] === 'poor' ? <WifiOff className="w-3 h-3" /> : <Wifi className="w-3 h-3" />}
+              </div>
+            )}
+          </div>
           <div className="flex gap-1.5 items-center">
             {!isMe && (
               <button
                 type="button"
                 onClick={() => setPinnedId((cur) => (cur === participantId ? null : participantId))}
-                className={`p-1.5 rounded-full border pointer-events-auto cursor-pointer ${
-                  pinnedId === participantId
+                className={`p-1.5 rounded-full border pointer-events-auto cursor-pointer ${pinnedId === participantId
                     ? 'bg-primary text-on-primary border-primary'
                     : 'bg-card/85 border-border text-muted hover:text-primary'
-                }`}
+                  }`}
                 title={pinnedId === participantId ? 'Unpin' : 'Pin / spotlight'}
               >
                 <Pin className="w-3.5 h-3.5" />
@@ -1136,9 +1447,9 @@ export default function Meetings({ socket, roomId, userName }) {
             {!isMe && remoteStreams[participantId]?.stream && (
               <button
                 type="button"
-                onClick={() => requestScreenControl(participantId)}
+                onClick={() => toggleFullscreen(participantId)}
                 className="p-1.5 rounded-full border bg-card/85 border-border text-muted hover:text-primary pointer-events-auto cursor-pointer"
-                title="Request remote control of shared screen"
+                title="Fullscreen"
               >
                 <Maximize2 className="w-3.5 h-3.5" />
               </button>
@@ -1159,7 +1470,7 @@ export default function Meetings({ socket, roomId, userName }) {
     )
   }
 
-  return (
+  const meetingContent = (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken text-text select-none lg:flex-row">
       {/* Floating reactions */}
       <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center gap-2">
@@ -1247,8 +1558,8 @@ export default function Meetings({ socket, roomId, userName }) {
               {Object.entries(meetingParticipants)
                 .filter(([id]) => id !== speakerId)
                 .map(([id, part]) => (
-                  <div key={id} className="w-36 shrink-0">
-                    {renderParticipantTile(id, part)}
+                  <div key={id} className="w-48 md:w-56 shrink-0">
+                    {renderParticipantTile(id, part, { small: true })}
                   </div>
                 ))}
             </div>
@@ -1379,6 +1690,68 @@ export default function Meetings({ socket, roomId, userName }) {
               >
                 <Activity className="w-4 h-4" />
               </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowDeviceSettings((v) => !v)}
+                  className={`p-2.5 rounded-xl cursor-pointer border ${showDeviceSettings ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
+                  title="Device settings"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+                {showDeviceSettings && (
+                  <div className="absolute bottom-full mb-2 right-0 flex flex-col gap-2.5 bg-card border border-border rounded-2xl p-4 shadow-lg z-50 w-72 select-text">
+                    <h4 className="font-bold text-xs text-text border-b border-border pb-1.5 mb-1 flex items-center justify-between">
+                      <span>Device Settings</span>
+                      <button onClick={() => setShowDeviceSettings(false)} className="text-muted hover:text-text cursor-pointer">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </h4>
+
+                    {/* Microphone Select */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-muted uppercase tracking-wider">Microphone</label>
+                      <select
+                        value={selectedMic}
+                        onChange={(e) => changeDevice('audioinput', e.target.value)}
+                        className="bg-card-sunken border border-border rounded-lg text-xs p-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-text max-w-full"
+                      >
+                        {devices.filter(d => d.kind === 'audioinput').map(d => (
+                          <option key={d.deviceId} value={d.deviceId}>{d.label || `Microphone ${d.deviceId.substring(0, 5)}`}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Camera Select */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-muted uppercase tracking-wider">Camera</label>
+                      <select
+                        value={selectedCam}
+                        onChange={(e) => changeDevice('videoinput', e.target.value)}
+                        className="bg-card-sunken border border-border rounded-lg text-xs p-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-text max-w-full"
+                      >
+                        {devices.filter(d => d.kind === 'videoinput').map(d => (
+                          <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.substring(0, 5)}`}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Speaker Select */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-muted uppercase tracking-wider">Speaker</label>
+                      <select
+                        value={selectedSpeaker}
+                        onChange={(e) => changeDevice('audiooutput', e.target.value)}
+                        className="bg-card-sunken border border-border rounded-lg text-xs p-1.5 focus:outline-none focus:ring-1 focus:ring-primary text-text max-w-full"
+                      >
+                        {devices.filter(d => d.kind === 'audiooutput').map(d => (
+                          <option key={d.deviceId} value={d.deviceId}>{d.label || `Speaker ${d.deviceId.substring(0, 5)}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -1587,6 +1960,92 @@ export default function Meetings({ socket, roomId, userName }) {
           )}
         </div>
       )}
+    </div>
+  )
+
+  const miniViewRef = useRef(null)
+
+  const handlePointerDown = (e) => {
+    dragRef.current = { isDragging: true, startX: e.clientX, startY: e.clientY, posX: position.x, posY: position.y }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const handlePointerMove = (e) => {
+    if (!dragRef.current.isDragging || !miniViewRef.current) return
+    const dx = e.clientX - dragRef.current.startX
+    const dy = e.clientY - dragRef.current.startY
+    requestAnimationFrame(() => {
+      if (miniViewRef.current) {
+        miniViewRef.current.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+      }
+    })
+  }
+  const handlePointerUp = (e) => {
+    if (!dragRef.current.isDragging) return
+    dragRef.current.isDragging = false
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    
+    const dx = e.clientX - dragRef.current.startX
+    const dy = e.clientY - dragRef.current.startY
+    setPosition({ x: dragRef.current.posX + dx, y: dragRef.current.posY + dy })
+    
+    if (miniViewRef.current) {
+      miniViewRef.current.style.transform = 'none'
+    }
+  }
+
+  // eslint-disable-next-line react-hooks/refs
+  const speakerStream = speakerId === socketId ? localStreamRef.current : remoteStreams[speakerId]?.stream
+  const speakerName = speakerId === socketId ? userName : meetingParticipants[speakerId]?.user
+
+  const miniView = (
+    <div 
+      ref={miniViewRef}
+      className={`fixed z-[9999] pointer-events-auto shadow-2xl rounded-2xl overflow-hidden bg-card border border-border flex flex-col ${isMinimized ? 'w-64 h-16' : 'w-80 h-64'} transition-all`}
+      style={{ left: position.x, top: position.y }}
+    >
+      <div 
+        className="h-8 bg-card-sunken border-b border-border flex items-center justify-between px-3 cursor-move touch-none"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+          <span className="text-[10px] font-bold text-muted uppercase">Meeting</span>
+        </div>
+        <div className="flex items-center gap-1.5 pointer-events-auto">
+           <button onClick={toggleMinimize} className="p-1 hover:bg-primary/10 rounded cursor-pointer text-muted"><span className="block w-2.5 border-b-2 border-current"></span></button>
+           <button onClick={() => navigate(`/workspace/${roomId}/meetings`)} className="p-1 hover:bg-primary/10 rounded cursor-pointer text-muted"><Maximize2 className="w-3.5 h-3.5" /></button>
+        </div>
+      </div>
+      {!isMinimized && (
+        <div className="flex-1 relative bg-black/90 flex items-center justify-center overflow-hidden">
+          {speakerStream ? (
+            <MiniVideo stream={speakerStream} isMe={speakerId === socketId} />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xl font-bold border border-primary/30">
+              {(speakerName || 'U').substring(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] text-white font-bold backdrop-blur-sm border border-white/10">
+            {speakerName || 'User'} {speakerId === socketId ? '(You)' : ''}
+          </div>
+        </div>
+      )}
+      <div className="h-14 bg-card px-4 flex items-center justify-center gap-3 border-t border-border shrink-0 pointer-events-auto">
+        <button onClick={toggleMic} className={`p-2.5 rounded-full border transition-colors cursor-pointer ${micActive ? 'bg-card border-border text-text hover:bg-primary/10' : 'bg-danger text-on-primary border-danger'}`}>{micActive ? <Mic className="w-4 h-4"/> : <MicOff className="w-4 h-4"/>}</button>
+        <button onClick={toggleCam} className={`p-2.5 rounded-full border transition-colors cursor-pointer ${camActive ? 'bg-card border-border text-text hover:bg-primary/10' : 'bg-danger text-on-primary border-danger'}`}>{camActive ? <Video className="w-4 h-4"/> : <VideoOff className="w-4 h-4"/>}</button>
+        <button onClick={handleLeaveMeeting} className="p-2.5 rounded-full bg-danger text-on-primary hover:bg-danger-hover cursor-pointer border border-danger"><PhoneOff className="w-4 h-4"/></button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className={isMaximized ? "w-full h-full relative" : "relative pointer-events-none"}>
+      <div className={isMaximized ? "w-full h-full" : "hidden"} aria-hidden={!isMaximized}>
+        {meetingContent}
+      </div>
+      {!isMaximized && miniView}
     </div>
   )
 }

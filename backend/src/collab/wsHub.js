@@ -20,9 +20,9 @@ const runSession = (sessionMiddleware, req) =>
   new Promise((resolve, reject) => {
     // Minimal response stub — session only needs setHeader/getHeader for cookies.
     const res = {
-      getHeader() {},
-      setHeader() {},
-      end() {}
+      getHeader() { },
+      setHeader() { },
+      end() { }
     };
     sessionMiddleware(req, res, (err) => {
       if (err) reject(err);
@@ -38,6 +38,8 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
   const wss = new WebSocketServer({ noServer: true });
   /** @type {Map<string, Set<import('ws').WebSocket>>} */
   const rooms = new Map();
+  /** @type {Map<string, Object>} */
+  const activeMeetings = new Map();
 
   const leaveAll = (ws) => {
     if (!ws.rooms) return;
@@ -141,6 +143,33 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
           joinRoom(ws, rk);
           ws.userMeta = msg.user && typeof msg.user === 'object' ? msg.user : { name: 'User' };
           ws.send(JSON.stringify({ type: 'joined', workspaceId, key, peers: (rooms.get(rk)?.size || 1) - 1 }));
+          
+          if (key === 'meetings') {
+            const meeting = activeMeetings.get(workspaceId);
+            if (meeting) {
+              ws.send(JSON.stringify({
+                type: 'meeting-event',
+                workspaceId,
+                key,
+                event: 'meeting-active-session',
+                payload: {
+                  type: 'meeting-active-session',
+                  ...meeting
+                }
+              }));
+            } else {
+              ws.send(JSON.stringify({
+                type: 'meeting-event',
+                workspaceId,
+                key,
+                event: 'meeting-not-active',
+                payload: {
+                  type: 'meeting-not-active'
+                }
+              }));
+            }
+          }
+
           broadcast(
             rk,
             {
@@ -182,8 +211,49 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
 
         // Meeting mesh signaling (multi-device). Room fanout; clients filter targets.
         if (msg.type === 'meeting-event') {
-          const rk = roomKey(String(msg.workspaceId || ''), String(msg.key || 'meetings'));
+          const workspaceId = String(msg.workspaceId || '');
+          const rk = roomKey(workspaceId, String(msg.key || 'meetings'));
           if (!ws.rooms?.has(rk)) return;
+
+          if (msg.payload && msg.payload.type) {
+            const p = msg.payload;
+            if (p.type === 'meeting-started') {
+              if (!activeMeetings.has(workspaceId)) {
+                activeMeetings.set(workspaceId, {
+                  meetingId: p.meetingId,
+                  title: p.title,
+                  organizer: p.organizer,
+                  startedAt: p.startedAt,
+                  participants: {}
+                });
+              }
+            } else if (p.type === 'meeting-join' && p.participant) {
+              const meeting = activeMeetings.get(workspaceId);
+              if (meeting) {
+                meeting.participants[p.participant.socketId] = p.participant;
+              }
+            } else if (p.type === 'meeting-state-change' && p.state) {
+              const meeting = activeMeetings.get(workspaceId);
+              if (meeting && msg.socketId && meeting.participants[msg.socketId]) {
+                meeting.participants[msg.socketId] = {
+                  ...meeting.participants[msg.socketId],
+                  ...p.state
+                };
+              }
+            } else if (p.type === 'meeting-leave' && p.socketId) {
+              const meeting = activeMeetings.get(workspaceId);
+              if (meeting) {
+                delete meeting.participants[p.socketId];
+                if (Object.keys(meeting.participants).length === 0) {
+                  activeMeetings.delete(workspaceId);
+                  msg.payload = { type: 'meeting-ended', workspaceId, meetingId: meeting.meetingId };
+                }
+              }
+            } else if (p.type === 'meeting-ended') {
+              activeMeetings.delete(workspaceId);
+            }
+          }
+
           broadcast(rk, msg, ws);
         }
       } catch (error) {
@@ -194,6 +264,18 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
     ws.on('close', () => {
       if (ws.rooms) {
         for (const rk of ws.rooms) {
+          if (rk.endsWith('::meetings')) {
+            const workspaceId = rk.split('::')[0];
+            const meeting = activeMeetings.get(workspaceId);
+            if (meeting) {
+              const participantIds = Object.keys(meeting.participants);
+              let wasInMeeting = false;
+              for (const pid of participantIds) {
+                // If we had a way to map WS connection to socketId, we'd do it here.
+                // For now, clients emit meeting-leave on beforeunload.
+              }
+            }
+          }
           broadcast(
             rk,
             {
