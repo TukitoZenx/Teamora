@@ -4,7 +4,6 @@ import {
   Building2,
   CalendarDays,
   Clock3,
-  MoreHorizontal,
   Pin,
   PinOff,
   Plus,
@@ -22,7 +21,7 @@ import WorkspaceDeleteDialog from './WorkspaceDeleteDialog'
 import WorkspaceModal from './WorkspaceModal'
 import ConfirmDialog from './ConfirmDialog'
 import Button from './ui/Button'
-import { DropdownItem, DropdownMenu } from './ui/Dropdown'
+
 
 const tabs = ['Recent', 'Pinned', 'Favorites', 'History']
 const sortOptions = [
@@ -120,7 +119,7 @@ export default function Dashboard({
   onCreateWorkspace,
   onJoinWorkspace,
   onOpenWorkspace,
-  onUpdateWorkspace,
+
   onLeaveWorkspace,
   onRemoveRecentWorkspace,
   onDeleteWorkspace
@@ -286,16 +285,7 @@ export default function Dashboard({
     }
   }
 
-  const renameWorkspace = async (workspace) => {
-    const nextName = window.prompt('Rename workspace', workspace.name)
-    if (!nextName || nextName.trim() === workspace.name) return
 
-    try {
-      await onUpdateWorkspace(workspace.workspaceId, { name: nextName.trim() })
-    } catch (error) {
-      toast.error(error.message)
-    }
-  }
 
   const deleteWorkspace = async (workspace) => {
     // Already-archived (trash) workspaces cannot be deleted again via API —
@@ -496,7 +486,7 @@ export default function Dashboard({
                 onJoin={() => joinWorkspace(workspace)}
                 onPin={() => toggleStoredId(workspace.workspaceId, 'teamora-pinned-workspaces', setPinnedIds)}
                 onFavorite={() => toggleStoredId(workspace.workspaceId, 'teamora-favorite-workspaces', setFavoriteIds)}
-                onRename={() => renameWorkspace(workspace)}
+
                 onLeave={() => leaveWorkspaceRequest(workspace)}
                 onDelete={() => deleteWorkspace(workspace)}
                 onRemove={() => setWorkspaceToRemove(workspace)}
@@ -564,7 +554,6 @@ function WorkspaceLauncherCard({
   onJoin,
   onPin,
   onFavorite,
-  onRename,
   onLeave,
   onDelete,
   onRemove

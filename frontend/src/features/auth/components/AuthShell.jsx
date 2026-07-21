@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react'
 import teamoraLogo from '../../../assets/hero.png'
 import AuthBrandPanel from './AuthBrandPanel'
 import { motion } from 'framer-motion'
-import { Building2, Sparkles, Zap } from 'lucide-react'
+
 
 export default function AuthShell({ children }) {
   return (

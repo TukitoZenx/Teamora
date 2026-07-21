@@ -20,9 +20,9 @@ const runSession = (sessionMiddleware, req) =>
   new Promise((resolve, reject) => {
     // Minimal response stub — session only needs setHeader/getHeader for cookies.
     const res = {
-      getHeader() { },
-      setHeader() { },
-      end() { }
+      getHeader() {},
+      setHeader() {},
+      end() {}
     };
     sessionMiddleware(req, res, (err) => {
       if (err) reject(err);
@@ -143,30 +143,34 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
           joinRoom(ws, rk);
           ws.userMeta = msg.user && typeof msg.user === 'object' ? msg.user : { name: 'User' };
           ws.send(JSON.stringify({ type: 'joined', workspaceId, key, peers: (rooms.get(rk)?.size || 1) - 1 }));
-          
+
           if (key === 'meetings') {
             const meeting = activeMeetings.get(workspaceId);
             if (meeting) {
-              ws.send(JSON.stringify({
-                type: 'meeting-event',
-                workspaceId,
-                key,
-                event: 'meeting-active-session',
-                payload: {
-                  type: 'meeting-active-session',
-                  ...meeting
-                }
-              }));
+              ws.send(
+                JSON.stringify({
+                  type: 'meeting-event',
+                  workspaceId,
+                  key,
+                  event: 'meeting-active-session',
+                  payload: {
+                    type: 'meeting-active-session',
+                    ...meeting
+                  }
+                })
+              );
             } else {
-              ws.send(JSON.stringify({
-                type: 'meeting-event',
-                workspaceId,
-                key,
-                event: 'meeting-not-active',
-                payload: {
-                  type: 'meeting-not-active'
-                }
-              }));
+              ws.send(
+                JSON.stringify({
+                  type: 'meeting-event',
+                  workspaceId,
+                  key,
+                  event: 'meeting-not-active',
+                  payload: {
+                    type: 'meeting-not-active'
+                  }
+                })
+              );
             }
           }
 

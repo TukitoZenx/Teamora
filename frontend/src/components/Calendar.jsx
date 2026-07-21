@@ -285,11 +285,6 @@ export default function Calendar({
     }))
   }, [currentDate, tasks])
 
-  const selectedTasks = useMemo(
-    () => (activeDate ? tasks.filter((task) => task.date === activeDate) : []),
-    [activeDate, tasks]
-  )
-
   const visibleTasks = useMemo(() => {
     const query = taskSearch.trim().toLowerCase()
     const filtered = tasks.filter((task) => {
