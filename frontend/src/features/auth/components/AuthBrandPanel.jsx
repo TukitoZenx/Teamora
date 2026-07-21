@@ -10,7 +10,11 @@ export default function AuthBrandPanel() {
 
       <div className="relative z-10 flex h-full flex-col justify-between py-10">
         <Link to="/" className="flex items-center gap-3 w-fit cursor-pointer group">
-          <img src={teamoraLogo} alt="Teamora logo" className="h-10 w-10 rounded-xl shadow-lg group-hover:scale-105 transition-transform" />
+          <img
+            src={teamoraLogo}
+            alt="Teamora logo"
+            className="h-10 w-10 rounded-xl shadow-lg group-hover:scale-105 transition-transform"
+          />
           <span className="text-lg font-medium text-white group-hover:text-white/90 transition-colors">Teamora</span>
         </Link>
 
@@ -27,9 +31,7 @@ export default function AuthBrandPanel() {
             <br />
             Ship faster.
           </p>
-          <p className="mt-6 text-sm leading-6 text-white/60">
-            Everything your team needs in one secure workspace.
-          </p>
+          <p className="mt-6 text-sm leading-6 text-white/60">Everything your team needs in one secure workspace.</p>
         </div>
 
         <div className="space-y-4 text-sm text-white/70">

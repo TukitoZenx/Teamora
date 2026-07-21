@@ -1,4 +1,4 @@
-// it is the entry point of the application 
+// it is the entry point of the application
 import React from 'react' // used to create the react components
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'

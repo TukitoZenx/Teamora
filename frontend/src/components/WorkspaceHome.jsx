@@ -642,9 +642,7 @@ export default function WorkspaceHome({
               </div>
               <div>
                 <p className="text-sm font-bold text-text">Meeting in Progress</p>
-                <p className="text-xs text-muted">
-                  {activeMeeting.organizer || 'A teammate'} started a meeting
-                </p>
+                <p className="text-xs text-muted">{activeMeeting.organizer || 'A teammate'} started a meeting</p>
               </div>
             </div>
             <button

@@ -48,7 +48,7 @@ export default function GlobalMeetings() {
     }
 
     updateRect()
-    
+
     // Set up MutationObserver / ResizeObserver to track layout changes
     const observer = new ResizeObserver(updateRect)
     const el = document.getElementById('global-meeting-portal-target')
@@ -71,8 +71,6 @@ export default function GlobalMeetings() {
     }
   }, [isMaximized, portalTarget])
 
-
-
   if (!delayedRender || !workspaceId) {
     return null
   }
@@ -80,7 +78,7 @@ export default function GlobalMeetings() {
   // Transition state: maximized page is loaded but DOM target hasn't been measured yet
   const isTransitioning = isMaximized && !rect
 
-  const style = isMaximized 
+  const style = isMaximized
     ? {
         position: 'fixed',
         left: rect?.left || 0,
@@ -94,17 +92,12 @@ export default function GlobalMeetings() {
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        pointerEvents: 'none',
+        pointerEvents: 'none'
       }
 
   return (
     <div style={style}>
-      <Meetings 
-        socket={socket} 
-        roomId={workspaceId} 
-        userName={userName}
-        isMaximized={isMaximized}
-      />
+      <Meetings socket={socket} roomId={workspaceId} userName={userName} isMaximized={isMaximized} />
     </div>
   )
 }

@@ -758,7 +758,6 @@ export default function Calendar({
         })}
       </div>
 
-
       {taskViewerOpen && (
         <div className="fixed inset-0 z-toast flex items-center justify-center bg-overlay p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-modal">
