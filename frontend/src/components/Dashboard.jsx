@@ -13,11 +13,14 @@ import {
   Trash2,
   UserPlus,
   Users,
-  X
+  X,
+  ChevronDown
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import WorkspaceLeaveDialog from './WorkspaceLeaveDialog'
+import WorkspaceDeleteDialog from './WorkspaceDeleteDialog'
 import WorkspaceModal from './WorkspaceModal'
+import ConfirmDialog from './ConfirmDialog'
 import Button from './ui/Button'
 import { DropdownItem, DropdownMenu } from './ui/Dropdown'
 
@@ -125,11 +128,15 @@ export default function Dashboard({
   const [query, setQuery] = useState('')
   const [activeTab, setActiveTab] = useState('Recent')
   const [sortBy, setSortBy] = useState('lastOpened')
+  const [sortOpen, setSortOpen] = useState(false)
+  const sortRef = useRef(null)
   const [modalMode, setModalMode] = useState(null)
   const [pinnedIds, setPinnedIds] = useState(() => readStoredIds('teamora-pinned-workspaces'))
   const [favoriteIds, setFavoriteIds] = useState(() => readStoredIds('teamora-favorite-workspaces'))
   const [openedMap, setOpenedMap] = useState(readOpenedMap)
   const [leaveWorkspace, setLeaveWorkspace] = useState(null)
+  const [workspaceToDelete, setWorkspaceToDelete] = useState(null)
+  const [workspaceToRemove, setWorkspaceToRemove] = useState(null)
   const firstName = (user?.fullName || user?.username || user?.email?.split('@')[0] || 'there').split(' ')[0]
   const subtitle = useMemo(() => subtitles[(getUserId(user) || firstName).length % subtitles.length], [firstName, user])
 
@@ -201,6 +208,17 @@ export default function Dashboard({
     }
     return items
   }, [activeTab, favoriteIds, pinnedIds, query, sortBy, workspaceItems])
+
+  useEffect(() => {
+    if (!sortOpen) return
+    const handleOutside = (e) => {
+      if (sortRef.current && !sortRef.current.contains(e.target)) {
+        setSortOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [sortOpen])
 
   const toggleStoredId = (id, key, setter) => {
     setter((current) => {
@@ -283,19 +301,29 @@ export default function Dashboard({
     // Already-archived (trash) workspaces cannot be deleted again via API —
     // remove them from history instead so the dashboard stays clean.
     if (workspace.status === 'trashed') {
-      try {
-        await onRemoveRecentWorkspace?.(workspace.workspaceId)
-        toast.success('Removed from history.')
-      } catch (error) {
-        toast.error(error.message)
-      }
+      setWorkspaceToRemove(workspace)
       return
     }
 
-    if (!window.confirm(`Delete "${workspace.name}"? This cannot be undone.`)) return
+    setWorkspaceToDelete(workspace)
+  }
 
+  const handleDelete = async () => {
+    if (!workspaceToDelete) return
     try {
-      await onDeleteWorkspace(workspace.workspaceId)
+      await onDeleteWorkspace(workspaceToDelete.workspaceId)
+      setWorkspaceToDelete(null)
+    } catch (error) {
+      toast.error(error.message)
+    }
+  }
+
+  const handleRemove = async () => {
+    if (!workspaceToRemove) return
+    try {
+      await onRemoveRecentWorkspace?.(workspaceToRemove.workspaceId)
+      setWorkspaceToRemove(null)
+      toast.success('Removed from history.')
     } catch (error) {
       toast.error(error.message)
     }
@@ -350,7 +378,7 @@ export default function Dashboard({
 
       <section className="shrink-0 space-y-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="group relative min-w-0 lg:basis-[60%]">
+          <div className="group relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted transition group-focus-within:text-primary" />
             <input
               value={query}
@@ -408,20 +436,41 @@ export default function Dashboard({
             ))}
           </div>
 
-          <label className="flex h-10 w-full items-center justify-between rounded-button border border-border bg-card px-3 text-sm font-semibold text-muted md:w-44">
-            <span>Sort</span>
-            <select
-              value={sortBy}
-              onChange={(event) => setSortBy(event.target.value)}
-              className="bg-transparent text-right text-sm font-semibold text-text outline-none"
+          <div className="relative" ref={sortRef}>
+            <button
+              type="button"
+              onClick={() => setSortOpen(!sortOpen)}
+              className="flex h-12 w-full items-center justify-between rounded-button border border-border bg-card px-4 text-sm font-semibold text-muted md:w-56 transition-colors hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20 cursor-pointer"
             >
-              {sortOptions.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <span>Sort</span>
+              <div className="flex items-center gap-1.5 text-text">
+                <span>{sortOptions.find((o) => o[0] === sortBy)?.[1]}</span>
+                <ChevronDown className="h-4 w-4 text-muted" />
+              </div>
+            </button>
+
+            {sortOpen && (
+              <div className="absolute right-0 top-full mt-2 w-full md:w-56 overflow-hidden rounded-2xl border border-border bg-card shadow-modal z-20 animate-[teamora-content-fade_180ms_ease-out_both]">
+                <div className="flex flex-col py-1">
+                  {sortOptions.map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setSortBy(value)
+                        setSortOpen(false)
+                      }}
+                      className={`flex w-full items-center px-4 py-3 text-left text-sm font-semibold transition-colors hover:bg-primary/10 ${
+                        sortBy === value ? 'bg-primary/5 text-primary' : 'text-text'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -450,7 +499,7 @@ export default function Dashboard({
                 onRename={() => renameWorkspace(workspace)}
                 onLeave={() => leaveWorkspaceRequest(workspace)}
                 onDelete={() => deleteWorkspace(workspace)}
-                onRemove={() => onRemoveRecentWorkspace?.(workspace.workspaceId)}
+                onRemove={() => setWorkspaceToRemove(workspace)}
               />
             ))}
           </div>
@@ -467,6 +516,17 @@ export default function Dashboard({
       )}
 
       {leaveWorkspace && <WorkspaceLeaveDialog onCancel={() => setLeaveWorkspace(null)} onLeave={handleLeave} />}
+      {workspaceToDelete && <WorkspaceDeleteDialog workspace={workspaceToDelete} onCancel={() => setWorkspaceToDelete(null)} onDelete={handleDelete} />}
+      {workspaceToRemove && (
+        <ConfirmDialog
+          title="Remove from History?"
+          description={`Are you sure you want to remove "${workspaceToRemove?.name}" from your recent workspaces?`}
+          confirmLabel="Remove"
+          danger
+          onCancel={() => setWorkspaceToRemove(null)}
+          onConfirm={handleRemove}
+        />
+      )}
     </main>
   )
 }
@@ -509,38 +569,26 @@ function WorkspaceLauncherCard({
   onDelete,
   onRemove
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef(null)
   const status = statusStyles[workspace.status] || statusStyles.previously_joined
   const isActive = workspace.status === 'active'
   const isPending = workspace.status === 'pending'
   const isTrashed = workspace.status === 'trashed'
   const canRemoveFromHistory = !isActive
-  const canRequestJoin =
-    !isActive &&
-    !isPending &&
-    !isTrashed &&
-    (workspace.canRequestAccess || workspace.inviteCode || workspace.inviteLink)
-
-  useEffect(() => {
-    if (!menuOpen) return undefined
-    const handleOutside = (event) => {
-      if (!menuRef.current?.contains(event.target)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [menuOpen])
-
   const handleCardActivate = () => {
     if (isPending || isTrashed) return
     if (isActive) onOpen()
-    else if (canRequestJoin) onJoin()
+    else onJoin()
   }
 
-  const runMenuAction = (event, action) => {
+  const handleDeleteAction = (event) => {
     event.stopPropagation()
-    setMenuOpen(false)
-    action()
+    if (isOwner && isActive) {
+      onDelete()
+    } else if (isActive) {
+      onLeave()
+    } else if (canRemoveFromHistory) {
+      onRemove()
+    }
   }
 
   return (
@@ -588,14 +636,11 @@ function WorkspaceLauncherCard({
           </IconAction>
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation()
-              setMenuOpen((current) => !current)
-            }}
-            className="rounded-xl p-2 text-muted transition duration-normal hover:bg-primary/10 hover:text-primary"
-            aria-label="Workspace actions"
+            onClick={handleDeleteAction}
+            className="rounded-xl p-2 text-muted transition duration-normal hover:bg-danger/10 hover:text-danger"
+            aria-label="Delete Workspace"
           >
-            <MoreHorizontal className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -634,47 +679,22 @@ function WorkspaceLauncherCard({
           <Button type="button" variant="secondary" className="h-10 px-4" disabled>
             Pending Approval
           </Button>
+        ) : !isTrashed ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-10 px-4 border-primary text-primary hover:bg-primary hover:text-on-primary"
+            onClick={(e) => {
+              e.stopPropagation()
+              onJoin()
+            }}
+          >
+            Join
+            <UserPlus className="h-4 w-4" />
+          </Button>
         ) : null}
       </div>
 
-      {menuOpen && (
-        <div ref={menuRef}>
-          <DropdownMenu className="right-5 top-14 z-20 w-56">
-            {isActive && (
-              <DropdownItem icon={ArrowRight} onClick={(event) => runMenuAction(event, onOpen)}>
-                Open
-              </DropdownItem>
-            )}
-            {isOwner && isActive && (
-              <DropdownItem icon={Building2} onClick={(event) => runMenuAction(event, onRename)}>
-                Rename
-              </DropdownItem>
-            )}
-            <DropdownItem icon={pinned ? PinOff : Pin} onClick={(event) => runMenuAction(event, onPin)}>
-              {pinned ? 'Unpin' : 'Pin'}
-            </DropdownItem>
-            <DropdownItem icon={Star} onClick={(event) => runMenuAction(event, onFavorite)}>
-              {favorite ? 'Remove Favorite' : 'Favorite'}
-            </DropdownItem>
-            {isActive && (
-              <DropdownItem icon={X} danger onClick={(event) => runMenuAction(event, onLeave)}>
-                Leave Workspace
-              </DropdownItem>
-            )}
-            {canRemoveFromHistory && (
-              <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onRemove)}>
-                Remove from History
-              </DropdownItem>
-            )}
-            {/* Permanent delete only for live workspaces — trash is already archived. */}
-            {isOwner && isActive && (
-              <DropdownItem icon={Trash2} danger onClick={(event) => runMenuAction(event, onDelete)}>
-                Delete Workspace
-              </DropdownItem>
-            )}
-          </DropdownMenu>
-        </div>
-      )}
     </article>
   )
 }

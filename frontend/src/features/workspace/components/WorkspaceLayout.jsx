@@ -73,6 +73,11 @@ export default function WorkspaceLayout({
 
   // Editor surfaces fill viewport; only internal panes scroll (not the whole page).
   const fillHeightSections = new Set([
+    'home',
+    'calendar',
+    'tasks',
+    'members',
+    'settings',
     'documents',
     'spreadsheet',
     'presentation',
@@ -131,9 +136,8 @@ export default function WorkspaceLayout({
       )}
 
       <main
-        className={`h-full pt-navbar transition-[padding-left] duration-slow ease-in-out ${
-          isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'
-        } ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
+        className={`h-full pt-navbar transition-[padding-left] duration-slow ease-in-out ${isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'
+          } ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
       >
         <div
           className={

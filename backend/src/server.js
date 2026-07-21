@@ -1,13 +1,14 @@
-const path = require('path');
+const path = require('path');//  used to path 
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+// load .env file then it access the values like port , mongodb , etc...
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const app = require('./app');
-const { sessionMiddleware, isAllowedOrigin } = require('./app');
-const connectDatabase = require('./config/database');
-const { attachCollabWs } = require('./collab/wsHub');
+const app = require('./app');// used as handler for the http server 
+const { sessionMiddleware, isAllowedOrigin } = require('./app');// used for the websocket server
+const connectDatabase = require('./config/database');// used to connect to the database
+const { attachCollabWs } = require('./collab/wsHub');// used to attach the websocket server
 
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';

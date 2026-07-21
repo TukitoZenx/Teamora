@@ -189,7 +189,7 @@ const putContent = async (userId, workspaceId, key, data) => {
         updatedBy: userId
       }
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   );
 
   return {

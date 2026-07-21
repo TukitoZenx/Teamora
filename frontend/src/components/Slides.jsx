@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { ensureArray } from './utils/arrayUtils'
 import {
-  Presentation, Plus, Copy, Trash2, ChevronLeft, ChevronRight, X, StickyNote, Tv, Download, Image as ImageIcon, Video, Table2, Shapes, Upload, Eye, EyeOff, FolderInput, Type, Cloud, MonitorPlay, Settings2, Minus, Undo2, Redo2, Share2, AlignLeft, AlignCenter, AlignRight, Bold, AlertTriangle,
-  Italic, Underline, Palette, ChevronDown, AlignJustify
+  Presentation, Plus, Copy, Trash2, ChevronLeft, ChevronRight, X, StickyNote, Download, Image as ImageIcon, Video, Table2, Shapes, Upload, Eye, EyeOff, FolderInput, Type, Cloud, MonitorPlay, Settings2, Minus, Undo2, Redo2, Share2, AlignLeft, AlignCenter, AlignRight, Bold, AlertTriangle,
+  Italic, Underline, Palette, ChevronDown, AlignJustify, Strikethrough, Highlighter, RemoveFormatting, List, ListOrdered, Paintbrush, ArrowUpDown
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -327,7 +327,7 @@ export default function Slides({
 }) {
   const [showNotes, setShowNotes] = useState(true)
   const [selectedTheme, setSelectedTheme] = useState('default')
-  const [presenterMode, setPresenterMode] = useState(false)
+
   const [transitionEffect, setTransitionEffect] = useState('fade')
   const [zoom, setZoom] = useState(100)
   const showRightPanel = false
@@ -433,6 +433,7 @@ export default function Slides({
         return prev
       })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slides])
 
   const undo = () => {
@@ -562,7 +563,7 @@ export default function Slides({
     // Duplicate slide and modify element in the new slide
     const slideToDuplicate = activeSlideData
     const newSlides = [...slides]
-    // eslint-disable-next-line react-hooks/purity
+     
     newSlides.splice(activeSlide + 1, 0, {
       // eslint-disable-next-line react-hooks/purity
       id: `slide-${Date.now().toString(36)}-${Math.floor(Date.now() / 1000)}`,
@@ -573,10 +574,10 @@ export default function Slides({
       elements: slideToDuplicate.elements
         ? slideToDuplicate.elements.map((el, idx) => {
           if (el.id === elem.id) {
-            // eslint-disable-next-line react-hooks/purity
+             
             return { ...el, id: `elem-${Date.now().toString(36)}-${idx}`, text: secondHalf }
           }
-          // eslint-disable-next-line react-hooks/purity
+           
           return { ...el, id: `${el.id}-copy-${Date.now().toString(36)}-${idx}` }
         })
         : []
@@ -875,20 +876,40 @@ export default function Slides({
       if (isPresenting) {
         if (e.key === 'Escape') {
           setIsPresenting(false)
-          setPresenterMode(false)
-        } else if (e.key === 'ArrowRight' || e.key === ' ') {
-          e.preventDefault()
-          const nextIndex = step(activeSlide, 1)
-          setActiveSlide(nextIndex)
-          socket.emit('change-slide', { roomId, slideIndex: nextIndex })
-        } else if (e.key === 'ArrowLeft') {
+        } else if (['ArrowRight', ' ', 'PageDown'].includes(e.key)) {
+          if (e.key === ' ' && e.shiftKey) {
+            e.preventDefault()
+            const prevIndex = step(activeSlide, -1)
+            setActiveSlide(prevIndex)
+            socket.emit('change-slide', { roomId, slideIndex: prevIndex })
+          } else {
+            e.preventDefault()
+            const nextIndex = step(activeSlide, 1)
+            setActiveSlide(nextIndex)
+            socket.emit('change-slide', { roomId, slideIndex: nextIndex })
+          }
+        } else if (['ArrowLeft', 'PageUp'].includes(e.key)) {
           e.preventDefault()
           const prevIndex = step(activeSlide, -1)
           setActiveSlide(prevIndex)
           socket.emit('change-slide', { roomId, slideIndex: prevIndex })
+        } else if (e.key === 'Home') {
+          e.preventDefault()
+          const first = ensureArray(slides).findIndex(s => !s?.hidden)
+          if (first >= 0) {
+            setActiveSlide(first)
+            socket.emit('change-slide', { roomId, slideIndex: first })
+          }
+        } else if (e.key === 'End') {
+          e.preventDefault()
+          const visible = ensureArray(slides).map((s, i) => !s?.hidden ? i : -1).filter(i => i !== -1)
+          if (visible.length) {
+            const last = visible[visible.length - 1]
+            setActiveSlide(last)
+            socket.emit('change-slide', { roomId, slideIndex: last })
+          }
         } else if (e.key === 'F5') {
           e.preventDefault()
-          setIsPresenting(true)
         }
       } else {
         // Canvas Editor Shortcuts
@@ -985,6 +1006,7 @@ export default function Slides({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPresenting, activeSlide, slides, roomId, socket, setActiveSlide, setIsPresenting, selectedElemId, addTextBoxToSlide, deleteElement, addElementToSlide, copiedElement, copiedSlide, activeSlideData, handleDeleteSlide, handleSlideUpdate, setSlides, undo, redo])
 
   /** PPTX import via JSZip — text, notes, and embedded images. */
@@ -1072,6 +1094,276 @@ export default function Slides({
     }
   }
 
+  useEffect(() => {
+    if (isPresenting) {
+      document.documentElement.requestFullscreen?.().catch(() => { })
+    } else {
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => { })
+      }
+    }
+  }, [isPresenting])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isPresenting) {
+        setIsPresenting(false)
+      }
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [isPresenting, setIsPresenting])
+
+  const [presentScale, setPresentScale] = useState(1)
+  useEffect(() => {
+    if (isPresenting) {
+      const updateScale = () => {
+        const scale = Math.min(window.innerWidth / 850, window.innerHeight / (850 * 9 / 16))
+        setPresentScale(scale)
+      }
+      updateScale()
+      window.addEventListener('resize', updateScale)
+      return () => window.removeEventListener('resize', updateScale)
+    }
+  }, [isPresenting])
+
+  const renderSlide = (isForPresenting = false) => {
+    return (
+      <div
+        className={`relative aspect-[16/9] w-[850px] overflow-hidden bg-gradient-to-br rounded-lg pointer-events-auto ${theme.gradient} ${isForPresenting ? '' : 'shadow-2xl ring-1 ring-border/50'}`}
+        style={isForPresenting ? { transform: `scale(${presentScale})`, transformOrigin: 'center' } : { cursor: activeTool === 'textbox' ? 'crosshair' : 'default' }}
+        onClick={isForPresenting ? undefined : (e) => e.stopPropagation()}
+        onMouseDown={isForPresenting ? undefined : handleCanvasMouseDown}
+        onMouseMove={isForPresenting ? undefined : handleCanvasMouseMove}
+        onMouseLeave={isForPresenting ? undefined : () => socket?.emit('cursor-move', { x: null, y: null })}
+      >
+        <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${theme.accent}`} />
+
+        {/* Creation Dotted Rectangle */}
+        {!isForPresenting && creationRect && (
+          <div
+            className="absolute border-2 border-dashed border-primary pointer-events-none z-50 bg-primary/5"
+            style={{
+              left: creationRect.x,
+              top: creationRect.y,
+              width: creationRect.width,
+              height: creationRect.height
+            }}
+          />
+        )}
+
+        {/* Live Cursors Overlay */}
+        {!isForPresenting && Object.values(liveCursors).map(cursor => (
+          <div
+            key={cursor.senderSocketId}
+            className="absolute pointer-events-none z-[100] flex items-center"
+            style={{
+              left: cursor.x,
+              top: cursor.y,
+              transition: 'left 0.1s linear, top 0.1s linear'
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill={cursor.color} xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md -translate-x-1 -translate-y-1">
+              <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.8c.45 0 .67-.54.35-.85L6.35 2.85a.5.5 0 0 0-.85.35Z" stroke="white" strokeWidth="1.5" />
+            </svg>
+            <div
+              className="absolute top-5 left-3 px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap drop-shadow-sm"
+              style={{ backgroundColor: cursor.color }}
+            >
+              {cursor.name}
+            </div>
+          </div>
+        ))}
+
+        {/* Dynamic templates */}
+        {activeSlideData.layout === 'title' ? (
+          <div className="flex flex-col justify-center items-center h-full text-center">
+            {isForPresenting ? (
+              <div className="text-4xl font-bold text-slate-900 dark:text-on-primary w-3/4 text-center py-2">{activeSlideData.title}</div>
+            ) : (
+              <input
+                type="text"
+                value={activeSlideData.title || ''}
+                onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                className="text-4xl font-bold text-text border-b border-transparent focus:border-primary/30 outline-none w-3/4 text-center bg-transparent py-2 transition-colors"
+                placeholder="Enter Title"
+              />
+            )}
+            {isForPresenting ? (
+              <div className="text-base text-slate-700 dark:text-slate-300 w-3/4 text-center py-2 mt-4 min-h-24">{activeSlideData.content}</div>
+            ) : (
+              <textarea
+                value={activeSlideData.content || ''}
+                onChange={(e) => handleSlideUpdate('content', e.target.value)}
+                className="text-base text-muted outline-none w-3/4 text-center bg-transparent py-2 resize-none mt-4 h-24 focus:bg-card-sunken/50 transition-colors rounded-lg"
+                placeholder="Enter subtitle details..."
+              />
+            )}
+          </div>
+        ) : activeSlideData.layout === 'split' ? (
+          <div className="h-full flex flex-col px-10 py-8">
+            {isForPresenting ? (
+              <div className="text-2xl font-bold text-slate-900 dark:text-on-primary py-1 w-full text-center">{activeSlideData.title}</div>
+            ) : (
+              <input
+                type="text"
+                value={activeSlideData.title || ''}
+                onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                className="text-2xl font-bold text-text border-b border-transparent focus:border-primary/30 outline-none bg-transparent py-1 w-full text-center transition-colors"
+                placeholder="Enter Title"
+              />
+            )}
+            <div className="grid grid-cols-2 gap-8 flex-1 mt-8">
+              {isForPresenting ? (
+                <div className="p-4 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeSlideData.content}</div>
+              ) : (
+                <textarea
+                  value={activeSlideData.content || ''}
+                  onChange={(e) => handleSlideUpdate('content', e.target.value)}
+                  className="border border-dashed border-border/50 rounded-xl p-4 text-sm bg-transparent resize-none h-full outline-none focus:border-primary/50 focus:bg-card-sunken/30 transition-colors"
+                  placeholder="Column 1 text..."
+                />
+              )}
+              {isForPresenting ? (
+                <div className="p-4 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeSlideData.splitContent2}</div>
+              ) : (
+                <textarea
+                  value={activeSlideData.splitContent2 || ''}
+                  onChange={(e) => handleSlideUpdate('splitContent2', e.target.value)}
+                  className="border border-dashed border-border/50 rounded-xl p-4 text-sm bg-transparent resize-none h-full outline-none focus:border-primary/50 focus:bg-card-sunken/30 transition-colors"
+                  placeholder="Column 2 text..."
+                />
+              )}
+            </div>
+          </div>
+        ) : activeSlideData.layout === 'image-left' ? (
+          <div className="h-full flex gap-8 items-center px-8 py-6">
+            <div className="w-1/2 aspect-[4/3] bg-card-sunken/50 rounded-2xl flex flex-col items-center justify-center border border-dashed border-border/50 text-muted text-xs relative overflow-hidden">
+              {activeSlideData.elements?.some((el) => el.type === 'image') ? (
+                <img
+                  src={activeSlideData.elements.find((el) => el.type === 'image').src}
+                  className="w-full h-full object-cover rounded-2xl absolute inset-0"
+                  alt="slide-left"
+                />
+              ) : (
+                <>
+                  <ImageIcon className="w-8 h-8 mb-2 opacity-50" />
+                  <span>Insert Image element</span>
+                </>
+              )}
+            </div>
+            <div className="w-1/2 flex flex-col justify-center gap-4">
+              {isForPresenting ? (
+                <div className="text-3xl font-bold text-slate-900 dark:text-on-primary py-1">{activeSlideData.title}</div>
+              ) : (
+                <input
+                  type="text"
+                  value={activeSlideData.title || ''}
+                  onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                  className="text-3xl font-bold text-text outline-none bg-transparent border-b border-transparent focus:border-primary/30 transition-colors py-1"
+                  placeholder="Title"
+                />
+              )}
+              {isForPresenting ? (
+                <div className="text-sm text-slate-700 dark:text-slate-300 p-2 whitespace-pre-wrap min-h-40">{activeSlideData.content}</div>
+              ) : (
+                <textarea
+                  value={activeSlideData.content || ''}
+                  onChange={(e) => handleSlideUpdate('content', e.target.value)}
+                  className="text-sm text-muted bg-transparent resize-none h-40 outline-none focus:border-primary/30 focus:bg-card-sunken/30 p-2 rounded-lg transition-colors"
+                  placeholder="Content text..."
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex flex-col px-10 py-8">
+            {isForPresenting ? (
+              <div className="text-3xl font-bold text-slate-900 dark:text-on-primary py-2 w-full">{activeSlideData.title}</div>
+            ) : (
+              <input
+                type="text"
+                value={activeSlideData.title || ''}
+                onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                className="text-3xl font-bold text-text border-b border-transparent focus:border-primary/30 outline-none bg-transparent py-2 w-full transition-colors"
+                placeholder="Click to add title"
+              />
+            )}
+            {isForPresenting ? (
+              <div className="flex-1 text-base text-slate-700 dark:text-slate-300 mt-6 p-2 whitespace-pre-wrap">{activeSlideData.content}</div>
+            ) : (
+              <textarea
+                value={activeSlideData.content || ''}
+                onChange={(e) => handleSlideUpdate('content', e.target.value)}
+                className="flex-1 text-base text-muted bg-transparent resize-none mt-6 outline-none focus:border-primary/30 focus:bg-card-sunken/30 p-2 rounded-lg transition-colors"
+                placeholder="Click to add body content..."
+              />
+            )}
+          </div>
+        )}
+
+        {/* Absolute elements */}
+        {ensureArray(slideElements).map((el) => {
+          const isSelected = !isForPresenting && selectedElemId === el.id
+          const obj = (
+            <SlideObject
+              key={el.id}
+              el={el}
+              isSelected={isSelected}
+              onSelect={isForPresenting ? () => {} : setSelectedElemId}
+              onDrag={isForPresenting ? () => {} : handleElementDrag}
+              onDelete={isForPresenting ? undefined : deleteElement}
+              externalIsEditing={!isForPresenting && editingElemId === el.id}
+              onSetEditing={isForPresenting ? undefined : (editing) => setEditingElemId(editing ? el.id : null)}
+            >
+              {(el.type === 'textbox' || el.type === 'shape' || el.type === 'text') && (
+                <TextEditor
+                  el={el}
+                  patchElement={isForPresenting ? () => {} : patchElement}
+                  isSelected={isSelected}
+                  onDuplicateToNextSlide={isForPresenting ? undefined : handleOverflowToNextSlide}
+                  undo={undo}
+                  redo={redo}
+                />
+              )}
+              {el.type === 'image' ? (
+                <img
+                  src={el.src}
+                  className="w-full h-full object-cover rounded pointer-events-none"
+                  alt="deck-insert"
+                />
+              ) : el.type === 'video' ? (
+                <iframe
+                  src={el.src}
+                  className="w-full h-full rounded pointer-events-none bg-black"
+                  title="deck-video"
+                  frameBorder="0"
+                />
+              ) : el.type === 'shape' ? (
+                <div className="w-full h-full bg-primary/35 rounded-full border-2 border-primary pointer-events-none" />
+              ) : el.type === 'table' ? (
+                <table className="w-full h-full border border-slate-300 text-[10px] bg-card-sunken pointer-events-none">
+                  <tbody>
+                    <tr><td className="border p-1 text-text">Row Cell</td><td className="border p-1 text-text">Row Cell</td></tr>
+                    <tr><td className="border p-1 text-text">Row Cell</td><td className="border p-1 text-text">Row Cell</td></tr>
+                  </tbody>
+                </table>
+              ) : (
+                <div className="w-full h-full border border-dashed border-border pointer-events-none" />
+              )}
+            </SlideObject>
+          )
+          
+          if (isForPresenting) {
+            // Apply a pointer-events-none wrapper so elements aren't interactive
+            return <div key={el.id} className="pointer-events-none absolute inset-0">{obj}</div>
+          }
+          return obj
+        })}
+      </div>
+    )
+  }
+
   const selectedElem = selectedElemId ? activeSlideData?.elements?.find(e => e.id === selectedElemId) : null
   const isTextElem = selectedElem && (selectedElem.type === 'textbox' || selectedElem.type === 'shape')
 
@@ -1079,127 +1371,30 @@ export default function Slides({
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card">
       {/* Presentation Fullscreen */}
       {isPresenting && (
-        <div className="fixed inset-0 bg-slate-950 z-[9999] flex flex-col items-center justify-center">
-          <button
-            onClick={() => {
-              setIsPresenting(false)
-              setPresenterMode(false)
-            }}
-            className="absolute top-4 right-4 p-2.5 bg-card/10 hover:bg-card/20 text-on-primary rounded-full transition-all cursor-pointer z-50"
-            title="Exit Slideshow (Esc)"
+        <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center select-none group" onClick={() => {
+          const nextIndex = nextVisibleIndex(activeSlide, 1)
+          setActiveSlide(nextIndex)
+          socket.emit('change-slide', { roomId, slideIndex: nextIndex })
+        }}>
+          {/* Active Slide Scaled to Fit */}
+          <div className="relative w-full h-full max-w-[100vw] max-h-[100vh] aspect-video overflow-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSlide}
+                {...getSlideTransition()}
+                transition={{ duration: 0.4, ease: 'easeInOut' }}
+                className={`w-full h-full bg-gradient-to-br ${theme.gradient} p-12 md:p-20 flex flex-col justify-center items-center text-center relative overflow-hidden`}
+              >
+                {renderSlide(true)}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Navigation Controls floating panel (visible on hover) */}
+          <div
+            className="absolute bottom-8 flex items-center gap-4 bg-slate-900/60 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            onClick={(e) => e.stopPropagation()}
           >
-            <X className="w-5 h-5" />
-          </button>
-
-          {presenterMode ? (
-            <div className="w-[90vw] h-[85vh] flex gap-6">
-              {/* Presenter Split Screen View */}
-              <div className="flex-1 bg-black/40 rounded-2xl p-6 border border-white/5 flex flex-col justify-between">
-                <span className="text-[10px] font-bold tracking-wider text-muted uppercase">Current Slide</span>
-                <div
-                  className={`aspect-[16/9] w-full bg-gradient-to-br ${theme.gradient} rounded-xl p-8 flex flex-col justify-center text-center relative border border-white/5 overflow-hidden`}
-                >
-                  <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-on-primary mb-4">
-                    {activeSlideData.title || 'Untitled Slide'}
-                  </h1>
-                  <p className="text-xs md:text-sm text-muted leading-relaxed max-w-md mx-auto">
-                    {activeSlideData.content}
-                  </p>
-                </div>
-                <div className="text-xs text-on-primary/50">
-                  Slide {activeSlide + 1} of {slides.length}
-                </div>
-              </div>
-
-              <div className="w-96 bg-black/40 rounded-2xl p-6 border border-white/5 flex flex-col justify-between space-y-4">
-                <div>
-                  <span className="text-[10px] font-bold tracking-wider text-muted uppercase block mb-3">
-                    Speaker Notes
-                  </span>
-                  <div className="bg-card/5 border border-white/10 rounded-xl p-4 min-h-[150px] text-xs text-slate-200 leading-relaxed overflow-y-auto">
-                    {activeSlideData.notes || 'No notes added to this slide.'}
-                  </div>
-                </div>
-
-                <div className="flex-1 border-t border-white/10 pt-4 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold tracking-wider text-muted uppercase">Up Next</span>
-                  {slides[activeSlide + 1] ? (
-                    <div className="p-3 bg-card/5 rounded-xl border border-white/5 text-left">
-                      <p className="font-bold text-xs text-on-primary">{slides[activeSlide + 1].title}</p>
-                      <p className="text-[10px] text-muted truncate mt-1">{slides[activeSlide + 1].content}</p>
-                    </div>
-                  ) : (
-                    <p className="italic text-[10px] text-muted text-center py-4">End of Slide Presentation</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="relative w-[85vw] max-w-5xl aspect-[16/9] overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeSlide}
-                  {...getSlideTransition()}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className={`w-full h-full bg-gradient-to-br ${theme.gradient} rounded-2xl p-12 md:p-20 shadow-2xl flex flex-col justify-center items-center text-center relative border border-white/5 overflow-hidden`}
-                >
-                  <div className={`absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r ${theme.accent} rounded-t-2xl`} />
-                  <h1 className="text-4xl md:text-6xl font-bold text-slate-900 dark:text-on-primary mb-6 leading-tight select-none">
-                    {activeSlideData.title || 'Untitled Slide'}
-                  </h1>
-                  <p className="text-lg md:text-2xl text-slate-200 max-w-2xl leading-relaxed select-none">
-                    {activeSlideData.content}
-                  </p>
-
-                  {/* Absolute Elements on Presentation Screen */}
-                  {ensureArray(slideElements).map((el) => (
-                    <div
-                      key={el.id}
-                      style={{
-                        position: 'absolute',
-                        left: el.x,
-                        top: el.y,
-                        width: el.width,
-                        height: el.height,
-                        zIndex: 10
-                      }}
-                    >
-                      {el.type === 'image' ? (
-                        <img src={el.src} className="w-full h-full object-cover rounded shadow" alt="slide-elem" />
-                      ) : el.type === 'video' ? (
-                        <iframe
-                          src={el.src}
-                          className="w-full h-full rounded shadow"
-                          title="slide-video"
-                          frameBorder="0"
-                        />
-                      ) : el.type === 'shape' ? (
-                        <div className="w-full h-full bg-indigo-500/35 rounded-full border-2 border-indigo-500" />
-                      ) : el.type === 'table' ? (
-                        <table className="w-full h-full border border-slate-300 text-slate-800 text-[10px] bg-card">
-                          <tbody>
-                            <tr>
-                              <td className="border p-1">Row Cell</td>
-                              <td className="border p-1">Row Cell</td>
-                            </tr>
-                            <tr>
-                              <td className="border p-1">Row Cell</td>
-                              <td className="border p-1">Row Cell</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      ) : (
-                        <div className="w-full h-full border border-dashed border-slate-300" />
-                      )}
-                    </div>
-                  ))}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          )}
-
-          {/* Navigation Controls floating panel */}
-          <div className="absolute bottom-8 flex items-center gap-4 bg-slate-900/60 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 z-50">
             <button
               type="button"
               onClick={() => {
@@ -1209,6 +1404,7 @@ export default function Slides({
               }}
               disabled={nextVisibleIndex(activeSlide, -1) === activeSlide}
               className="cursor-pointer rounded-full p-1.5 text-on-primary/80 transition-all hover:bg-card/15 hover:text-on-primary disabled:opacity-35"
+              title="Previous Slide (Left Arrow)"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -1224,16 +1420,18 @@ export default function Slides({
               }}
               disabled={nextVisibleIndex(activeSlide, 1) === activeSlide}
               className="cursor-pointer rounded-full p-1.5 text-on-primary/80 transition-all hover:bg-card/15 hover:text-on-primary disabled:opacity-35"
+              title="Next Slide (Right Arrow)"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
             <div className="w-px h-5 bg-card/10" />
             <button
-              onClick={() => setPresenterMode(!presenterMode)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-card/10 hover:bg-card/20 text-on-primary rounded-full text-[10px] font-bold transition-all cursor-pointer"
+              onClick={() => setIsPresenting(false)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-card/10 hover:bg-red-500/20 hover:text-red-400 text-on-primary rounded-full text-[10px] font-bold transition-all cursor-pointer"
+              title="Exit Presentation (Esc)"
             >
-              <Tv className="w-3.5 h-3.5" />
-              <span>Presenter Mode</span>
+              <X className="w-3.5 h-3.5" />
+              <span>Exit</span>
             </button>
           </div>
         </div>
@@ -1318,49 +1516,65 @@ export default function Slides({
               transition={{ duration: 0.15 }}
               className="flex items-center gap-6 w-full"
             >
-              {activeRibbonTab === 'home' && (
-                <>
-                  <div className="flex items-center gap-1 border-r border-border/50 pr-4">
-                    <button onClick={undo} className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Undo">
-                      <Undo2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={redo} className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Redo">
-                      <Redo2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 border-r border-border/50 pr-4">
-                    <button onClick={addSlide} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-primary hover:bg-primary/10 transition-colors">
-                      <Plus className="w-4 h-4" />
-                      <span className="text-[9px] font-bold">New Slide</span>
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1 border-r border-border/50 pr-4">
-                    <button 
-                      onClick={addTextBoxToSlide} 
-                      className={`flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg transition-colors ${activeTool === 'textbox' ? 'bg-primary/20 text-primary border border-primary/30 shadow-inner font-bold' : 'text-muted hover:text-text hover:bg-card-sunken border border-transparent'}`}
-                    >
-                      <Type className="w-4 h-4" />
-                      <span className="text-[9px]">Text Box</span>
-                    </button>
-                    <button onClick={() => addElementToSlide('shape')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
-                      <Shapes className="w-4 h-4" />
-                      <span className="text-[9px]">Shape</span>
-                    </button>
-                    <button onClick={() => addElementToSlide('image')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
-                      <ImageIcon className="w-4 h-4" />
-                      <span className="text-[9px]">Image</span>
-                    </button>
-                  </div>
+              {activeRibbonTab === 'home' && (() => {
+                const isFormatActive = isTextElem && selectedElem;
+                const fontFam = isFormatActive && selectedElem.fontFamily ? selectedElem.fontFamily.split(',')[0] : 'Inter';
+                const fontSz = isFormatActive && selectedElem.fontSize ? parseInt(selectedElem.fontSize, 10) : 16;
+                const isBold = isFormatActive && selectedElem.fontWeight === 'bold';
+                const isItal = isFormatActive && selectedElem.fontStyle === 'italic';
+                const isUnder = isFormatActive && selectedElem.textDecoration === 'underline';
+                const isStrike = isFormatActive && selectedElem.textDecoration === 'line-through';
+                const align = isFormatActive && selectedElem.textAlign ? selectedElem.textAlign : 'left';
+                const textColor = isFormatActive && selectedElem.color ? selectedElem.color : '#000000';
+                const highlightColor = isFormatActive && selectedElem.backgroundColor ? selectedElem.backgroundColor : 'transparent';
 
-                  {isTextElem && selectedElem && (
+                return (
+                  <>
+                    <div className="flex items-center gap-1 border-r border-border/50 pr-4">
+                      <button onClick={undo} className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Undo">
+                        <Undo2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={redo} className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Redo">
+                        <Redo2 className="w-4 h-4" />
+                      </button>
+                      <button className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Format Painter (Coming Soon)">
+                        <Paintbrush className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 border-r border-border/50 pr-4">
+                      <button onClick={addSlide} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+                        <Plus className="w-4 h-4" />
+                        <span className="text-[9px] font-bold">New Slide</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 border-r border-border/50 pr-4">
+                      <button
+                        onClick={addTextBoxToSlide}
+                        className={`flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg transition-colors ${activeTool === 'textbox' ? 'bg-primary/20 text-primary border border-primary/30 shadow-inner font-bold' : 'text-muted hover:text-text hover:bg-card-sunken border border-transparent'}`}
+                      >
+                        <Type className="w-4 h-4" />
+                        <span className="text-[9px]">Text Box</span>
+                      </button>
+                      <button onClick={() => addElementToSlide('shape')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
+                        <Shapes className="w-4 h-4" />
+                        <span className="text-[9px]">Shape</span>
+                      </button>
+                      <button onClick={() => addElementToSlide('image')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
+                        <ImageIcon className="w-4 h-4" />
+                        <span className="text-[9px]">Image</span>
+                      </button>
+                    </div>
+
                     <div className="flex items-center gap-1 pl-2">
                       {/* Font Selector */}
                       <div className="relative">
-                        <button 
+                        <button
                           onClick={() => setActiveDropdown(activeDropdown === 'font' ? null : 'font')}
                           className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-card-sunken rounded font-medium transition-colors border border-transparent"
                         >
-                          <span className="truncate max-w-[80px]">{selectedElem.fontFamily ? selectedElem.fontFamily.split(',')[0] : 'Inter'}</span>
+                          <span className="truncate max-w-[80px]">{fontFam}</span>
                           <ChevronDown className="w-3 h-3 opacity-60" />
                         </button>
                         {activeDropdown === 'font' && (
@@ -1368,7 +1582,7 @@ export default function Slides({
                             {['Inter', 'Roboto', 'Playfair Display', 'Georgia', 'Courier New', 'Caveat'].map(f => (
                               <button
                                 key={f}
-                                onClick={() => { patchElement(selectedElem.id, { fontFamily: `${f}, sans-serif` }); setActiveDropdown(null) }}
+                                onClick={() => { if (isFormatActive) patchElement(selectedElem.id, { fontFamily: `${f}, sans-serif` }); setActiveDropdown(null) }}
                                 className="w-full text-left px-3 py-1.5 text-xs hover:bg-card-sunken transition-colors text-text"
                                 style={{ fontFamily: f }}
                               >
@@ -1383,12 +1597,12 @@ export default function Slides({
 
                       {/* Size Controls */}
                       <div className="flex items-center gap-0.5">
-                        <button 
+                        <button
                           onClick={() => {
-                            const current = parseInt(selectedElem.fontSize || '16', 10)
-                            patchElement(selectedElem.id, { fontSize: `${Math.max(8, current - 2)}px` })
+                            if (!isFormatActive) return;
+                            patchElement(selectedElem.id, { fontSize: `${Math.max(8, fontSz - 2)}px` })
                           }}
-                          className="p-1 hover:bg-card-sunken rounded transition-colors text-muted hover:text-text"
+                          className={`p-1 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
@@ -1397,14 +1611,14 @@ export default function Slides({
                             onClick={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')}
                             className="px-1.5 py-1 text-xs hover:bg-card-sunken rounded font-bold min-w-[32px] text-center transition-colors text-text border border-transparent"
                           >
-                            {parseInt(selectedElem.fontSize || '16', 10)}
+                            {fontSz}
                           </button>
                           {activeDropdown === 'size' && (
                             <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[60px] max-h-[160px] overflow-y-auto z-50">
                               {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map(sz => (
                                 <button
                                   key={sz}
-                                  onClick={() => { patchElement(selectedElem.id, { fontSize: `${sz}px` }); setActiveDropdown(null) }}
+                                  onClick={() => { if (isFormatActive) patchElement(selectedElem.id, { fontSize: `${sz}px` }); setActiveDropdown(null) }}
                                   className="w-full text-center px-3 py-1 text-xs hover:bg-card-sunken transition-colors text-text"
                                 >
                                   {sz}
@@ -1413,12 +1627,12 @@ export default function Slides({
                             </div>
                           )}
                         </div>
-                        <button 
+                        <button
                           onClick={() => {
-                            const current = parseInt(selectedElem.fontSize || '16', 10)
-                            patchElement(selectedElem.id, { fontSize: `${Math.min(120, current + 2)}px` })
+                            if (!isFormatActive) return;
+                            patchElement(selectedElem.id, { fontSize: `${Math.min(120, fontSz + 2)}px` })
                           }}
-                          className="p-1 hover:bg-card-sunken rounded transition-colors text-muted hover:text-text"
+                          className={`p-1 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </button>
@@ -1428,46 +1642,46 @@ export default function Slides({
 
                       {/* Style Buttons */}
                       <div className="flex items-center gap-0.5">
-                        <button 
-                          onClick={() => patchElement(selectedElem.id, { fontWeight: selectedElem.fontWeight === 'bold' ? 'normal' : 'bold' })}
-                          className={`p-1.5 rounded transition-colors ${selectedElem.fontWeight === 'bold' ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                        <button
+                          disabled={!isFormatActive}
+                          onClick={() => patchElement(selectedElem.id, { fontWeight: isBold ? 'normal' : 'bold' })}
+                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isBold ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
                           title="Bold"
                         >
                           <Bold className="w-3.5 h-3.5" />
                         </button>
-                        <button 
-                          onClick={() => patchElement(selectedElem.id, { fontStyle: selectedElem.fontStyle === 'italic' ? 'normal' : 'italic' })}
-                          className={`p-1.5 rounded transition-colors ${selectedElem.fontStyle === 'italic' ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                        <button
+                          disabled={!isFormatActive}
+                          onClick={() => patchElement(selectedElem.id, { fontStyle: isItal ? 'normal' : 'italic' })}
+                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isItal ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
                           title="Italic"
                         >
                           <Italic className="w-3.5 h-3.5" />
                         </button>
-                        <button 
-                          onClick={() => patchElement(selectedElem.id, { textDecoration: selectedElem.textDecoration === 'underline' ? 'none' : 'underline' })}
-                          className={`p-1.5 rounded transition-colors ${selectedElem.textDecoration === 'underline' ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                        <button
+                          disabled={!isFormatActive}
+                          onClick={() => patchElement(selectedElem.id, { textDecoration: isUnder ? 'none' : 'underline' })}
+                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isUnder ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
                           title="Underline"
                         >
                           <Underline className="w-3.5 h-3.5" />
                         </button>
-                      </div>
-
-                      <div className="w-px h-4 bg-border/50 mx-1" />
-
-                      {/* Alignments */}
-                      <div className="flex items-center gap-0.5">
-                        {['left', 'center', 'right', 'justify'].map(align => (
-                          <button 
-                            key={align}
-                            onClick={() => patchElement(selectedElem.id, { textAlign: align })}
-                            className={`p-1.5 rounded transition-colors ${selectedElem.textAlign === align || (!selectedElem.textAlign && align === 'left') ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                            title={`Align ${align}`}
-                          >
-                            {align === 'left' && <AlignLeft className="w-3.5 h-3.5" />}
-                            {align === 'center' && <AlignCenter className="w-3.5 h-3.5" />}
-                            {align === 'right' && <AlignRight className="w-3.5 h-3.5" />}
-                            {align === 'justify' && <AlignJustify className="w-3.5 h-3.5" />}
-                          </button>
-                        ))}
+                        <button
+                          disabled={!isFormatActive}
+                          onClick={() => patchElement(selectedElem.id, { textDecoration: isStrike ? 'none' : 'line-through' })}
+                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isStrike ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                          title="Strikethrough"
+                        >
+                          <Strikethrough className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          disabled={!isFormatActive}
+                          onClick={() => patchElement(selectedElem.id, { fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', color: '#000000', backgroundColor: 'transparent' })}
+                          className={`p-1.5 rounded transition-colors ml-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                          title="Clear Formatting"
+                        >
+                          <RemoveFormatting className="w-3.5 h-3.5" />
+                        </button>
                       </div>
 
                       <div className="w-px h-4 bg-border/50 mx-1" />
@@ -1475,12 +1689,13 @@ export default function Slides({
                       {/* Color Selectors */}
                       <div className="flex items-center gap-0.5">
                         <div className="relative">
-                          <button 
+                          <button
+                            disabled={!isFormatActive}
                             onClick={() => setActiveDropdown(activeDropdown === 'color' ? null : 'color')}
-                            className="p-1.5 hover:bg-card-sunken rounded transition-colors flex items-center gap-0.5 text-muted hover:text-text"
+                            className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
                             title="Text Color"
                           >
-                            <Palette className="w-3.5 h-3.5" style={{ color: selectedElem.color || '#000000' }} />
+                            <Palette className="w-3.5 h-3.5" style={{ color: textColor }} />
                             <ChevronDown className="w-2.5 h-2.5 opacity-60" />
                           </button>
                           {activeDropdown === 'color' && (
@@ -1496,11 +1711,72 @@ export default function Slides({
                             </div>
                           )}
                         </div>
+                        <div className="relative">
+                          <button
+                            disabled={!isFormatActive}
+                            onClick={() => setActiveDropdown(activeDropdown === 'highlight' ? null : 'highlight')}
+                            className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                            title="Highlight Color"
+                          >
+                            <Highlighter className="w-3.5 h-3.5" style={{ color: highlightColor !== 'transparent' ? highlightColor : 'currentColor' }} />
+                            <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                          </button>
+                          {activeDropdown === 'highlight' && (
+                            <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl p-2 grid grid-cols-4 gap-1.5 min-w-[100px] z-50">
+                              {['transparent', '#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', '#e9d5ff', '#fed7aa', '#fbcfe8'].map(c => (
+                                <button
+                                  key={c}
+                                  onClick={() => { patchElement(selectedElem.id, { backgroundColor: c }); setActiveDropdown(null) }}
+                                  className="w-5 h-5 rounded-full border border-border shadow-sm flex items-center justify-center"
+                                  style={{ backgroundColor: c === 'transparent' ? '#ffffff' : c }}
+                                >
+                                  {c === 'transparent' && <span className="text-red-500 text-[10px] font-bold">/</span>}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
+
+                      <div className="w-px h-4 bg-border/50 mx-1" />
+
+                      {/* Alignments */}
+                      <div className="flex items-center gap-0.5">
+                        {['left', 'center', 'right', 'justify'].map(a => (
+                          <button
+                            key={a}
+                            disabled={!isFormatActive}
+                            onClick={() => patchElement(selectedElem.id, { textAlign: a })}
+                            className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : align === a ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                            title={`Align ${a}`}
+                          >
+                            {a === 'left' && <AlignLeft className="w-3.5 h-3.5" />}
+                            {a === 'center' && <AlignCenter className="w-3.5 h-3.5" />}
+                            {a === 'right' && <AlignRight className="w-3.5 h-3.5" />}
+                            {a === 'justify' && <AlignJustify className="w-3.5 h-3.5" />}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="w-px h-4 bg-border/50 mx-1" />
+
+                      {/* Paragraph format placeholders */}
+                      <div className="flex items-center gap-0.5">
+                        <button className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed" title="Bullets (Requires rich text model)">
+                          <List className="w-3.5 h-3.5" />
+                        </button>
+                        <button className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed" title="Numbering (Requires rich text model)">
+                          <ListOrdered className="w-3.5 h-3.5" />
+                        </button>
+                        <button className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed" title="Line Spacing (Requires rich text model)">
+                          <ArrowUpDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
                     </div>
-                  )}
-                </>
-              )}
+                  </>
+                );
+              })()}
 
               {activeRibbonTab === 'insert' && (
                 <>
@@ -1727,203 +2003,7 @@ export default function Slides({
                   }}
                   className="relative flex items-center justify-center pointer-events-none"
                 >
-                  <div
-                    className={`relative aspect-[16/9] w-[850px] overflow-hidden bg-gradient-to-br shadow-2xl ring-1 ring-border/50 rounded-lg pointer-events-auto ${theme.gradient}`}
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={handleCanvasMouseDown}
-                    onMouseMove={handleCanvasMouseMove}
-                    onMouseLeave={() => socket?.emit('cursor-move', { x: null, y: null })}
-                    style={{ cursor: activeTool === 'textbox' ? 'crosshair' : 'default' }}
-                  >
-                    <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${theme.accent}`} />
-
-                    {/* Creation Dotted Rectangle */}
-                    {creationRect && (
-                      <div
-                        className="absolute border-2 border-dashed border-primary pointer-events-none z-50 bg-primary/5"
-                        style={{
-                          left: creationRect.x,
-                          top: creationRect.y,
-                          width: creationRect.width,
-                          height: creationRect.height
-                        }}
-                      />
-                    )}
-
-                    {/* Live Cursors Overlay */}
-                    {Object.values(liveCursors).map(cursor => (
-                      <div
-                        key={cursor.senderSocketId}
-                        className="absolute pointer-events-none z-[100] flex items-center"
-                        style={{
-                          left: cursor.x,
-                          top: cursor.y,
-                          transition: 'left 0.1s linear, top 0.1s linear'
-                        }}
-                      >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill={cursor.color} xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md -translate-x-1 -translate-y-1">
-                          <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.8c.45 0 .67-.54.35-.85L6.35 2.85a.5.5 0 0 0-.85.35Z" stroke="white" strokeWidth="1.5" />
-                        </svg>
-                        <div
-                          className="absolute top-5 left-3 px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap drop-shadow-sm"
-                          style={{ backgroundColor: cursor.color }}
-                        >
-                          {cursor.name}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Dynamic templates */}
-                    {activeSlideData.layout === 'title' ? (
-                      <div className="flex flex-col justify-center items-center h-full text-center">
-                        <input
-                          type="text"
-                          value={activeSlideData.title || ''}
-                          onChange={(e) => handleSlideUpdate('title', e.target.value)}
-                          className="text-4xl font-bold text-text border-b border-transparent focus:border-primary/30 outline-none w-3/4 text-center bg-transparent py-2 transition-colors"
-                          placeholder="Enter Title"
-                        />
-                        <textarea
-                          value={activeSlideData.content || ''}
-                          onChange={(e) => handleSlideUpdate('content', e.target.value)}
-                          className="text-base text-muted outline-none w-3/4 text-center bg-transparent py-2 resize-none mt-4 h-24 focus:bg-card-sunken/50 transition-colors rounded-lg"
-                          placeholder="Enter subtitle details..."
-                        />
-                      </div>
-                    ) : activeSlideData.layout === 'split' ? (
-                      <div className="h-full flex flex-col px-10 py-8">
-                        <input
-                          type="text"
-                          value={activeSlideData.title || ''}
-                          onChange={(e) => handleSlideUpdate('title', e.target.value)}
-                          className="text-2xl font-bold text-text border-b border-transparent focus:border-primary/30 outline-none bg-transparent py-1 w-full text-center transition-colors"
-                          placeholder="Enter Title"
-                        />
-                        <div className="grid grid-cols-2 gap-8 flex-1 mt-8">
-                          <textarea
-                            value={activeSlideData.content || ''}
-                            onChange={(e) => handleSlideUpdate('content', e.target.value)}
-                            className="border border-dashed border-border/50 rounded-xl p-4 text-sm bg-transparent resize-none h-full outline-none focus:border-primary/50 focus:bg-card-sunken/30 transition-colors"
-                            placeholder="Column 1 text..."
-                          />
-                          <textarea
-                            value={activeSlideData.splitContent2 || ''}
-                            onChange={(e) => handleSlideUpdate('splitContent2', e.target.value)}
-                            className="border border-dashed border-border/50 rounded-xl p-4 text-sm bg-transparent resize-none h-full outline-none focus:border-primary/50 focus:bg-card-sunken/30 transition-colors"
-                            placeholder="Column 2 text..."
-                          />
-                        </div>
-                      </div>
-                    ) : activeSlideData.layout === 'image-left' ? (
-                      <div className="h-full flex gap-8 items-center px-8 py-6">
-                        <div className="w-1/2 aspect-[4/3] bg-card-sunken/50 rounded-2xl flex flex-col items-center justify-center border border-dashed border-border/50 text-muted text-xs relative overflow-hidden">
-                          {activeSlideData.elements?.some((el) => el.type === 'image') ? (
-                            <img
-                              src={activeSlideData.elements.find((el) => el.type === 'image').src}
-                              className="w-full h-full object-cover rounded-2xl absolute inset-0"
-                              alt="slide-left"
-                            />
-                          ) : (
-                            <>
-                              <ImageIcon className="w-8 h-8 mb-2 opacity-50" />
-                              <span>Insert Image element</span>
-                            </>
-                          )}
-                        </div>
-                        <div className="w-1/2 flex flex-col justify-center gap-4">
-                          <input
-                            type="text"
-                            value={activeSlideData.title || ''}
-                            onChange={(e) => handleSlideUpdate('title', e.target.value)}
-                            className="text-3xl font-bold text-text outline-none bg-transparent border-b border-transparent focus:border-primary/30 transition-colors py-1"
-                            placeholder="Title"
-                          />
-                          <textarea
-                            value={activeSlideData.content || ''}
-                            onChange={(e) => handleSlideUpdate('content', e.target.value)}
-                            className="text-sm text-muted bg-transparent resize-none h-40 outline-none focus:border-primary/30 focus:bg-card-sunken/30 p-2 rounded-lg transition-colors"
-                            placeholder="Content text..."
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      // Normal layout
-                      <div className="h-full flex flex-col px-10 py-8">
-                        <input
-                          type="text"
-                          value={activeSlideData.title || ''}
-                          onChange={(e) => handleSlideUpdate('title', e.target.value)}
-                          className="text-3xl font-bold text-text border-b border-transparent focus:border-primary/30 outline-none bg-transparent py-2 w-full transition-colors"
-                          placeholder="Click to add title"
-                        />
-                        <textarea
-                          value={activeSlideData.content || ''}
-                          onChange={(e) => handleSlideUpdate('content', e.target.value)}
-                          className="flex-1 text-base text-muted bg-transparent resize-none mt-6 outline-none focus:border-primary/30 focus:bg-card-sunken/30 p-2 rounded-lg transition-colors"
-                          placeholder="Click to add body content..."
-                        />
-                      </div>
-                    )}
-
-                    {/* Absolute elements: move / resize / rotate / edit */}
-                    {ensureArray(slideElements).map((el) => {
-                      const isSelected = selectedElemId === el.id
-                      return (
-                        <SlideObject
-                          key={el.id}
-                          el={el}
-                          isSelected={isSelected}
-                          onSelect={setSelectedElemId}
-                          onDrag={handleElementDrag}
-                          onDelete={deleteElement}
-                          externalIsEditing={editingElemId === el.id}
-                          onSetEditing={(editing) => setEditingElemId(editing ? el.id : null)}
-                        >
-                          {(el.type === 'textbox' || el.type === 'shape' || el.type === 'text') && (
-                            <TextEditor
-                              el={el}
-                              patchElement={patchElement}
-                              isSelected={isSelected}
-                              onDuplicateToNextSlide={handleOverflowToNextSlide}
-                              undo={undo}
-                              redo={redo}
-                            />
-                          )}
-                          {el.type === 'image' ? (
-                            <img
-                              src={el.src}
-                              className="w-full h-full object-cover rounded pointer-events-none"
-                              alt="deck-insert"
-                            />
-                          ) : el.type === 'video' ? (
-                            <iframe
-                              src={el.src}
-                              className="w-full h-full rounded pointer-events-none bg-black"
-                              title="deck-video"
-                              frameBorder="0"
-                            />
-                          ) : el.type === 'shape' ? (
-                            <div className="w-full h-full bg-primary/35 rounded-full border-2 border-primary pointer-events-none" />
-                          ) : el.type === 'table' ? (
-                            <table className="w-full h-full border border-border text-text text-[10px] bg-card pointer-events-none">
-                              <tbody>
-                                <tr>
-                                  <td className="border p-1">Row Cell</td>
-                                  <td className="border p-1">Row Cell</td>
-                                </tr>
-                                <tr>
-                                  <td className="border p-1">Row Cell</td>
-                                  <td className="border p-1">Row Cell</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          ) : (
-                            <div className="w-full h-full border border-dashed border-border pointer-events-none" />
-                          )}
-                        </SlideObject>
-                      )
-                    })}
-                  </div>
+                  {renderSlide(false)}
                 </div>
               </div>
 

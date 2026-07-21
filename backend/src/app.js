@@ -1,3 +1,4 @@
+// this file is used for the express application setup 
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');

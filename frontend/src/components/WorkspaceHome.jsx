@@ -34,6 +34,7 @@ import Input from './ui/Input'
 import Textarea from './ui/Textarea'
 import { addWorkspaceNotification } from './utils/notifications'
 import useMeetingNotifications from '../hooks/useMeetingNotifications'
+import { useMeeting } from '../contexts/MeetingContext'
 import { getWorkspaceContent, putWorkspaceContent } from '../services/workspaceContent'
 
 // Lazily loaded: each of these pulls in a heavy editor (Quill, xlsx, canvas
@@ -153,6 +154,7 @@ export default function WorkspaceHome({
   const workspaceId = workspace?._id || workspace?.workspaceId
   // Real-time meeting start notifications for all workspace members
   useMeetingNotifications(workspaceId, getDisplayName(user))
+  const { joinMeeting, activeMeeting, activeMeetingWorkspace, inMeeting } = useMeeting()
   const [workspaceFiles, setWorkspaceFiles] = useState(() => {
     if (!workspaceId) return []
     const stored = readStoredJson(fileStoreKey(workspaceId), null)
@@ -184,6 +186,23 @@ export default function WorkspaceHome({
   useEffect(() => {
     chatMessagesRef.current = chatMessages
   }, [chatMessages])
+
+  useEffect(() => {
+    if (!workspaceId) return
+    const handleOpenMeeting = (e) => {
+      if (e.detail?.workspaceId === workspaceId) {
+        joinMeeting(workspace)
+      }
+    }
+    window.addEventListener('teamora-open-meetings', handleOpenMeeting)
+
+    if (sessionStorage.getItem('teamora-auto-join-meeting') === workspaceId) {
+      sessionStorage.removeItem('teamora-auto-join-meeting')
+      queueMicrotask(() => joinMeeting(workspace))
+    }
+
+    return () => window.removeEventListener('teamora-open-meetings', handleOpenMeeting)
+  }, [workspaceId, workspace, joinMeeting])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -579,15 +598,7 @@ export default function WorkspaceHome({
       onLeaveWorkspace={onLeaveWorkspace}
       onDeleteWorkspace={onDeleteWorkspace}
     >
-      <div
-        className={`teamora-content-fade flex min-h-0 flex-1 flex-col ${
-          ['documents', 'spreadsheet', 'presentation', 'whiteboard', 'meetings', 'shared-files', 'chat'].includes(
-            activeItem
-          )
-            ? 'h-full'
-            : ''
-        }`}
-      >
+      <div className="teamora-content-fade flex min-h-0 flex-1 h-full flex-col">
         <WorkspaceFileTabs
           files={workspaceFiles}
           tabs={openTabs}
@@ -623,6 +634,27 @@ export default function WorkspaceHome({
             toast.success(`Folder "${folder.name}" selected for new files`)
           }}
         />
+        {activeMeeting && (!inMeeting || activeMeetingWorkspace?._id !== workspaceId) && (
+          <div className="bg-primary/10 border-b border-primary/20 px-6 py-3 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary animate-pulse">
+                <Video className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-text">Meeting in Progress</p>
+                <p className="text-xs text-muted">
+                  {activeMeeting.organizer || 'A teammate'} started a meeting
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => joinMeeting(workspace)}
+              className="px-4 py-2 bg-primary hover:bg-primary-hover text-on-primary text-sm font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+            >
+              Join Meeting
+            </button>
+          </div>
+        )}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {loading ? (
             <WorkspaceContentSkeleton activeItem={activeItem} />
@@ -1130,7 +1162,7 @@ function WorkspaceOverview({
   ]
 
   return (
-    <section className="space-y-5">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto">
       <div className="rounded-card border border-border bg-card p-5 shadow-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 gap-4">
@@ -1466,6 +1498,7 @@ function WorkspaceSettings({
 
   const removeMember = async (member) => {
     const memberId = (member._id || member)?.toString()
+    if (!isOwner || memberId === ownerId) return
     setRemovingId(memberId)
     try {
       await api.delete(`/api/v1/workspaces/${workspace._id}/members/${memberId}`)
@@ -1479,7 +1512,7 @@ function WorkspaceSettings({
   }
 
   return (
-    <section className="space-y-6">
+    <section className="h-full space-y-6 overflow-y-auto">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-primary">Workspace Settings</p>
@@ -1750,7 +1783,7 @@ function SettingToggle({ label, description, checked, disabled, onChange }) {
 
 function MembersAndRequests({ workspace, isOwner, pendingRequests, onCopyInviteLink, onResolveRequest }) {
   return (
-    <section className="space-y-6">
+    <section className="h-full space-y-6 overflow-y-auto">
       <div>
         <p className="text-sm font-semibold text-primary">Workspace Settings</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-text">Members</h1>

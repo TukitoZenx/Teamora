@@ -96,7 +96,7 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
               Workspace Settings
             </DropdownItem>
           )}
-          {onLeaveWorkspace && (
+          {onLeaveWorkspace ? (
             <DropdownItem
               icon={LogOut}
               danger
@@ -105,10 +105,11 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
             >
               Leave Workspace
             </DropdownItem>
+          ) : (
+            <DropdownItem icon={LogOut} danger onClick={handleLogout} className="rounded-button py-2.5">
+              Logout
+            </DropdownItem>
           )}
-          <DropdownItem icon={LogOut} danger onClick={handleLogout} className="rounded-button py-2.5">
-            Logout
-          </DropdownItem>
         </DropdownMenu>
       )}
     </div>

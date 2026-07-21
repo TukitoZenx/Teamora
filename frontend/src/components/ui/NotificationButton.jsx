@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, Check, CheckCheck, Eye, UserPlus, Video, X } from 'lucide-react'
+import { Bell, Check, CheckCheck, RefreshCw, UserPlus, Video, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 import api from '../../services/api'
@@ -71,6 +71,7 @@ export default function NotificationButton() {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState(() => keepVisibleNotifications(readNotificationCache()))
   const [busyId, setBusyId] = useState(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const seenDecisionIds = useRef(new Set())
   const rootRef = useRef(null)
   const notificationsRef = useRef(notifications)
@@ -117,6 +118,12 @@ export default function NotificationButton() {
       applyNotifications(readLocalNotifications())
     }
   }, [applyNotifications])
+
+  const handleRefreshClick = async () => {
+    setIsRefreshing(true)
+    await loadNotifications()
+    setTimeout(() => setIsRefreshing(false), 500)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -207,7 +214,9 @@ export default function NotificationButton() {
     }
     setOpen(false)
     // Navigate into workspace meetings section
+    sessionStorage.setItem('teamora-auto-join-meeting', workspaceId)
     navigate(`/workspace/${workspaceId}/meetings`)
+    // Also dispatch in case we are already in the workspace and no mount happens
     window.dispatchEvent(new CustomEvent('teamora-open-meetings', { detail: { workspaceId } }))
     toast.success('Opening meeting…')
   }
@@ -360,10 +369,10 @@ export default function NotificationButton() {
 
           <button
             type="button"
-            onClick={loadNotifications}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-button border border-border px-3 py-2 text-sm font-semibold text-text-secondary"
+            onClick={handleRefreshClick}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-button border border-border px-3 py-2 text-sm font-semibold text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
           >
-            <Eye className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>

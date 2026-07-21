@@ -95,10 +95,16 @@ export default function WorkspaceNavbar({
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'k' || event.code === 'KeyK')) {
         event.preventDefault()
-        inputRef.current?.focus()
-        setIsOpen(true)
+        if (window.innerWidth < 768) {
+          setMobileSearchOpen(true)
+          // Use setTimeout to wait for the mobile search DOM to render
+          setTimeout(() => inputRef.current?.focus(), 50)
+        } else {
+          inputRef.current?.focus()
+          setIsOpen(true)
+        }
       }
     }
     const handleClickOutside = (e) => {

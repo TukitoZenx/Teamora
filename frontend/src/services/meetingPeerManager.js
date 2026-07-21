@@ -61,8 +61,15 @@ export class MeetingPeerManager {
     /** @type {Map<string, MediaStream>} */
     this.remoteStreams = new Map()
     this.localStream = null
-    this.screenTrack = null
+    this.screenStream = null
     this.destroyed = false
+    
+    // Audio Mixing
+    this.audioCtx = null
+    this.audioDestination = null
+    this.micSource = null
+    this.screenAudioSource = null
+    this.mixedAudioTrack = null
   }
 
   diag(msg, extra) {
@@ -75,17 +82,95 @@ export class MeetingPeerManager {
     return String(this.selfId) > String(remoteId)
   }
 
+  _setupAudioMixer() {
+    if (!this.localStream) {
+      this._cleanupAudioMixer()
+      this.mixedAudioTrack = null
+      return
+    }
+
+    const micTrack = this.localStream.getAudioTracks()[0]
+    const screenAudioTrack = this.screenStream?.getAudioTracks()[0]
+
+    // If there is no screen audio track, bypass the AudioContext mixer entirely.
+    // This avoids any autoplay/gesture limitations of AudioContext for mic-only calls.
+    if (!screenAudioTrack) {
+      this._cleanupAudioMixer()
+      this.mixedAudioTrack = micTrack
+      return
+    }
+
+    try {
+      if (!this.audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext
+        this.audioCtx = new AudioContextClass()
+      }
+
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch((err) => {
+          console.warn('[RTC-AUDIO-MIXER] Failed to resume AudioContext:', err)
+        })
+      }
+
+      this._cleanupAudioMixerSources()
+
+      if (!this.audioDestination) {
+        this.audioDestination = this.audioCtx.createMediaStreamDestination()
+      }
+
+      if (micTrack) {
+        const micStream = new MediaStream([micTrack])
+        this.micSource = this.audioCtx.createMediaStreamSource(micStream)
+        this.micSource.connect(this.audioDestination)
+      }
+
+      const screenAudioStream = new MediaStream([screenAudioTrack])
+      this.screenAudioSource = this.audioCtx.createMediaStreamSource(screenAudioStream)
+      this.screenAudioSource.connect(this.audioDestination)
+
+      this.mixedAudioTrack = this.audioDestination.stream.getAudioTracks()[0]
+      console.log(`[RTC-AUDIO-MIXER] Mixed track created: id=${this.mixedAudioTrack?.id}`);
+    } catch (err) {
+      console.error('[RTC-AUDIO-MIXER] Failed to initialize AudioContext mixer, falling back to mic track:', err)
+      this.mixedAudioTrack = micTrack
+    }
+  }
+
+  _cleanupAudioMixerSources() {
+    if (this.micSource) {
+      try { this.micSource.disconnect() } catch { /* ignore */ }
+      this.micSource = null
+    }
+    if (this.screenAudioSource) {
+      try { this.screenAudioSource.disconnect() } catch { /* ignore */ }
+      this.screenAudioSource = null
+    }
+  }
+
+  _cleanupAudioMixer() {
+    this._cleanupAudioMixerSources()
+    if (this.audioDestination) {
+      this.audioDestination = null
+    }
+    if (this.audioCtx) {
+      this.audioCtx.close().catch(() => {})
+      this.audioCtx = null
+    }
+  }
+
   setLocalStream(stream) {
     this.localStream = stream
-    this.pcs.forEach((pc, peerId) => {
-      this._syncLocalTracks(pc, peerId)
+    this._setupAudioMixer()
+    this.pcs.forEach((pc) => {
+      this._syncLocalTracks(pc)
     })
   }
 
-  setScreenTrack(track) {
-    this.screenTrack = track || null
+  setScreenStream(stream) {
+    this.screenStream = stream || null
+    this._setupAudioMixer()
     this.pcs.forEach((pc) => {
-      this._applyVideoTrack(pc, track || this.localStream?.getVideoTracks()?.[0] || null)
+      this._syncLocalTracks(pc)
     })
   }
 
@@ -102,6 +187,8 @@ export class MeetingPeerManager {
   async handleSignal(fromId, signal) {
     if (this.destroyed || !fromId || fromId === this.selfId || !signal?.type) return
 
+    console.log(`[RTC-AUDIO-AUDIT] [Signal IN] from=${fromId} type=${signal.type}`);
+
     // Only negotiate media signals here
     if (signal.type !== 'offer' && signal.type !== 'answer' && signal.type !== 'candidate') {
       return
@@ -114,25 +201,47 @@ export class MeetingPeerManager {
         const offerCollision =
           this.makingOffer.get(fromId) || (pc.signalingState !== 'stable' && pc.signalingState !== 'have-remote-offer')
         const polite = !this.shouldOffer(fromId)
+        
+        console.log(`[RTC-AUDIO-AUDIT] [Offer collision check] peer=${fromId} collision=${offerCollision} polite=${polite} state=${pc.signalingState}`);
+        
         if (offerCollision && !polite) {
           this.diag(`glare ignore offer from ${fromId}`)
+          console.warn(`[RTC-AUDIO-AUDIT] Glare: ignoring offer from non-polite peer=${fromId}`);
           return
         }
         if (offerCollision && polite) {
           try {
+            console.log(`[RTC-AUDIO-AUDIT] Glare: rolling back local offer for polite peer=${fromId}`);
             await pc.setLocalDescription({ type: 'rollback' })
-          } catch {
-            // ignore — some browsers don't support rollback
+          } catch (e) {
+            console.error(`[RTC-AUDIO-AUDIT] Rollback failed:`, e);
           }
         }
         const desc = toSessionDesc(signal.sdp)
         if (!desc?.sdp) {
           this.diag(`empty offer SDP from ${fromId}`)
+          console.error(`[RTC-AUDIO-AUDIT] Received empty offer SDP from=${fromId}`);
           return
         }
+
+        // Audit the incoming SDP
+        const hasAudio = desc.sdp.includes('m=audio');
+        const audioDirMatch = desc.sdp.match(/a=(sendrecv|sendonly|recvonly|inactive)/g);
+        console.log(`[RTC-AUDIO-AUDIT] Incoming Offer SDP: hasAudio=${hasAudio} directions=${JSON.stringify(audioDirMatch)}`);
+
+        console.log(`[RTC-AUDIO-AUDIT] Applying remote offer description for peer=${fromId}`);
         await pc.setRemoteDescription(desc)
+        
+        console.log(`[RTC-AUDIO-AUDIT] Flushing ICE candidates queue for peer=${fromId}`);
         await this._flushIce(fromId, pc)
+        
+        console.log(`[RTC-AUDIO-AUDIT] Creating answer for peer=${fromId}`);
         const answer = await pc.createAnswer()
+        
+        // Audit answer SDP
+        const answerHasAudio = answer.sdp.includes('m=audio');
+        console.log(`[RTC-AUDIO-AUDIT] Created Answer SDP: hasAudio=${answerHasAudio}`);
+
         await pc.setLocalDescription(answer)
         this.diag(`answer → ${fromId}`)
         this.emitSignal(fromId, {
@@ -145,13 +254,21 @@ export class MeetingPeerManager {
       if (signal.type === 'answer') {
         if (pc.signalingState !== 'have-local-offer') {
           this.diag(`ignore answer in state ${pc.signalingState} from ${fromId}`)
+          console.warn(`[RTC-AUDIO-AUDIT] Ignoring answer from peer=${fromId} in state=${pc.signalingState}`);
           return
         }
         const desc = toSessionDesc(signal.sdp)
         if (!desc?.sdp) {
           this.diag(`empty answer SDP from ${fromId}`)
+          console.error(`[RTC-AUDIO-AUDIT] Received empty answer SDP from=${fromId}`);
           return
         }
+
+        // Audit incoming answer SDP
+        const hasAudio = desc.sdp.includes('m=audio');
+        console.log(`[RTC-AUDIO-AUDIT] Incoming Answer SDP: hasAudio=${hasAudio}`);
+
+        console.log(`[RTC-AUDIO-AUDIT] Applying remote answer description for peer=${fromId}`);
         await pc.setRemoteDescription(desc)
         await this._flushIce(fromId, pc)
         this.diag(`answer applied ${fromId}`)
@@ -161,7 +278,6 @@ export class MeetingPeerManager {
       if (signal.type === 'candidate' && signal.candidate) {
         const init = toIceInit(signal.candidate)
         if (!init?.candidate && init?.candidate !== '') {
-          // end-of-candidates may have empty string; skip nulls only
           if (init.candidate == null) return
         }
         if (!pc.remoteDescription) {
@@ -169,13 +285,16 @@ export class MeetingPeerManager {
           q.push(init)
           this.iceQueue.set(fromId, q)
           this.diag(`ICE queued ${fromId} (${q.length})`)
+          console.log(`[RTC-AUDIO-AUDIT] ICE candidate queued: peer=${fromId} queueLength=${q.length}`);
           return
         }
+        console.log(`[RTC-AUDIO-AUDIT] Adding ICE candidate directly: peer=${fromId} candidate=${init.candidate.substring(0, 40)}...`);
         await pc.addIceCandidate(init)
         return
       }
     } catch (err) {
       this.diag(`handleSignal error ${signal.type} from ${fromId}`, err?.message || String(err))
+      console.error(`[RTC-AUDIO-AUDIT] handleSignal failed from=${fromId} type=${signal.type}:`, err);
     }
   }
 
@@ -210,7 +329,8 @@ export class MeetingPeerManager {
     this.destroyed = true
     ;[...this.pcs.keys()].forEach((id) => this.removePeer(id))
     this.localStream = null
-    this.screenTrack = null
+    this.screenStream = null
+    this._cleanupAudioMixer()
   }
 
   getDiagnostics() {
@@ -233,7 +353,7 @@ export class MeetingPeerManager {
       peerCount: this.pcs.size,
       peers,
       hasLocal: Boolean(this.localStream),
-      screenSharing: Boolean(this.screenTrack),
+      screenSharing: Boolean(this.screenStream),
       iceServers: getMeetingRtcConfiguration().iceServers?.length || 0
     }
   }
@@ -241,10 +361,15 @@ export class MeetingPeerManager {
   _ensurePc(peerId) {
     let pc = this.pcs.get(peerId)
     if (pc && (pc.connectionState === 'closed' || pc.signalingState === 'closed')) {
+      console.log(`[RTC-AUDIO-AUDIT] Found closed PC for peer=${peerId}, removing and recreating.`);
       this.removePeer(peerId)
       pc = null
     }
     if (pc) return pc
+
+    // Audit active PeerConnections
+    console.log(`[RTC-AUDIO-AUDIT] Active PeerConnections count: ${this.pcs.size + 1} (creating new PC for peer=${peerId})`);
+    console.log(`[RTC-AUDIO-AUDIT] Current peer IDs: ${Array.from(this.pcs.keys()).join(', ') || 'none'}`);
 
     this.diag(`create PC ${this.selfId} ↔ ${peerId}`)
     pc = new RTCPeerConnection(getMeetingRtcConfiguration())
@@ -252,17 +377,23 @@ export class MeetingPeerManager {
     this.pcs.set(peerId, pc)
 
     pc.onicecandidate = (e) => {
-      if (!e.candidate) return
+      if (!e.candidate) {
+        console.log(`[RTC-AUDIO-AUDIT] End of ICE candidates for peer=${peerId}`);
+        return
+      }
+      console.log(`[RTC-AUDIO-AUDIT] Local ICE candidate gathered for peer=${peerId}: candidate=${e.candidate.candidate.substring(0, 40)}...`);
       this.emitSignal(peerId, { type: 'candidate', candidate: toIceInit(e.candidate) })
     }
 
     pc.oniceconnectionstatechange = () => {
       this.diag(`ICE ${peerId}: ${pc.iceConnectionState}`)
+      console.log(`[RTC-AUDIO-AUDIT] ICE connection state change for peer=${peerId}: state=${pc.iceConnectionState}`);
       this.onPeerState(peerId, pc.iceConnectionState)
     }
 
     pc.onconnectionstatechange = () => {
       this.diag(`PC ${peerId}: ${pc.connectionState}`)
+      console.log(`[RTC-AUDIO-AUDIT] Connection state change for peer=${peerId}: state=${pc.connectionState}`);
       this.onPeerState(peerId, pc.connectionState)
       if (pc.connectionState === 'connected') {
         this.reconnectAttempts.set(peerId, 0)
@@ -276,73 +407,152 @@ export class MeetingPeerManager {
       }
     }
 
-    pc.ontrack = (e) => {
-      this.diag(`ontrack ${peerId} ${e.track?.kind}`)
-      let stream = e.streams?.[0]
-      if (!stream) {
-        stream = this.remoteStreams.get(peerId) || new MediaStream()
-        if (!stream.getTracks().some((t) => t.id === e.track.id)) {
-          stream.addTrack(e.track)
-        }
-      } else {
-        const existing = this.remoteStreams.get(peerId)
-        if (existing && existing !== stream) {
-          stream.getTracks().forEach((t) => {
-            if (!existing.getTracks().some((x) => x.id === t.id)) existing.addTrack(t)
-          })
-          stream = existing
-        }
-      }
-      e.track.onended = () => {
-        this.diag(`remote track ended ${peerId} ${e.track.kind}`)
-      }
-      this.remoteStreams.set(peerId, stream)
-      this.onRemoteStream(peerId, stream)
+    pc.onsignalingstatechange = () => {
+      console.log(`[RTC-AUDIO-AUDIT] Signaling state change for peer=${peerId}: state=${pc.signalingState}`);
     }
 
-    this._syncLocalTracks(pc, peerId)
+    pc.onnegotiationneeded = async () => {
+      console.log(`[RTC-AUDIO-AUDIT] Negotiation needed event fired for peer=${peerId}`);
+      if (pc.signalingState !== 'stable') {
+        console.log(`[RTC-AUDIO-AUDIT] Negotiation ignored: signalingState is ${pc.signalingState}`);
+        return
+      }
+
+      // If we are the polite peer AND the connection state is new/connecting,
+      // we do not initiate the offer; we let the impolite peer initiate.
+      // Once established, either peer can negotiate (e.g. for screen share).
+      const isInitialConnection = pc.connectionState === 'new' || pc.connectionState === 'connecting';
+      if (!this.shouldOffer(peerId) && isInitialConnection) {
+        console.log(`[RTC-AUDIO-AUDIT] Polite peer ignoring initial negotiation; waiting for remote offer.`);
+        return
+      }
+
+      try {
+        this.makingOffer.set(peerId, true)
+        const offer = await pc.createOffer()
+        await pc.setLocalDescription(offer)
+        this.emitSignal(peerId, {
+          type: 'offer',
+          sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp }
+        })
+      } catch (err) {
+        this.diag(`negotiation needed error ${peerId}`, err?.message)
+      } finally {
+        this.makingOffer.set(peerId, false)
+      }
+    }
+
+    pc.ontrack = (e) => {
+      this.diag(`ontrack ${peerId} ${e.track?.kind}`)
+      
+      console.log(`[RTC-AUDIO-AUDIT] [Track Received] peer=${peerId} kind=${e.track?.kind} id=${e.track?.id} label=${e.track?.label} enabled=${e.track?.enabled} muted=${e.track?.muted} readyState=${e.track?.readyState}`);
+      
+      let stream = e.streams?.[0]
+      console.log(`[RTC-AUDIO-AUDIT] Track streams list length: ${e.streams?.length || 0}. Initial stream ID: ${stream?.id || 'none'}`);
+      
+      if (!stream) {
+        console.warn(`[RTC-AUDIO-AUDIT] No remote stream provided by browser, synthesizing stream wrapper for peer=${peerId}`);
+        stream = this.remoteStreams.get(peerId) || new MediaStream()
+      }
+
+      // Always add the track if it's not present in the stream
+      if (!stream.getTracks().some(t => t.id === e.track.id)) {
+        stream.addTrack(e.track)
+      }
+
+      // Force a new MediaStream instance so React updates dependencies referentially.
+      // This is crucial because when tracks are added sequentially (e.g. video first, then audio),
+      // the browser uses the same stream reference. React will not re-bind srcObject unless
+      // a new MediaStream reference is provided.
+      const newStream = new MediaStream(stream.getTracks())
+      console.log(`[RTC-AUDIO-AUDIT] Stream wrapper created: newStreamId=${newStream.id} tracks=${newStream.getTracks().map(t => t.kind + ':' + t.id).join(', ')}`);
+
+      e.track.onended = () => {
+        this.diag(`remote track ended ${peerId} ${e.track.kind}`)
+        console.warn(`[RTC-AUDIO-AUDIT] Remote track ended: peer=${peerId} kind=${e.track.kind} id=${e.track.id}`);
+      }
+      
+      this.remoteStreams.set(peerId, newStream)
+      this.onRemoteStream(peerId, newStream)
+    }
+
+    this._syncLocalTracks(pc)
     return pc
   }
 
-  _applyVideoTrack(pc, track) {
-    if (!track) return
-    const videoSender = pc.getSenders().find((s) => s.track?.kind === 'video')
-    if (videoSender) {
-      videoSender.replaceTrack(track).catch((e) => this.diag('replaceTrack video failed', e?.message))
+  _syncLocalTracks(pc) {
+    if (!this.localStream) {
+      console.warn(`[RTC-AUDIO-AUDIT] Local stream is empty, cannot sync tracks!`);
       return
     }
-    // No video sender yet — add if we have a stream container
-    if (this.localStream) {
-      try {
-        pc.addTrack(track, this.localStream)
-      } catch (err) {
-        this.diag('addTrack video failed', err?.message)
-      }
-    }
-  }
-
-  _syncLocalTracks(pc, peerId) {
-    if (!this.localStream) return
     const senders = pc.getSenders()
-    this.localStream.getTracks().forEach((track) => {
-      // Prefer screen track for video when sharing
-      const effective = track.kind === 'video' && this.screenTrack ? this.screenTrack : track
-      const existing = senders.find((s) => s.track?.kind === track.kind)
-      if (existing) {
-        if (existing.track?.id !== effective.id) {
-          existing.replaceTrack(effective).catch(() => {})
+    
+    // Process Video
+    const videoTrack = this.localStream.getVideoTracks()[0]
+    const screenVideoTrack = this.screenStream?.getVideoTracks()[0]
+    const effectiveVideo = screenVideoTrack || videoTrack
+    
+    console.log(`[RTC-AUDIO-AUDIT] Syncing local video track:`, effectiveVideo ? `id=${effectiveVideo.id} enabled=${effectiveVideo.enabled} active=${effectiveVideo.active}` : 'none');
+
+    if (effectiveVideo) {
+      const existingVideoSender = senders.find((s) => s.track?.kind === 'video')
+      if (existingVideoSender) {
+        if (existingVideoSender.track?.id !== effectiveVideo.id) {
+          console.log(`[RTC-AUDIO-AUDIT] Replacing video track with: id=${effectiveVideo.id}`);
+          existingVideoSender.replaceTrack(effectiveVideo).catch((e) => {
+            console.error(`[RTC-AUDIO-AUDIT] Video replaceTrack failed:`, e);
+          })
         }
       } else {
-        try {
-          pc.addTrack(effective, this.localStream)
-        } catch (err) {
-          this.diag(`addTrack ${track.kind} → ${peerId} failed`, err?.message)
+        try { 
+          console.log(`[RTC-AUDIO-AUDIT] Adding local video track to PC`);
+          pc.addTrack(effectiveVideo, this.localStream) 
+        } catch (e) {
+          console.error(`[RTC-AUDIO-AUDIT] Video addTrack failed:`, e);
         }
       }
-    })
+    } else {
+      const existingVideoSender = senders.find((s) => s.track?.kind === 'video')
+      if (existingVideoSender) {
+        console.log(`[RTC-AUDIO-AUDIT] Removing local video track from PC`);
+        try {
+          pc.removeTrack(existingVideoSender)
+        } catch (e) {
+          console.error(`[RTC-AUDIO-AUDIT] Video removeTrack failed:`, e);
+        }
+      }
+    }
+
+    // Process Audio (Mixed or direct)
+    console.log(`[RTC-AUDIO-AUDIT] Syncing local audio track: mixedAudioTrack=${this.mixedAudioTrack ? `id=${this.mixedAudioTrack.id} enabled=${this.mixedAudioTrack.enabled} active=${this.mixedAudioTrack.active}` : 'none'}`);
+    
+    if (this.mixedAudioTrack) {
+      const existingAudioSender = senders.find((s) => s.track?.kind === 'audio')
+      if (existingAudioSender) {
+        if (existingAudioSender.track?.id !== this.mixedAudioTrack.id) {
+          console.log(`[RTC-AUDIO-AUDIT] Replacing audio track with: id=${this.mixedAudioTrack.id}`);
+          existingAudioSender.replaceTrack(this.mixedAudioTrack).catch((e) => {
+            console.error(`[RTC-AUDIO-AUDIT] Audio replaceTrack failed:`, e);
+          })
+        }
+      } else {
+        try { 
+          console.log(`[RTC-AUDIO-AUDIT] Adding local audio track to PC`);
+          pc.addTrack(this.mixedAudioTrack, this.localStream)
+        } catch (e) {
+          console.error(`[RTC-AUDIO-AUDIT] Audio addTrack failed:`, e);
+        }
+      }
+    }
+
+    // Log transceivers overview
+    console.log(`[RTC-AUDIO-AUDIT] PC Transceivers count: ${pc.getTransceivers().length}`);
+    pc.getTransceivers().forEach((t, index) => {
+      console.log(`[RTC-AUDIO-AUDIT] Transceiver #${index}: mid=${t.mid} direction=${t.direction} currentDirection=${t.currentDirection} senderTrackKind=${t.sender.track?.kind || 'none'} receiverTrackKind=${t.receiver.track?.kind || 'none'}`);
+    });
   }
 
-  async _createOffer(peerId) {
+  async _createOffer(peerId, options = {}) {
     const pc = this._ensurePc(peerId)
     if (this.makingOffer.get(peerId)) return
     if (pc.signalingState !== 'stable') {
@@ -351,7 +561,7 @@ export class MeetingPeerManager {
     }
     try {
       this.makingOffer.set(peerId, true)
-      const offer = await pc.createOffer()
+      const offer = await pc.createOffer(options)
       // Re-check state after async gap (glare)
       if (pc.signalingState !== 'stable') {
         this.diag(`abort offer ${peerId} state changed to ${pc.signalingState}`)
@@ -395,22 +605,18 @@ export class MeetingPeerManager {
     const timer = window.setTimeout(() => {
       this.reconnectTimers.delete(peerId)
       if (this.destroyed || !this.isPeerActive(peerId)) return
-      try {
-        const old = this.pcs.get(peerId)
-        if (old) {
-          old.onicecandidate = null
-          old.ontrack = null
-          old.onconnectionstatechange = null
-          old.oniceconnectionstatechange = null
-          old.close()
+      
+      const pc = this.pcs.get(peerId)
+      if (pc) {
+        if (typeof pc.restartIce === 'function') {
+          pc.restartIce()
         }
-      } catch {
-        // ignore
+        if (this.shouldOffer(peerId)) {
+          this._createOffer(peerId, { iceRestart: true })
+        }
+      } else {
+        this.connect(peerId)
       }
-      this.pcs.delete(peerId)
-      this.iceQueue.delete(peerId)
-      this.makingOffer.delete(peerId)
-      this.connect(peerId)
     }, delay)
     this.reconnectTimers.set(peerId, timer)
   }

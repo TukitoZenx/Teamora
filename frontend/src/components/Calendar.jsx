@@ -81,18 +81,20 @@ const parseDateInput = (value) => {
 
 const getTaskId = (task) => task?._id || task?.id
 const getReminderMinutes = (reminder) => {
+  if (reminder === 'At time of event') return 0
   if (reminder === '15 min') return 15
   if (reminder === '30 min') return 30
   if (reminder === '1 hour') return 60
   if (reminder === '1 day') return 1440
-  return 0
+  return null
 }
 
 const getReminderTriggerTime = (task) => {
   const minutes = getReminderMinutes(task?.reminder)
-  if (!minutes || !task?.date) return null
+  if (minutes === null || !task?.date) return null
   const dueTime = task.startTime || task.endTime || '09:00'
-  const dueDate = new Date(`${task.date}T${dueTime}`)
+  const timeStr = dueTime.includes(':') && dueTime.length === 5 ? `${dueTime}:00` : dueTime
+  const dueDate = new Date(`${task.date}T${timeStr}`)
   if (Number.isNaN(dueDate.getTime())) return null
   return new Date(dueDate.getTime() - minutes * 60 * 1000)
 }
@@ -385,6 +387,10 @@ export default function Calendar({
     const normalizedDate = parseDateInput(dateInput)
     if (!title.trim() || !priority || !normalizedDate) return
 
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default' && reminder) {
+      Notification.requestPermission().catch(() => {})
+    }
+
     setSaving(true)
     const payload = {
       title: title.trim(),
@@ -457,7 +463,7 @@ export default function Calendar({
 
   if (taskViewerPage) {
     return (
-      <section className="flex h-[calc(100vh-var(--tw-navbar-height)-3rem)] min-h-[620px] flex-col rounded-card border border-border bg-card shadow-modal">
+      <section className="flex h-full min-h-[620px] flex-col rounded-card border border-border bg-card shadow-modal">
         <div className="flex shrink-0 flex-col gap-4 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-subtle text-primary">
@@ -651,7 +657,7 @@ export default function Calendar({
   }
 
   return (
-    <section className="flex h-[calc(100vh-var(--tw-navbar-height)-3rem)] min-h-[620px] flex-col rounded-card border border-border bg-card shadow-card xl:min-h-0">
+    <section className="flex h-full min-h-[620px] flex-col rounded-card border border-border bg-card shadow-card xl:min-h-0">
       <div className="flex shrink-0 flex-col gap-4 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -720,7 +726,6 @@ export default function Calendar({
           return (
             <div
               key={cell.key}
-              onClick={() => setActiveDate(cell.key)}
               onDoubleClick={() => {
                 if (cell.tasks.length === 0) openCreateModal(cell.key)
               }}
@@ -758,108 +763,6 @@ export default function Calendar({
         })}
       </div>
 
-      {activeDate && !modalMode && (
-        <div
-          className="fixed inset-0 z-[1250] bg-overlay/30 backdrop-blur-[1px]"
-          role="presentation"
-          onMouseDown={closeDatePanel}
-        >
-          <aside
-            className="ml-auto flex h-full w-full max-w-md flex-col border-l border-border bg-card p-5 shadow-card animate-[teamora-content-fade_180ms_ease-out_both]"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="calendar-task-panel-title"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-primary">Tasks</p>
-                <h3 id="calendar-task-panel-title" className="mt-1 text-xl font-semibold text-text">
-                  {formatDate(activeDate)}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={closeDatePanel}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition hover:bg-primary/10 hover:text-primary"
-                aria-label="Close task details"
-                title="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => openCreateModal(activeDate)}
-              className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary transition hover:bg-primary-hover"
-            >
-              <Plus className="h-4 w-4" />
-              Create Task
-            </button>
-
-            <div className="mt-5 flex-1 space-y-3 overflow-y-auto">
-              {selectedTasks.length === 0 ? (
-                <div className="rounded-card border border-dashed border-border p-5 text-sm text-muted">
-                  No tasks for this date.
-                </div>
-              ) : (
-                selectedTasks.map((task) => (
-                  <article key={getTaskId(task)} className="rounded-card border border-border bg-card p-4 shadow-card">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h4
-                          className={`text-sm font-semibold text-text ${task.completed ? 'line-through decoration-success' : ''}`}
-                        >
-                          {task.title}
-                        </h4>
-                        {task.description && <p className="mt-1 text-sm leading-5 text-muted">{task.description}</p>}
-                      </div>
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                        {task.priority}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-xs text-muted/65">
-                      Created by{' '}
-                      {task.creator?.fullName ||
-                        task.creator?.username ||
-                        task.creator?.email ||
-                        userName ||
-                        'Teamora user'}
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleComplete(task)}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-control border border-success/30 px-3 text-xs font-semibold text-success transition hover:bg-success-subtle"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {task.completed ? 'Completed' : 'Mark Complete'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(task)}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary transition hover:bg-card-sunken"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteTask(task)}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-control border border-danger/30 px-3 text-xs font-semibold text-danger transition hover:bg-danger-subtle"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </aside>
-        </div>
-      )}
 
       {taskViewerOpen && (
         <div className="fixed inset-0 z-toast flex items-center justify-center bg-overlay p-4 backdrop-blur-sm">
@@ -1123,6 +1026,7 @@ export default function Calendar({
                     className="mt-2 h-12 w-full rounded-input border border-border bg-card px-4 text-sm text-text outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
                   >
                     <option value="">None</option>
+                    <option value="At time of event">At time of event</option>
                     <option value="15 min">15 min before</option>
                     <option value="30 min">30 min before</option>
                     <option value="1 hour">1 hour before</option>
@@ -1313,6 +1217,7 @@ function TaskEditorModal({
                 className="mt-2 h-12 w-full rounded-input border border-border bg-card px-4 text-sm text-text outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
               >
                 <option value="">None</option>
+                <option value="At time of event">At time of event</option>
                 <option value="15 min">15 min before</option>
                 <option value="30 min">30 min before</option>
                 <option value="1 hour">1 hour before</option>

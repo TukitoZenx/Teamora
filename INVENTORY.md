@@ -1,171 +1,123 @@
-# Collaborative Editing Inventory
+# Project Inventory
 
-**Phase:** 1 — Audit only  
-**Date:** 2026-07-10  
-**Branch context:** Teamora monorepo (`frontend/` + `backend/`)  
-**Basis:** Phase 0 architecture summary + source inspection of `*Section` containers, feature components, and REST content API.
+This document maps out the entire Teamora Collaboration Workspace repository, providing clear dependency graphs and feature mappings.
 
----
+## Core Dependency Graphs
 
-## Shared infrastructure (all collab-adjacent UIs)
+### Backend Request Flow
+```mermaid
+graph TD
+    Router[Express Router] --> Middleware[Auth Middleware]
+    Middleware --> Controller[Controller]
+    Controller --> Service[Service Logic]
+    Service --> Model[Mongoose Model]
+    Model --> DB[(MongoDB)]
+```
 
-| Piece | Location | Role today |
-|-------|----------|------------|
-| Local socket shim | `frontend/src/components/utils/localCollabChannel.js` | `emit`/`on`/`off`; `BroadcastChannel` + `localStorage`; same-browser only |
-| Hook | `frontend/src/hooks/useLocalCollabChannel.js` | Per workspace+feature channel lifecycle |
-| Section wiring | `frontend/src/components/workspace-sections/*` | Lazy-loaded; construct channel + pass to feature UI |
-| Server blobs | `WorkspaceContent` + `GET/PUT /api/v1/workspaces/:id/content/:key` | Last-write-wins JSON; docs HTML + files tree partially wired |
-| Workspace shell | `WorkspaceHome.jsx` | File tabs, section routing, local file tree |
+### Frontend Rendering Flow
+```mermaid
+graph TD
+    Main[main.jsx] --> App[App.jsx]
+    App --> AuthProvider[AuthContext.jsx]
+    AuthProvider --> Routing[React Router]
+    Routing --> Public[Public Routes]
+    Routing --> Protected[Protected Routes]
+    Protected --> Dashboard[Dashboard.jsx]
+    Protected --> Workspace[WorkspaceLayout.jsx]
+    Workspace --> Feature[Feature Components]
+```
 
-**No** WebSocket server, Yjs, Automerge, or OT library is installed.
+## Folder Inventory
 
----
+### Frontend Folders
+| Folder | Purpose | Responsibility | Dependencies |
+|--------|---------|----------------|--------------|
+| `frontend/src/components` | Core UI Views | Layouts and pages for major features. | `lucide-react`, `React`, `services/api.js` |
+| `frontend/src/features/auth` | Authentication | Handling login, signup, and profiles. | `AuthContext.jsx`, `services/auth.js` |
+| `frontend/src/features/workspace` | Workspace Shell | Rendering the layout (navbar, sidebar). | `AuthContext.jsx`, `react-router-dom` |
+| `frontend/src/services` | External I/O | API fetching, WebSocket hub logic. | `axios`, `wsHub.js`, `yjs` |
+| `frontend/src/contexts` | Global State | Storing user session and active meetings. | React Context API |
 
-## Editable components
+### Backend Folders
+| Folder | Purpose | Responsibility | Dependencies |
+|--------|---------|----------------|--------------|
+| `backend/src/controllers` | HTTP Handlers | Formatting HTTP req/res. | `services/*` |
+| `backend/src/services` | Business Logic | Executing operations, talking to DB. | `models/*`, `bcrypt` |
+| `backend/src/models` | Data Schemas | Defining MongoDB collections. | `mongoose` |
+| `backend/src/routes` | API Definitions | Routing URL paths to controllers. | `express`, `controllers/*` |
+| `backend/src/collab` | Realtime Hub | WebSocket server for fanout messaging. | `ws`, `express-session` |
 
-### 1. Documents (rich text)
+## File Inventory (Key Files)
 
-| Field | Detail |
-|-------|--------|
-| **What** | Quill 2 snow editor, custom File/Insert/Layout ribbon, comments + version history panels |
-| **Where** | `Documents.jsx`, `workspace-sections/DocumentsSection.jsx` |
-| **Save / update** | Debounced local channel `doc-content-sync` (full HTML LWW); server `PUT content` key `documents:<fileId>` `{ html }`; local drafts via `update-document-versions` |
-| **Conflict frequency** | **High** if multi-user concurrent typing |
-| **Complexity** | **High** — needs CRDT/OT for character-level merge; existing socket surface helps wiring |
+### Backend
 
-### 2. Spreadsheet (grid)
+**`backend/src/server.js`**
+- **Purpose:** Entry point for the backend.
+- **Approx. Size:** ~50 lines.
+- **Imports:** `http`, `app.js`, `config/database.js`, `collab/wsHub.js`.
+- **Called by:** Node.js (via `npm start`).
+- **Calls:** DB connect, HTTP server listen, WebSocket attach.
+- **Responsibilities:** Bootstrapping the server and attaching the WebSocket hub to the HTTP server upgrade event.
 
-| Field | Detail |
-|-------|--------|
-| **What** | Custom cell grid, import/export xlsx, sheet settings |
-| **Where** | `Spreadsheet.jsx`, `workspace-sections/SpreadsheetSection.jsx` |
-| **Save / update** | **Shipped:** Yjs `Y.Map` cells + REST `yjs-v1` key `spreadsheet:<fileId>`; legacy localStorage import; sheet meta on Y.Map + channel |
-| **Conflict frequency** | **Medium–High** (cell-level overlaps common in team planning) |
-| **Complexity** | **High** — cell CRDT or op log; grid size/perf constraints |
+**`backend/src/app.js`**
+- **Purpose:** Express application configuration.
+- **Approx. Size:** ~100 lines.
+- **Imports:** Express middleware, routes, Passport config.
+- **Called by:** `server.js`.
+- **Responsibilities:** Setting up CORS, parsers, sessions, and registering API routers.
 
-### 3. Whiteboard (canvas elements)
+**`backend/src/collab/wsHub.js`**
+- **Purpose:** Realtime WebSocket signaling.
+- **Approx. Size:** ~300 lines.
+- **Imports:** `ws`, `Workspace.js`.
+- **Responsibilities:** Authenticates WS connections, manages `workspaceId::key` rooms, and fans out WebRTC and Yjs payloads to peers.
 
-| Field | Detail |
-|-------|--------|
-| **What** | Freehand + shapes/elements list on canvas |
-| **Where** | `Whiteboard.jsx`, `workspace-sections/WhiteboardSection.jsx` |
-| **Save / update** | **Shipped:** Yjs `Y.Map` elements by id + REST `yjs-v1` key `whiteboard:<fileId>`; freehand `draw-line` still local-tab only |
-| **Conflict frequency** | **Medium** (simultaneous drawing common) |
-| **Complexity** | **Medium–High** — element list LWW loses concurrent strokes; better as op-log or Yjs array |
+### Frontend
 
-### 4. Presentation / slides
+**`frontend/src/App.jsx`**
+- **Purpose:** Root application component and router.
+- **Approx. Size:** ~1000 lines.
+- **Imports:** `react-router-dom`, context providers, all page components.
+- **Responsibilities:** Routing logic, managing active workspace state, loading preferences.
 
-| Field | Detail |
-|-------|--------|
-| **What** | Slide list, title/body, free elements, presenter mode |
-| **Where** | `Slides.jsx`, `workspace-sections/PresentationSection.jsx` |
-| **Save / update** | **Shipped:** Yjs `Y.Map` slides by id + REST `yjs-v1` key `presentation:<fileId>`; `change-slide` local channel |
-| **Conflict frequency** | **Medium** |
-| **Complexity** | **Medium** — structured JSON; LWW-with-version or per-slide merge |
+**`frontend/src/services/restYjsProvider.js`**
+- **Purpose:** Hybrid Yjs sync provider.
+- **Approx. Size:** ~160 lines.
+- **Imports:** `yjs`, `workspaceContent.js`, `collabSocket.js`.
+- **Responsibilities:** Connecting local Y.Doc to REST backend for durable saving and to WebSockets for low-latency synchronization.
 
-### 5. Workspace file tree (tabs / “explorer”)
+**`frontend/src/contexts/MeetingContext.jsx`**
+- **Purpose:** Global meeting state.
+- **Approx. Size:** ~350 lines.
+- **Imports:** `meetingPeerManager.js`, `meetingSocket.js`.
+- **Responsibilities:** Handles joining/leaving meetings, tracking tracks, generating WebRTC connections across the app.
 
-| Field | Detail |
-|-------|--------|
-| **What** | Create/rename/delete/reorder files & folders driving which editor opens |
-| **Where** | `WorkspaceHome.jsx` (+ `SharedFilesSection`/`Files.jsx` for shared-files UI) |
-| **Save / update** | Channel `update-files`; localStorage; server `files` content key (debounced PUT) |
-| **Conflict frequency** | **Low–Medium** |
-| **Complexity** | **Low–Medium** — versioned LWW or simple merge-by-id usually enough |
+## Feature-to-File Mappings
 
-### 6. Shared files panel
+| Feature | Primary Frontend Files | Primary Backend Files |
+|---------|------------------------|-----------------------|
+| **Auth** | `AuthPage.jsx`, `AuthContext.jsx` | `auth.routes.js`, `auth.controller.js`, `User.js` |
+| **Workspace Shell** | `WorkspaceHome.jsx`, `WorkspaceLayout.jsx` | `workspace.routes.js`, `Workspace.js` |
+| **Documents** | `Documents.jsx`, `restYjsProvider.js` | `content.controller.js`, `WorkspaceContent.js` |
+| **Whiteboard** | `Whiteboard.jsx`, `canvasOverlays.js` | `content.controller.js`, `wsHub.js` |
+| **Meetings** | `GlobalMeetings.jsx`, `MeetingContext.jsx`, `meetingPeerManager.js` | `wsHub.js` |
+| **Spreadsheet** | `Spreadsheet.jsx` | `content.controller.js` |
 
-| Field | Detail |
-|-------|--------|
-| **What** | Alternate files UI (`Files.jsx`) on shared-files section |
-| **Where** | `Files.jsx`, `SharedFilesSection.jsx` |
-| **Save / update** | Same `files` channel events as above (may dual-write with WorkspaceHome tree) |
-| **Conflict frequency** | **Low–Medium** |
-| **Complexity** | **Low** if unified with file tree source of truth |
+## API-to-Controller Mappings
 
-### 7. Calendar / tasks
+| Endpoint Route | Handled By Controller | Method |
+|----------------|-----------------------|--------|
+| `/api/v1/auth/login` | `authController.login` | POST |
+| `/api/v1/workspaces/` | `workspaceController.createWorkspace` | POST |
+| `/api/v1/workspaces/:id` | `workspaceController.getWorkspaceById` | GET |
+| `/api/v1/workspaces/:id/content/:key` | `contentController.getContent` | GET |
 
-| Field | Detail |
-|-------|--------|
-| **What** | Task CRUD on calendar + “All Tasks” view |
-| **Where** | `Calendar.jsx`; backend `workspace.service` tasks on `Workspace` |
-| **Save / update** | REST create/patch/delete; local channel `tasks-updated` for same-browser refresh |
-| **Conflict frequency** | **Low–Medium** (task-level, not keystroke) |
-| **Complexity** | **Low** — optimistic locking / last-write per task id already natural |
+## Service-to-Model Mappings
 
-### 8. Workspace chat
+- **`workspace.service.js`** relies on `Workspace.js` and `User.js`.
+- **`auth.service.js`** relies on `User.js`.
+- **`content.service.js`** relies on `WorkspaceContent.js` and `Workspace.js`.
 
-| Field | Detail |
-|-------|--------|
-| **What** | Message list in workspace chat section |
-| **Where** | `WorkspaceHome.jsx` chat UI + local channel `chat-messages` |
-| **Save / update** | localStorage + BroadcastChannel only; no server |
-| **Conflict frequency** | **Low** (append-only) |
-| **Complexity** | **Low** — server append log, not CRDT |
-
-### 9. Meetings (A/V + chat + host controls)
-
-| Field | Detail |
-|-------|--------|
-| **What** | WebRTC mesh, waiting room, meeting chat, host mute/kick |
-| **Where** | `Meetings.jsx`, `MeetingsSection.jsx` |
-| **Save / update** | Local channel for signal/join/chat; MediaStream local; recording downloads locally |
-| **Conflict frequency** | N/A for media; **Low** for chat |
-| **Complexity** | **Very high** for true multi-device (signaling server + TURN). Out of band from “document CRDT” work |
-
-### 10. Document comments / version history
-
-| Field | Detail |
-|-------|--------|
-| **What** | Side panels on Documents |
-| **Where** | `Documents.jsx` + `DocumentsSection` |
-| **Save / update** | **Shipped:** `comments-v1` / `versions-v1` merge-by-id on REST keys `documents-comments:*` / `documents-versions:*` |
-| **Conflict frequency** | **Low** |
-| **Complexity** | **Low** — append/version list with ids |
-
-### 11. Settings / permissions / profile / auth forms
-
-| Field | Detail |
-|-------|--------|
-| **What** | Workspace settings, member remove, join approval, visibility; user profile/settings |
-| **Where** | `WorkspaceHome` settings, `SettingsPage`, auth feature pages |
-| **Save / update** | REST only |
-| **Conflict frequency** | **Low** |
-| **Complexity** | **Low** — keep REST; optional ETag later |
-
-### 12. Drag / resize / reorder
-
-| Field | Detail |
-|-------|--------|
-| **What** | Tab reorder in WorkspaceHome; whiteboard/slides element drag; spreadsheet selection |
-| **Where** | Scattered in feature components |
-| **Save / update** | Bundled into parent state saves above |
-| **Conflict frequency** | Tied to parent surface |
-| **Complexity** | Include with parent component strategy, not standalone |
-
----
-
-## Recommended priority order
-
-Highest value / lowest risk first (for *this* codebase):
-
-| Order | Component | Why |
-|-------|-----------|-----|
-| **1** | **Documents** | Core product promise; already has Quill + server content key + section adapter; highest pain for multi-user overwrite |
-| **2** | Workspace file tree | Enables multi-device file discovery; LWW+version is enough; lower risk |
-| **3** | Spreadsheet cells | High value; cell ops map cleanly to CRDT/op-log after docs transport exists |
-| **4** | Whiteboard elements | High visual value; can reuse transport from docs |
-| **5** | Presentation slides | Structured array merge |
-| **6** | Document comments / versions | Easy once docs identity is stable |
-| **7** | Workspace chat | Append-only server log |
-| **8** | Calendar tasks | Already REST; add version field if needed |
-| **9** | Meetings multi-device | Separate program (signaling + TURN); do not couple to doc CRDT |
-
----
-
-## Phase 1 gate
-
-**No strategy or code in this phase.**  
-Next: Phase 2 strategy for **Documents** only (`STRATEGY-documents.md`), then implementation only after strategy sign-off.
-
-*(User directed “go ahead and do what’s recommended to make it work” — Phase 2+3 for Documents follow immediately in this program session, still scoped to one component.)*
+## Context Dependency Graph
+- **`AuthContext`** (Provides `user`, `authenticated`) -> Used by `App.jsx`, `WorkspaceHome.jsx`, `ProtectedRoute.jsx`.
+- **`MeetingContext`** (Provides `activeMeeting`, `joinMeeting`) -> Depends on `AuthContext`. Used by `WorkspaceHome.jsx`, `GlobalMeetings.jsx`.
