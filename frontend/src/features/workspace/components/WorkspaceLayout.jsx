@@ -136,8 +136,9 @@ export default function WorkspaceLayout({
       )}
 
       <main
-        className={`h-full pt-navbar transition-[padding-left] duration-slow ease-in-out ${isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'
-          } ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
+        className={`h-full pt-navbar transition-[padding-left] duration-slow ease-in-out ${
+          isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'
+        } ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
       >
         <div
           className={

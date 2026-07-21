@@ -8,7 +8,6 @@ import {
   Presentation,
   Video,
   Folder,
-
   Calendar,
   Sparkles,
   Shield,
@@ -200,8 +199,6 @@ export default function LandingPage() {
     }
   ]
 
-
-
   const faqs = [
     {
       q: 'What is Teamora and how is it organized?',
@@ -225,11 +222,20 @@ export default function LandingPage() {
     <div className="bg-card text-text font-sans selection:bg-indigo-100 selection:text-indigo-800 transition-colors duration-300 w-full relative">
       <div className="fixed top-0 inset-x-0 z-50 flex justify-center w-full pt-4 px-4 pointer-events-none">
         <header className="pointer-events-auto flex items-center justify-between px-5 h-14 bg-card/70 backdrop-blur-2xl border border-border/60 rounded-full shadow-lg shadow-black/5 w-full max-w-5xl transition-all">
-          <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex items-center gap-3 cursor-pointer group">
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault()
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+            className="flex items-center gap-3 cursor-pointer group"
+          >
             <div className="w-7 h-7 bg-primary rounded-md flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
               <Building2 className="w-4 h-4 text-white" />
             </div>
-            <span className="font-extrabold text-lg tracking-tight text-text group-hover:text-primary transition-colors">Teamora</span>
+            <span className="font-extrabold text-lg tracking-tight text-text group-hover:text-primary transition-colors">
+              Teamora
+            </span>
           </a>
 
           <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-wider text-muted">
@@ -267,10 +273,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 md:px-12 flex flex-col items-center text-center mx-auto w-full min-h-[90vh] justify-center overflow-hidden">
         {/* Dynamic Background Glow */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 flex justify-center opacity-70"
-        >
+        <div aria-hidden className="pointer-events-none absolute inset-0 flex justify-center opacity-70">
           <div className="absolute -top-32 w-[800px] h-[600px] bg-[radial-gradient(ellipse_at_top,color-mix(in_srgb,var(--tw-primary)_25%,transparent),transparent_65%)] blur-3xl rounded-full" />
         </div>
 
@@ -304,7 +307,8 @@ export default function LandingPage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-base md:text-lg text-muted max-w-2xl leading-relaxed mb-10"
           >
-            Collaborate on documents, whiteboards, spreadsheets, presentations, meetings and shared files in real time. Without ever switching tabs.
+            Collaborate on documents, whiteboards, spreadsheets, presentations, meetings and shared files in real time.
+            Without ever switching tabs.
           </motion.p>
 
           <motion.div
@@ -496,9 +500,7 @@ export default function LandingPage() {
                             Rich Text Editor
                           </span>
                         </div>
-                        <h4 className="font-extrabold text-base text-text mb-2">
-                          Product Strategy Document
-                        </h4>
+                        <h4 className="font-extrabold text-base text-text mb-2">Product Strategy Document</h4>
                         <div className="text-xs text-muted space-y-3 leading-relaxed">
                           <div className="flex gap-2 items-center">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -554,13 +556,17 @@ export default function LandingPage() {
                             </thead>
                             <tbody>
                               <tr className="border-b border-border/60">
-                                <td className="p-2 bg-card-sunken text-muted border-r border-border/60 text-center font-mono">1</td>
+                                <td className="p-2 bg-card-sunken text-muted border-r border-border/60 text-center font-mono">
+                                  1
+                                </td>
                                 <td className="p-2 border-r border-border/60">Revenue Q3</td>
                                 <td className="p-2 border-r border-border/60 font-mono">$45,000</td>
                                 <td className="p-2 font-mono">12%</td>
                               </tr>
                               <tr>
-                                <td className="p-2 bg-card-sunken text-muted border-r border-border/60 text-center font-mono">2</td>
+                                <td className="p-2 bg-card-sunken text-muted border-r border-border/60 text-center font-mono">
+                                  2
+                                </td>
                                 <td className="p-2 border-r border-border/60">Marketing</td>
                                 <td className="p-2 border-r border-border/60 bg-emerald-500/10 relative border border-emerald-500 font-mono">
                                   <span>$12,500</span>
@@ -571,7 +577,9 @@ export default function LandingPage() {
                                 <td className="p-2 font-mono text-emerald-500">8%</td>
                               </tr>
                               <tr className="border-t border-border/60">
-                                <td className="p-2 bg-card-sunken text-muted border-r border-border/60 text-center font-mono">3</td>
+                                <td className="p-2 bg-card-sunken text-muted border-r border-border/60 text-center font-mono">
+                                  3
+                                </td>
                                 <td className="p-2 border-r border-border/60">Total</td>
                                 <td className="p-2 border-r border-border/60 font-mono font-bold">$32,500</td>
                                 <td className="p-2"></td>
@@ -625,7 +633,7 @@ export default function LandingPage() {
                           transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse' }}
                         />
                       </svg>
-                      
+
                       <div className="absolute left-1/4 top-1/4 bg-yellow-200/80 dark:bg-yellow-900/40 border border-yellow-400 dark:border-yellow-600 p-3 rounded shadow-sm transform -rotate-3 backdrop-blur-sm">
                         <span className="text-[10px] font-bold text-yellow-900 dark:text-yellow-100">Brainstorm!</span>
                       </div>
@@ -667,12 +675,20 @@ export default function LandingPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-2 flex-1">
                           <div className="bg-neutral-800 rounded-lg overflow-hidden relative flex items-center justify-center border border-border shadow-inner">
-                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">S</div>
-                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] text-white font-semibold">Sarah (Host)</div>
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+                              S
+                            </div>
+                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] text-white font-semibold">
+                              Sarah (Host)
+                            </div>
                           </div>
                           <div className="bg-neutral-800 rounded-lg overflow-hidden relative flex items-center justify-center border border-border shadow-inner">
-                            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs">Y</div>
-                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] text-white font-semibold">You</div>
+                            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs">
+                              Y
+                            </div>
+                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] text-white font-semibold">
+                              You
+                            </div>
                           </div>
                         </div>
                         <div className="flex justify-center gap-2 mt-3">
@@ -733,9 +749,7 @@ export default function LandingPage() {
             <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-text">
               Stark design. Unrivaled experience.
             </h2>
-            <p className="text-muted mt-2 text-sm">
-              Take a closer look at the minimal, distraction-free workspaces.
-            </p>
+            <p className="text-muted mt-2 text-sm">Take a closer look at the minimal, distraction-free workspaces.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -757,14 +771,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-
       {/* FAQ Section */}
       <section id="faq" className="py-24 bg-card-sunken border-t border-border px-6 md:px-12 w-full scroll-mt-16">
         <div className="max-w-3xl mx-auto w-full">
           <div className="text-center mb-16">
-            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-text">
-              Frequently Asked Questions
-            </h2>
+            <h2 className="text-2.5xl md:text-3.5xl font-bold tracking-tight text-text">Frequently Asked Questions</h2>
             <p className="text-muted mt-2 text-sm">Have details to clarify? Explore typical responses here.</p>
           </div>
 
@@ -811,12 +822,19 @@ export default function LandingPage() {
       <footer className="bg-card-sunken border-t border-border text-muted py-16 px-6 md:px-12 w-full">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 border-b border-border pb-12 mb-8">
           <div className="md:col-span-4 flex flex-col gap-4">
-              <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex items-center gap-2 mb-6 cursor-pointer group w-fit">
-                <div className="w-8 h-8 bg-card border border-border rounded-lg flex items-center justify-center group-hover:border-primary/20 transition-all shadow-sm">
-                  <Building2 className="w-4.5 h-4.5 text-text group-hover:text-primary transition-colors" />
-                </div>
-                <span className="font-bold text-text group-hover:text-primary transition-colors">Teamora</span>
-              </a>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className="flex items-center gap-2 mb-6 cursor-pointer group w-fit"
+            >
+              <div className="w-8 h-8 bg-card border border-border rounded-lg flex items-center justify-center group-hover:border-primary/20 transition-all shadow-sm">
+                <Building2 className="w-4.5 h-4.5 text-text group-hover:text-primary transition-colors" />
+              </div>
+              <span className="font-bold text-text group-hover:text-primary transition-colors">Teamora</span>
+            </a>
             <p className="text-muted text-xs leading-relaxed max-w-sm">
               The premium, minimal collaboration platform designed to keep multiplayer product teams highly focused and
               aligned.
@@ -832,7 +850,6 @@ export default function LandingPage() {
               <a href="#collaboration" className="text-xs text-muted hover:text-primary transition-colors w-fit">
                 Showcase
               </a>
-
             </div>
             <div className="flex flex-col gap-3">
               <span className="text-text text-[10px] font-extrabold uppercase tracking-widest">Resources</span>
@@ -935,9 +952,7 @@ export default function LandingPage() {
                         className="max-w-md"
                       >
                         <Zap className="w-12 h-12 text-indigo-650 mx-auto mb-4" />
-                        <h4 className="font-extrabold text-lg text-text mb-2">
-                          2. Realtime Multiplayer Collaboration
-                        </h4>
+                        <h4 className="font-extrabold text-lg text-text mb-2">2. Realtime Multiplayer Collaboration</h4>
                         <p className="text-xs text-muted leading-relaxed">
                           Watch edits update in real-time as users write, design, and code together. Integrated cursor
                           tracking shows you exactly what your colleagues are editing.

@@ -1,8 +1,48 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { ensureArray } from './utils/arrayUtils'
 import {
-  Presentation, Plus, Copy, Trash2, ChevronLeft, ChevronRight, X, StickyNote, Download, Image as ImageIcon, Video, Table2, Shapes, Upload, Eye, EyeOff, FolderInput, Type, Cloud, MonitorPlay, Settings2, Minus, Undo2, Redo2, Share2, AlignLeft, AlignCenter, AlignRight, Bold, AlertTriangle,
-  Italic, Underline, Palette, ChevronDown, AlignJustify, Strikethrough, Highlighter, RemoveFormatting, List, ListOrdered, Paintbrush, ArrowUpDown
+  Presentation,
+  Plus,
+  Copy,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  StickyNote,
+  Download,
+  Image as ImageIcon,
+  Video,
+  Table2,
+  Shapes,
+  Upload,
+  Eye,
+  EyeOff,
+  FolderInput,
+  Type,
+  Cloud,
+  MonitorPlay,
+  Settings2,
+  Minus,
+  Undo2,
+  Redo2,
+  Share2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold,
+  AlertTriangle,
+  Italic,
+  Underline,
+  Palette,
+  ChevronDown,
+  AlignJustify,
+  Strikethrough,
+  Highlighter,
+  RemoveFormatting,
+  List,
+  ListOrdered,
+  Paintbrush,
+  ArrowUpDown
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -104,20 +144,16 @@ const SlideObject = ({ el, isSelected, onSelect, onDrag, onDelete, externalIsEdi
         borderColor: el.borderWidth ? el.borderColor || el.color : 'transparent',
         opacity: el.opacity ?? 1,
         boxShadow: el.shadow || 'none',
-        borderRadius: el.borderRadius ? `${el.borderRadius}px` : (el.type === 'shape' ? '9999px' : '0px'),
+        borderRadius: el.borderRadius ? `${el.borderRadius}px` : el.type === 'shape' ? '9999px' : '0px',
         borderWidth: el.borderWidth ? `${el.borderWidth}px` : '0px',
         borderStyle: el.borderWidth ? 'solid' : 'none',
         cursor: isEditing ? 'text' : 'move'
       }}
-      className={`relative transition-shadow duration-150 ${isEditing ? 'select-text' : 'select-none'
-        } ${isSelected
-          ? ''
-          : isHovered
-            ? 'shadow-[0_0_0_1px_rgba(124,58,237,0.4)]'
-            : ''
-        }`}
+      className={`relative transition-shadow duration-150 ${isEditing ? 'select-text' : 'select-none'} ${
+        isSelected ? '' : isHovered ? 'shadow-[0_0_0_1px_rgba(124,58,237,0.4)]' : ''
+      }`}
     >
-      {React.Children.map(children, child => {
+      {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
           return React.cloneElement(child, { isEditing })
         }
@@ -125,9 +161,7 @@ const SlideObject = ({ el, isSelected, onSelect, onDrag, onDelete, externalIsEdi
       })}
 
       {/* Accent-Colored Selection Bounding Box Outline */}
-      {isSelected && (
-        <div className="absolute inset-0 pointer-events-none border-2 border-primary z-40 animate-none" />
-      )}
+      {isSelected && <div className="absolute inset-0 pointer-events-none border-2 border-primary z-40 animate-none" />}
 
       {/* Delete (X) Button */}
       {isSelected && (
@@ -146,10 +180,34 @@ const SlideObject = ({ el, isSelected, onSelect, onDrag, onDelete, externalIsEdi
       {/* Draggable Borders (Hotzones) */}
       {isSelected && (
         <>
-          <div className="absolute -top-1 inset-x-0 h-2 cursor-move bg-transparent z-40" onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'move') }} />
-          <div className="absolute -bottom-1 inset-x-0 h-2 cursor-move bg-transparent z-40" onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'move') }} />
-          <div className="absolute -left-1 inset-y-0 w-2 cursor-move bg-transparent z-40" onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'move') }} />
-          <div className="absolute -right-1 inset-y-0 w-2 cursor-move bg-transparent z-40" onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'move') }} />
+          <div
+            className="absolute -top-1 inset-x-0 h-2 cursor-move bg-transparent z-40"
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'move')
+            }}
+          />
+          <div
+            className="absolute -bottom-1 inset-x-0 h-2 cursor-move bg-transparent z-40"
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'move')
+            }}
+          />
+          <div
+            className="absolute -left-1 inset-y-0 w-2 cursor-move bg-transparent z-40"
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'move')
+            }}
+          />
+          <div
+            className="absolute -right-1 inset-y-0 w-2 cursor-move bg-transparent z-40"
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'move')
+            }}
+          />
         </>
       )}
 
@@ -159,44 +217,71 @@ const SlideObject = ({ el, isSelected, onSelect, onDrag, onDelete, externalIsEdi
           {/* Corner Resize Handles */}
           <div
             className="absolute -top-[5px] -left-[5px] w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-nwse-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-nw') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-nw')
+            }}
           />
           <div
             className="absolute -top-[5px] -right-[5px] w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-nesw-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-ne') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-ne')
+            }}
           />
           <div
             className="absolute -bottom-[5px] -right-[5px] w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-nwse-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-se') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-se')
+            }}
           />
           <div
             className="absolute -bottom-[5px] -left-[5px] w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-nesw-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-sw') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-sw')
+            }}
           />
 
           {/* Edge Resize Handles */}
           <div
             className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-ns-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-n') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-n')
+            }}
           />
           <div
             className="absolute top-1/2 -right-[5px] -translate-y-1/2 w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-ew-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-e') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-e')
+            }}
           />
           <div
             className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-ns-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-s') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-s')
+            }}
           />
           <div
             className="absolute top-1/2 -left-[5px] -translate-y-1/2 w-[9px] h-[9px] bg-white border border-primary shadow-sm cursor-ew-resize z-50 hover:bg-primary/10 transition-colors"
-            onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'resize-w') }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onDrag(e, el, 'resize-w')
+            }}
           />
 
           {/* Rotate Handle */}
           <div className="absolute -top-[24px] left-1/2 -translate-x-1/2 flex flex-col items-center">
             <div
               className="w-2.5 h-2.5 cursor-grab rounded-full bg-white border border-primary shadow-sm z-50 flex items-center justify-center hover:bg-primary hover:border-primary transition-colors"
-              onMouseDown={(e) => { e.stopPropagation(); onDrag(e, el, 'rotate') }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                onDrag(e, el, 'rotate')
+              }}
             />
             <div className="w-px h-[14px] bg-primary/40 pointer-events-none" />
           </div>
@@ -300,9 +385,24 @@ const TextEditor = ({ el, patchElement, isEditing, onDuplicateToNextSlide }) => 
         <div className="absolute -bottom-6 left-0 bg-red-500 text-white text-[10px] px-2 py-1 rounded shadow cursor-pointer z-50 flex items-center gap-1 group">
           <AlertTriangle className="w-3 h-3" /> Overflow
           <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-white dark:bg-slate-800 rounded shadow-lg border border-border w-40">
-            <button onMouseDown={handleAutoFit} className="w-full text-xs text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">Auto-fit text</button>
-            <button onMouseDown={handleResizeBox} className="w-full text-xs text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">Resize box</button>
-            <button onMouseDown={handleContinue} className="w-full text-xs text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">Continue next slide</button>
+            <button
+              onMouseDown={handleAutoFit}
+              className="w-full text-xs text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+            >
+              Auto-fit text
+            </button>
+            <button
+              onMouseDown={handleResizeBox}
+              className="w-full text-xs text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+            >
+              Resize box
+            </button>
+            <button
+              onMouseDown={handleContinue}
+              className="w-full text-xs text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+            >
+              Continue next slide
+            </button>
           </div>
         </div>
       )}
@@ -348,7 +448,7 @@ export default function Slides({
     if (!socket) return
     const handleCursorMove = (data) => {
       if (data.senderSocketId === socket.id) return
-      setLiveCursors(prev => {
+      setLiveCursors((prev) => {
         if (data.x === null) {
           const next = { ...prev }
           delete next[data.senderSocketId]
@@ -367,7 +467,7 @@ export default function Slides({
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now()
-      setLiveCursors(prev => {
+      setLiveCursors((prev) => {
         const next = { ...prev }
         let changed = false
         for (const [id, cursor] of Object.entries(next)) {
@@ -395,7 +495,6 @@ export default function Slides({
     socket.emit('cursor-move', { x, y, name: myCursorInfo.name, color: myCursorInfo.color })
   }
 
-
   // Elements toolbar / states
   const [selectedElemId, setSelectedElemId] = useState(null)
   const [editingElemId, setEditingElemId] = useState(null)
@@ -422,7 +521,7 @@ export default function Slides({
         isHistoryUpdate.current = false
         return
       }
-      setHistory(prev => {
+      setHistory((prev) => {
         const next = prev.slice(0, historyIndex + 1)
         const lastState = next[next.length - 1]
         if (JSON.stringify(lastState) !== JSON.stringify(slides)) {
@@ -518,8 +617,8 @@ export default function Slides({
     return from
   }
 
-
-  const activeSlideData = slides[activeSlide] || slides[0] || { title: '', content: '', notes: '', elements: [], layout: 'title' }
+  const activeSlideData = slides[activeSlide] ||
+    slides[0] || { title: '', content: '', notes: '', elements: [], layout: 'title' }
   const slideElements = activeSlideData.elements || []
 
   const handleDuplicateSlide = (index = activeSlide) => {
@@ -534,11 +633,11 @@ export default function Slides({
       layout: slideToDuplicate.layout || 'title',
       elements: slideToDuplicate.elements
         ? slideToDuplicate.elements.map((el) => ({
-          ...el,
-          id: el?.id
-            ? `${el.id}-copy-${Math.random().toString(36).slice(2, 6)}`
-            : `elem-${Math.random().toString(36).slice(2, 9)}`
-        }))
+            ...el,
+            id: el?.id
+              ? `${el.id}-copy-${Math.random().toString(36).slice(2, 6)}`
+              : `elem-${Math.random().toString(36).slice(2, 9)}`
+          }))
         : []
     })
     setSlides(newSlides)
@@ -563,7 +662,7 @@ export default function Slides({
     // Duplicate slide and modify element in the new slide
     const slideToDuplicate = activeSlideData
     const newSlides = [...slides]
-     
+
     newSlides.splice(activeSlide + 1, 0, {
       // eslint-disable-next-line react-hooks/purity
       id: `slide-${Date.now().toString(36)}-${Math.floor(Date.now() / 1000)}`,
@@ -573,13 +672,12 @@ export default function Slides({
       layout: slideToDuplicate.layout || 'title',
       elements: slideToDuplicate.elements
         ? slideToDuplicate.elements.map((el, idx) => {
-          if (el.id === elem.id) {
-             
-            return { ...el, id: `elem-${Date.now().toString(36)}-${idx}`, text: secondHalf }
-          }
-           
-          return { ...el, id: `${el.id}-copy-${Date.now().toString(36)}-${idx}` }
-        })
+            if (el.id === elem.id) {
+              return { ...el, id: `elem-${Date.now().toString(36)}-${idx}`, text: secondHalf }
+            }
+
+            return { ...el, id: `${el.id}-copy-${Date.now().toString(36)}-${idx}` }
+          })
         : []
     })
     setSlides(newSlides)
@@ -594,11 +692,12 @@ export default function Slides({
       return
     }
     const newSlides = slides.filter((_, i) => i !== indexToDelete)
-    const newActive = indexToDelete === activeSlide
-      ? Math.max(0, activeSlide - 1)
-      : activeSlide >= newSlides.length
-        ? newSlides.length - 1
-        : activeSlide
+    const newActive =
+      indexToDelete === activeSlide
+        ? Math.max(0, activeSlide - 1)
+        : activeSlide >= newSlides.length
+          ? newSlides.length - 1
+          : activeSlide
     setSlides(newSlides)
     setActiveSlide(newActive)
     socket.emit('change-slide', { roomId, slideIndex: newActive })
@@ -782,7 +881,7 @@ export default function Slides({
   }
 
   const addTextBoxToSlide = () => {
-    setActiveTool(prev => prev === 'textbox' ? null : 'textbox')
+    setActiveTool((prev) => (prev === 'textbox' ? null : 'textbox'))
   }
 
   const handleCanvasMouseDown = (e) => {
@@ -895,14 +994,16 @@ export default function Slides({
           socket.emit('change-slide', { roomId, slideIndex: prevIndex })
         } else if (e.key === 'Home') {
           e.preventDefault()
-          const first = ensureArray(slides).findIndex(s => !s?.hidden)
+          const first = ensureArray(slides).findIndex((s) => !s?.hidden)
           if (first >= 0) {
             setActiveSlide(first)
             socket.emit('change-slide', { roomId, slideIndex: first })
           }
         } else if (e.key === 'End') {
           e.preventDefault()
-          const visible = ensureArray(slides).map((s, i) => !s?.hidden ? i : -1).filter(i => i !== -1)
+          const visible = ensureArray(slides)
+            .map((s, i) => (!s?.hidden ? i : -1))
+            .filter((i) => i !== -1)
           if (visible.length) {
             const last = visible[visible.length - 1]
             setActiveSlide(last)
@@ -918,7 +1019,7 @@ export default function Slides({
           if (key === 'c') {
             if (selectedElemId) {
               e.preventDefault()
-              const elem = activeSlideData.elements?.find(el => el.id === selectedElemId)
+              const elem = activeSlideData.elements?.find((el) => el.id === selectedElemId)
               if (elem) {
                 setCopiedElement(JSON.parse(JSON.stringify(elem)))
                 toast.success('Element copied')
@@ -947,9 +1048,9 @@ export default function Slides({
                 id: `slide-${Math.random().toString(36).slice(2, 10)}`,
                 elements: copiedSlide.elements
                   ? copiedSlide.elements.map((el, idx) => ({
-                    ...el,
-                    id: `${el.id}-copy-${Date.now().toString(36)}-${idx}`
-                  }))
+                      ...el,
+                      id: `${el.id}-copy-${Date.now().toString(36)}-${idx}`
+                    }))
                   : []
               }
               const newSlides = [...slides]
@@ -1007,7 +1108,27 @@ export default function Slides({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPresenting, activeSlide, slides, roomId, socket, setActiveSlide, setIsPresenting, selectedElemId, addTextBoxToSlide, deleteElement, addElementToSlide, copiedElement, copiedSlide, activeSlideData, handleDeleteSlide, handleSlideUpdate, setSlides, undo, redo])
+  }, [
+    isPresenting,
+    activeSlide,
+    slides,
+    roomId,
+    socket,
+    setActiveSlide,
+    setIsPresenting,
+    selectedElemId,
+    addTextBoxToSlide,
+    deleteElement,
+    addElementToSlide,
+    copiedElement,
+    copiedSlide,
+    activeSlideData,
+    handleDeleteSlide,
+    handleSlideUpdate,
+    setSlides,
+    undo,
+    redo
+  ])
 
   /** PPTX import via JSZip — text, notes, and embedded images. */
   const handleImportPptx = async (file) => {
@@ -1096,10 +1217,10 @@ export default function Slides({
 
   useEffect(() => {
     if (isPresenting) {
-      document.documentElement.requestFullscreen?.().catch(() => { })
+      document.documentElement.requestFullscreen?.().catch(() => {})
     } else {
       if (document.fullscreenElement) {
-        document.exitFullscreen?.().catch(() => { })
+        document.exitFullscreen?.().catch(() => {})
       }
     }
   }, [isPresenting])
@@ -1118,7 +1239,7 @@ export default function Slides({
   useEffect(() => {
     if (isPresenting) {
       const updateScale = () => {
-        const scale = Math.min(window.innerWidth / 850, window.innerHeight / (850 * 9 / 16))
+        const scale = Math.min(window.innerWidth / 850, window.innerHeight / ((850 * 9) / 16))
         setPresentScale(scale)
       }
       updateScale()
@@ -1131,7 +1252,11 @@ export default function Slides({
     return (
       <div
         className={`relative aspect-[16/9] w-[850px] overflow-hidden bg-gradient-to-br rounded-lg pointer-events-auto ${theme.gradient} ${isForPresenting ? '' : 'shadow-2xl ring-1 ring-border/50'}`}
-        style={isForPresenting ? { transform: `scale(${presentScale})`, transformOrigin: 'center' } : { cursor: activeTool === 'textbox' ? 'crosshair' : 'default' }}
+        style={
+          isForPresenting
+            ? { transform: `scale(${presentScale})`, transformOrigin: 'center' }
+            : { cursor: activeTool === 'textbox' ? 'crosshair' : 'default' }
+        }
         onClick={isForPresenting ? undefined : (e) => e.stopPropagation()}
         onMouseDown={isForPresenting ? undefined : handleCanvasMouseDown}
         onMouseMove={isForPresenting ? undefined : handleCanvasMouseMove}
@@ -1153,33 +1278,47 @@ export default function Slides({
         )}
 
         {/* Live Cursors Overlay */}
-        {!isForPresenting && Object.values(liveCursors).map(cursor => (
-          <div
-            key={cursor.senderSocketId}
-            className="absolute pointer-events-none z-[100] flex items-center"
-            style={{
-              left: cursor.x,
-              top: cursor.y,
-              transition: 'left 0.1s linear, top 0.1s linear'
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill={cursor.color} xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md -translate-x-1 -translate-y-1">
-              <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.8c.45 0 .67-.54.35-.85L6.35 2.85a.5.5 0 0 0-.85.35Z" stroke="white" strokeWidth="1.5" />
-            </svg>
+        {!isForPresenting &&
+          Object.values(liveCursors).map((cursor) => (
             <div
-              className="absolute top-5 left-3 px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap drop-shadow-sm"
-              style={{ backgroundColor: cursor.color }}
+              key={cursor.senderSocketId}
+              className="absolute pointer-events-none z-[100] flex items-center"
+              style={{
+                left: cursor.x,
+                top: cursor.y,
+                transition: 'left 0.1s linear, top 0.1s linear'
+              }}
             >
-              {cursor.name}
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill={cursor.color}
+                xmlns="http://www.w3.org/2000/svg"
+                className="drop-shadow-md -translate-x-1 -translate-y-1"
+              >
+                <path
+                  d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.8c.45 0 .67-.54.35-.85L6.35 2.85a.5.5 0 0 0-.85.35Z"
+                  stroke="white"
+                  strokeWidth="1.5"
+                />
+              </svg>
+              <div
+                className="absolute top-5 left-3 px-2 py-0.5 rounded text-[10px] font-semibold text-white whitespace-nowrap drop-shadow-sm"
+                style={{ backgroundColor: cursor.color }}
+              >
+                {cursor.name}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
         {/* Dynamic templates */}
         {activeSlideData.layout === 'title' ? (
           <div className="flex flex-col justify-center items-center h-full text-center">
             {isForPresenting ? (
-              <div className="text-4xl font-bold text-slate-900 dark:text-on-primary w-3/4 text-center py-2">{activeSlideData.title}</div>
+              <div className="text-4xl font-bold text-slate-900 dark:text-on-primary w-3/4 text-center py-2">
+                {activeSlideData.title}
+              </div>
             ) : (
               <input
                 type="text"
@@ -1190,7 +1329,9 @@ export default function Slides({
               />
             )}
             {isForPresenting ? (
-              <div className="text-base text-slate-700 dark:text-slate-300 w-3/4 text-center py-2 mt-4 min-h-24">{activeSlideData.content}</div>
+              <div className="text-base text-slate-700 dark:text-slate-300 w-3/4 text-center py-2 mt-4 min-h-24">
+                {activeSlideData.content}
+              </div>
             ) : (
               <textarea
                 value={activeSlideData.content || ''}
@@ -1203,7 +1344,9 @@ export default function Slides({
         ) : activeSlideData.layout === 'split' ? (
           <div className="h-full flex flex-col px-10 py-8">
             {isForPresenting ? (
-              <div className="text-2xl font-bold text-slate-900 dark:text-on-primary py-1 w-full text-center">{activeSlideData.title}</div>
+              <div className="text-2xl font-bold text-slate-900 dark:text-on-primary py-1 w-full text-center">
+                {activeSlideData.title}
+              </div>
             ) : (
               <input
                 type="text"
@@ -1215,7 +1358,9 @@ export default function Slides({
             )}
             <div className="grid grid-cols-2 gap-8 flex-1 mt-8">
               {isForPresenting ? (
-                <div className="p-4 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeSlideData.content}</div>
+                <div className="p-4 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                  {activeSlideData.content}
+                </div>
               ) : (
                 <textarea
                   value={activeSlideData.content || ''}
@@ -1225,7 +1370,9 @@ export default function Slides({
                 />
               )}
               {isForPresenting ? (
-                <div className="p-4 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{activeSlideData.splitContent2}</div>
+                <div className="p-4 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                  {activeSlideData.splitContent2}
+                </div>
               ) : (
                 <textarea
                   value={activeSlideData.splitContent2 || ''}
@@ -1254,7 +1401,9 @@ export default function Slides({
             </div>
             <div className="w-1/2 flex flex-col justify-center gap-4">
               {isForPresenting ? (
-                <div className="text-3xl font-bold text-slate-900 dark:text-on-primary py-1">{activeSlideData.title}</div>
+                <div className="text-3xl font-bold text-slate-900 dark:text-on-primary py-1">
+                  {activeSlideData.title}
+                </div>
               ) : (
                 <input
                   type="text"
@@ -1265,7 +1414,9 @@ export default function Slides({
                 />
               )}
               {isForPresenting ? (
-                <div className="text-sm text-slate-700 dark:text-slate-300 p-2 whitespace-pre-wrap min-h-40">{activeSlideData.content}</div>
+                <div className="text-sm text-slate-700 dark:text-slate-300 p-2 whitespace-pre-wrap min-h-40">
+                  {activeSlideData.content}
+                </div>
               ) : (
                 <textarea
                   value={activeSlideData.content || ''}
@@ -1279,7 +1430,9 @@ export default function Slides({
         ) : (
           <div className="h-full flex flex-col px-10 py-8">
             {isForPresenting ? (
-              <div className="text-3xl font-bold text-slate-900 dark:text-on-primary py-2 w-full">{activeSlideData.title}</div>
+              <div className="text-3xl font-bold text-slate-900 dark:text-on-primary py-2 w-full">
+                {activeSlideData.title}
+              </div>
             ) : (
               <input
                 type="text"
@@ -1290,7 +1443,9 @@ export default function Slides({
               />
             )}
             {isForPresenting ? (
-              <div className="flex-1 text-base text-slate-700 dark:text-slate-300 mt-6 p-2 whitespace-pre-wrap">{activeSlideData.content}</div>
+              <div className="flex-1 text-base text-slate-700 dark:text-slate-300 mt-6 p-2 whitespace-pre-wrap">
+                {activeSlideData.content}
+              </div>
             ) : (
               <textarea
                 value={activeSlideData.content || ''}
@@ -1344,8 +1499,14 @@ export default function Slides({
               ) : el.type === 'table' ? (
                 <table className="w-full h-full border border-slate-300 text-[10px] bg-card-sunken pointer-events-none">
                   <tbody>
-                    <tr><td className="border p-1 text-text">Row Cell</td><td className="border p-1 text-text">Row Cell</td></tr>
-                    <tr><td className="border p-1 text-text">Row Cell</td><td className="border p-1 text-text">Row Cell</td></tr>
+                    <tr>
+                      <td className="border p-1 text-text">Row Cell</td>
+                      <td className="border p-1 text-text">Row Cell</td>
+                    </tr>
+                    <tr>
+                      <td className="border p-1 text-text">Row Cell</td>
+                      <td className="border p-1 text-text">Row Cell</td>
+                    </tr>
                   </tbody>
                 </table>
               ) : (
@@ -1353,10 +1514,14 @@ export default function Slides({
               )}
             </SlideObject>
           )
-          
+
           if (isForPresenting) {
             // Apply a pointer-events-none wrapper so elements aren't interactive
-            return <div key={el.id} className="pointer-events-none absolute inset-0">{obj}</div>
+            return (
+              <div key={el.id} className="pointer-events-none absolute inset-0">
+                {obj}
+              </div>
+            )
           }
           return obj
         })}
@@ -1364,18 +1529,21 @@ export default function Slides({
     )
   }
 
-  const selectedElem = selectedElemId ? activeSlideData?.elements?.find(e => e.id === selectedElemId) : null
+  const selectedElem = selectedElemId ? activeSlideData?.elements?.find((e) => e.id === selectedElemId) : null
   const isTextElem = selectedElem && (selectedElem.type === 'textbox' || selectedElem.type === 'shape')
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card">
       {/* Presentation Fullscreen */}
       {isPresenting && (
-        <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center select-none group" onClick={() => {
-          const nextIndex = nextVisibleIndex(activeSlide, 1)
-          setActiveSlide(nextIndex)
-          socket.emit('change-slide', { roomId, slideIndex: nextIndex })
-        }}>
+        <div
+          className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center select-none group"
+          onClick={() => {
+            const nextIndex = nextVisibleIndex(activeSlide, 1)
+            setActiveSlide(nextIndex)
+            socket.emit('change-slide', { roomId, slideIndex: nextIndex })
+          }}
+        >
           {/* Active Slide Scaled to Fit */}
           <div className="relative w-full h-full max-w-[100vw] max-h-[100vh] aspect-video overflow-hidden">
             <AnimatePresence mode="wait">
@@ -1453,7 +1621,7 @@ export default function Slides({
             />
           </div>
 
-          {['home', 'insert', 'design', 'transitions'].map(tab => (
+          {['home', 'insert', 'design', 'transitions'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveRibbonTab(tab)}
@@ -1491,14 +1659,24 @@ export default function Slides({
               <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted mr-3 bg-card-sunken px-2 py-1 rounded-md">
                 <Cloud className="w-3 h-3 text-primary/80" /> Saved
               </div>
-              <button className="p-1.5 text-muted hover:text-primary rounded-md hover:bg-primary/10 transition-colors" title="Share">
+              <button
+                className="p-1.5 text-muted hover:text-primary rounded-md hover:bg-primary/10 transition-colors"
+                title="Share"
+              >
                 <Share2 className="w-3.5 h-3.5" />
               </button>
-              <button onClick={handleExportDeckOutline} className="p-1.5 text-muted hover:text-text rounded-md hover:bg-card-sunken cursor-pointer transition-colors" title="Export Outline">
+              <button
+                onClick={handleExportDeckOutline}
+                className="p-1.5 text-muted hover:text-text rounded-md hover:bg-card-sunken cursor-pointer transition-colors"
+                title="Export Outline"
+              >
                 <Download className="w-3.5 h-3.5" />
               </button>
             </div>
-            <button onClick={() => setIsPresenting(true)} className="flex items-center gap-1.5 px-3 py-1 bg-primary hover:bg-primary-hover text-on-primary text-[10px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors">
+            <button
+              onClick={() => setIsPresenting(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-primary hover:bg-primary-hover text-on-primary text-[10px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
+            >
               <MonitorPlay className="w-3.5 h-3.5" />
               <span>Present</span>
             </button>
@@ -1516,276 +1694,361 @@ export default function Slides({
               transition={{ duration: 0.15 }}
               className="flex items-center gap-6 w-full"
             >
-              {activeRibbonTab === 'home' && (() => {
-                const isFormatActive = isTextElem && selectedElem;
-                const fontFam = isFormatActive && selectedElem.fontFamily ? selectedElem.fontFamily.split(',')[0] : 'Inter';
-                const fontSz = isFormatActive && selectedElem.fontSize ? parseInt(selectedElem.fontSize, 10) : 16;
-                const isBold = isFormatActive && selectedElem.fontWeight === 'bold';
-                const isItal = isFormatActive && selectedElem.fontStyle === 'italic';
-                const isUnder = isFormatActive && selectedElem.textDecoration === 'underline';
-                const isStrike = isFormatActive && selectedElem.textDecoration === 'line-through';
-                const align = isFormatActive && selectedElem.textAlign ? selectedElem.textAlign : 'left';
-                const textColor = isFormatActive && selectedElem.color ? selectedElem.color : '#000000';
-                const highlightColor = isFormatActive && selectedElem.backgroundColor ? selectedElem.backgroundColor : 'transparent';
+              {activeRibbonTab === 'home' &&
+                (() => {
+                  const isFormatActive = isTextElem && selectedElem
+                  const fontFam =
+                    isFormatActive && selectedElem.fontFamily ? selectedElem.fontFamily.split(',')[0] : 'Inter'
+                  const fontSz = isFormatActive && selectedElem.fontSize ? parseInt(selectedElem.fontSize, 10) : 16
+                  const isBold = isFormatActive && selectedElem.fontWeight === 'bold'
+                  const isItal = isFormatActive && selectedElem.fontStyle === 'italic'
+                  const isUnder = isFormatActive && selectedElem.textDecoration === 'underline'
+                  const isStrike = isFormatActive && selectedElem.textDecoration === 'line-through'
+                  const align = isFormatActive && selectedElem.textAlign ? selectedElem.textAlign : 'left'
+                  const textColor = isFormatActive && selectedElem.color ? selectedElem.color : '#000000'
+                  const highlightColor =
+                    isFormatActive && selectedElem.backgroundColor ? selectedElem.backgroundColor : 'transparent'
 
-                return (
-                  <>
-                    <div className="flex items-center gap-1 border-r border-border/50 pr-4">
-                      <button onClick={undo} className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Undo">
-                        <Undo2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={redo} className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Redo">
-                        <Redo2 className="w-4 h-4" />
-                      </button>
-                      <button className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors" title="Format Painter (Coming Soon)">
-                        <Paintbrush className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 border-r border-border/50 pr-4">
-                      <button onClick={addSlide} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-primary hover:bg-primary/10 transition-colors">
-                        <Plus className="w-4 h-4" />
-                        <span className="text-[9px] font-bold">New Slide</span>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1 border-r border-border/50 pr-4">
-                      <button
-                        onClick={addTextBoxToSlide}
-                        className={`flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg transition-colors ${activeTool === 'textbox' ? 'bg-primary/20 text-primary border border-primary/30 shadow-inner font-bold' : 'text-muted hover:text-text hover:bg-card-sunken border border-transparent'}`}
-                      >
-                        <Type className="w-4 h-4" />
-                        <span className="text-[9px]">Text Box</span>
-                      </button>
-                      <button onClick={() => addElementToSlide('shape')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
-                        <Shapes className="w-4 h-4" />
-                        <span className="text-[9px]">Shape</span>
-                      </button>
-                      <button onClick={() => addElementToSlide('image')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
-                        <ImageIcon className="w-4 h-4" />
-                        <span className="text-[9px]">Image</span>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1 pl-2">
-                      {/* Font Selector */}
-                      <div className="relative">
+                  return (
+                    <>
+                      <div className="flex items-center gap-1 border-r border-border/50 pr-4">
                         <button
-                          onClick={() => setActiveDropdown(activeDropdown === 'font' ? null : 'font')}
-                          className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-card-sunken rounded font-medium transition-colors border border-transparent"
+                          onClick={undo}
+                          className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors"
+                          title="Undo"
                         >
-                          <span className="truncate max-w-[80px]">{fontFam}</span>
-                          <ChevronDown className="w-3 h-3 opacity-60" />
+                          <Undo2 className="w-4 h-4" />
                         </button>
-                        {activeDropdown === 'font' && (
-                          <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[120px] z-50">
-                            {['Inter', 'Roboto', 'Playfair Display', 'Georgia', 'Courier New', 'Caveat'].map(f => (
-                              <button
-                                key={f}
-                                onClick={() => { if (isFormatActive) patchElement(selectedElem.id, { fontFamily: `${f}, sans-serif` }); setActiveDropdown(null) }}
-                                className="w-full text-left px-3 py-1.5 text-xs hover:bg-card-sunken transition-colors text-text"
-                                style={{ fontFamily: f }}
-                              >
-                                {f}
-                              </button>
-                            ))}
+                        <button
+                          onClick={redo}
+                          className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors"
+                          title="Redo"
+                        >
+                          <Redo2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors"
+                          title="Format Painter (Coming Soon)"
+                        >
+                          <Paintbrush className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 border-r border-border/50 pr-4">
+                        <button
+                          onClick={addSlide}
+                          className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span className="text-[9px] font-bold">New Slide</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1 border-r border-border/50 pr-4">
+                        <button
+                          onClick={addTextBoxToSlide}
+                          className={`flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg transition-colors ${activeTool === 'textbox' ? 'bg-primary/20 text-primary border border-primary/30 shadow-inner font-bold' : 'text-muted hover:text-text hover:bg-card-sunken border border-transparent'}`}
+                        >
+                          <Type className="w-4 h-4" />
+                          <span className="text-[9px]">Text Box</span>
+                        </button>
+                        <button
+                          onClick={() => addElementToSlide('shape')}
+                          className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors"
+                        >
+                          <Shapes className="w-4 h-4" />
+                          <span className="text-[9px]">Shape</span>
+                        </button>
+                        <button
+                          onClick={() => addElementToSlide('image')}
+                          className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors"
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                          <span className="text-[9px]">Image</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1 pl-2">
+                        {/* Font Selector */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setActiveDropdown(activeDropdown === 'font' ? null : 'font')}
+                            className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-card-sunken rounded font-medium transition-colors border border-transparent"
+                          >
+                            <span className="truncate max-w-[80px]">{fontFam}</span>
+                            <ChevronDown className="w-3 h-3 opacity-60" />
+                          </button>
+                          {activeDropdown === 'font' && (
+                            <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[120px] z-50">
+                              {['Inter', 'Roboto', 'Playfair Display', 'Georgia', 'Courier New', 'Caveat'].map((f) => (
+                                <button
+                                  key={f}
+                                  onClick={() => {
+                                    if (isFormatActive)
+                                      patchElement(selectedElem.id, { fontFamily: `${f}, sans-serif` })
+                                    setActiveDropdown(null)
+                                  }}
+                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-card-sunken transition-colors text-text"
+                                  style={{ fontFamily: f }}
+                                >
+                                  {f}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="w-px h-4 bg-border/50 mx-1" />
+
+                        {/* Size Controls */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => {
+                              if (!isFormatActive) return
+                              patchElement(selectedElem.id, { fontSize: `${Math.max(8, fontSz - 2)}px` })
+                            }}
+                            className={`p-1 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')}
+                              className="px-1.5 py-1 text-xs hover:bg-card-sunken rounded font-bold min-w-[32px] text-center transition-colors text-text border border-transparent"
+                            >
+                              {fontSz}
+                            </button>
+                            {activeDropdown === 'size' && (
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[60px] max-h-[160px] overflow-y-auto z-50">
+                                {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    onClick={() => {
+                                      if (isFormatActive) patchElement(selectedElem.id, { fontSize: `${sz}px` })
+                                      setActiveDropdown(null)
+                                    }}
+                                    className="w-full text-center px-3 py-1 text-xs hover:bg-card-sunken transition-colors text-text"
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-
-                      <div className="w-px h-4 bg-border/50 mx-1" />
-
-                      {/* Size Controls */}
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          onClick={() => {
-                            if (!isFormatActive) return;
-                            patchElement(selectedElem.id, { fontSize: `${Math.max(8, fontSz - 2)}px` })
-                          }}
-                          className={`p-1 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="relative">
                           <button
-                            onClick={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')}
-                            className="px-1.5 py-1 text-xs hover:bg-card-sunken rounded font-bold min-w-[32px] text-center transition-colors text-text border border-transparent"
+                            onClick={() => {
+                              if (!isFormatActive) return
+                              patchElement(selectedElem.id, { fontSize: `${Math.min(120, fontSz + 2)}px` })
+                            }}
+                            className={`p-1 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
                           >
-                            {fontSz}
+                            <Plus className="w-3.5 h-3.5" />
                           </button>
-                          {activeDropdown === 'size' && (
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[60px] max-h-[160px] overflow-y-auto z-50">
-                              {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map(sz => (
-                                <button
-                                  key={sz}
-                                  onClick={() => { if (isFormatActive) patchElement(selectedElem.id, { fontSize: `${sz}px` }); setActiveDropdown(null) }}
-                                  className="w-full text-center px-3 py-1 text-xs hover:bg-card-sunken transition-colors text-text"
-                                >
-                                  {sz}
-                                </button>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                        <button
-                          onClick={() => {
-                            if (!isFormatActive) return;
-                            patchElement(selectedElem.id, { fontSize: `${Math.min(120, fontSz + 2)}px` })
-                          }}
-                          className={`p-1 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
 
-                      <div className="w-px h-4 bg-border/50 mx-1" />
+                        <div className="w-px h-4 bg-border/50 mx-1" />
 
-                      {/* Style Buttons */}
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          disabled={!isFormatActive}
-                          onClick={() => patchElement(selectedElem.id, { fontWeight: isBold ? 'normal' : 'bold' })}
-                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isBold ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                          title="Bold"
-                        >
-                          <Bold className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          disabled={!isFormatActive}
-                          onClick={() => patchElement(selectedElem.id, { fontStyle: isItal ? 'normal' : 'italic' })}
-                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isItal ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                          title="Italic"
-                        >
-                          <Italic className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          disabled={!isFormatActive}
-                          onClick={() => patchElement(selectedElem.id, { textDecoration: isUnder ? 'none' : 'underline' })}
-                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isUnder ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                          title="Underline"
-                        >
-                          <Underline className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          disabled={!isFormatActive}
-                          onClick={() => patchElement(selectedElem.id, { textDecoration: isStrike ? 'none' : 'line-through' })}
-                          className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isStrike ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                          title="Strikethrough"
-                        >
-                          <Strikethrough className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          disabled={!isFormatActive}
-                          onClick={() => patchElement(selectedElem.id, { fontWeight: 'normal', fontStyle: 'normal', textDecoration: 'none', color: '#000000', backgroundColor: 'transparent' })}
-                          className={`p-1.5 rounded transition-colors ml-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                          title="Clear Formatting"
-                        >
-                          <RemoveFormatting className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="w-px h-4 bg-border/50 mx-1" />
-
-                      {/* Color Selectors */}
-                      <div className="flex items-center gap-0.5">
-                        <div className="relative">
+                        {/* Style Buttons */}
+                        <div className="flex items-center gap-0.5">
                           <button
                             disabled={!isFormatActive}
-                            onClick={() => setActiveDropdown(activeDropdown === 'color' ? null : 'color')}
-                            className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                            title="Text Color"
+                            onClick={() => patchElement(selectedElem.id, { fontWeight: isBold ? 'normal' : 'bold' })}
+                            className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isBold ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                            title="Bold"
                           >
-                            <Palette className="w-3.5 h-3.5" style={{ color: textColor }} />
-                            <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                            <Bold className="w-3.5 h-3.5" />
                           </button>
-                          {activeDropdown === 'color' && (
-                            <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl p-2 grid grid-cols-4 gap-1.5 min-w-[100px] z-50">
-                              {['#000000', '#ffffff', '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'].map(c => (
-                                <button
-                                  key={c}
-                                  onClick={() => { patchElement(selectedElem.id, { color: c }); setActiveDropdown(null) }}
-                                  className="w-5 h-5 rounded-full border border-border shadow-sm"
-                                  style={{ backgroundColor: c }}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="relative">
                           <button
                             disabled={!isFormatActive}
-                            onClick={() => setActiveDropdown(activeDropdown === 'highlight' ? null : 'highlight')}
-                            className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                            title="Highlight Color"
+                            onClick={() => patchElement(selectedElem.id, { fontStyle: isItal ? 'normal' : 'italic' })}
+                            className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isItal ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                            title="Italic"
                           >
-                            <Highlighter className="w-3.5 h-3.5" style={{ color: highlightColor !== 'transparent' ? highlightColor : 'currentColor' }} />
-                            <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                            <Italic className="w-3.5 h-3.5" />
                           </button>
-                          {activeDropdown === 'highlight' && (
-                            <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl p-2 grid grid-cols-4 gap-1.5 min-w-[100px] z-50">
-                              {['transparent', '#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', '#e9d5ff', '#fed7aa', '#fbcfe8'].map(c => (
-                                <button
-                                  key={c}
-                                  onClick={() => { patchElement(selectedElem.id, { backgroundColor: c }); setActiveDropdown(null) }}
-                                  className="w-5 h-5 rounded-full border border-border shadow-sm flex items-center justify-center"
-                                  style={{ backgroundColor: c === 'transparent' ? '#ffffff' : c }}
-                                >
-                                  {c === 'transparent' && <span className="text-red-500 text-[10px] font-bold">/</span>}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          <button
+                            disabled={!isFormatActive}
+                            onClick={() =>
+                              patchElement(selectedElem.id, { textDecoration: isUnder ? 'none' : 'underline' })
+                            }
+                            className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isUnder ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                            title="Underline"
+                          >
+                            <Underline className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            disabled={!isFormatActive}
+                            onClick={() =>
+                              patchElement(selectedElem.id, { textDecoration: isStrike ? 'none' : 'line-through' })
+                            }
+                            className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : isStrike ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                            title="Strikethrough"
+                          >
+                            <Strikethrough className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            disabled={!isFormatActive}
+                            onClick={() =>
+                              patchElement(selectedElem.id, {
+                                fontWeight: 'normal',
+                                fontStyle: 'normal',
+                                textDecoration: 'none',
+                                color: '#000000',
+                                backgroundColor: 'transparent'
+                              })
+                            }
+                            className={`p-1.5 rounded transition-colors ml-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                            title="Clear Formatting"
+                          >
+                            <RemoveFormatting className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="w-px h-4 bg-border/50 mx-1" />
+
+                        {/* Color Selectors */}
+                        <div className="flex items-center gap-0.5">
+                          <div className="relative">
+                            <button
+                              disabled={!isFormatActive}
+                              onClick={() => setActiveDropdown(activeDropdown === 'color' ? null : 'color')}
+                              className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                              title="Text Color"
+                            >
+                              <Palette className="w-3.5 h-3.5" style={{ color: textColor }} />
+                              <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                            </button>
+                            {activeDropdown === 'color' && (
+                              <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl p-2 grid grid-cols-4 gap-1.5 min-w-[100px] z-50">
+                                {[
+                                  '#000000',
+                                  '#ffffff',
+                                  '#3b82f6',
+                                  '#ef4444',
+                                  '#10b981',
+                                  '#f59e0b',
+                                  '#8b5cf6',
+                                  '#ec4899'
+                                ].map((c) => (
+                                  <button
+                                    key={c}
+                                    onClick={() => {
+                                      patchElement(selectedElem.id, { color: c })
+                                      setActiveDropdown(null)
+                                    }}
+                                    className="w-5 h-5 rounded-full border border-border shadow-sm"
+                                    style={{ backgroundColor: c }}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <button
+                              disabled={!isFormatActive}
+                              onClick={() => setActiveDropdown(activeDropdown === 'highlight' ? null : 'highlight')}
+                              className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                              title="Highlight Color"
+                            >
+                              <Highlighter
+                                className="w-3.5 h-3.5"
+                                style={{ color: highlightColor !== 'transparent' ? highlightColor : 'currentColor' }}
+                              />
+                              <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                            </button>
+                            {activeDropdown === 'highlight' && (
+                              <div className="absolute top-full left-0 mt-1 bg-card border border-border rounded-lg shadow-xl p-2 grid grid-cols-4 gap-1.5 min-w-[100px] z-50">
+                                {[
+                                  'transparent',
+                                  '#fef08a',
+                                  '#bbf7d0',
+                                  '#bfdbfe',
+                                  '#fecaca',
+                                  '#e9d5ff',
+                                  '#fed7aa',
+                                  '#fbcfe8'
+                                ].map((c) => (
+                                  <button
+                                    key={c}
+                                    onClick={() => {
+                                      patchElement(selectedElem.id, { backgroundColor: c })
+                                      setActiveDropdown(null)
+                                    }}
+                                    className="w-5 h-5 rounded-full border border-border shadow-sm flex items-center justify-center"
+                                    style={{ backgroundColor: c === 'transparent' ? '#ffffff' : c }}
+                                  >
+                                    {c === 'transparent' && (
+                                      <span className="text-red-500 text-[10px] font-bold">/</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="w-px h-4 bg-border/50 mx-1" />
+
+                        {/* Alignments */}
+                        <div className="flex items-center gap-0.5">
+                          {['left', 'center', 'right', 'justify'].map((a) => (
+                            <button
+                              key={a}
+                              disabled={!isFormatActive}
+                              onClick={() => patchElement(selectedElem.id, { textAlign: a })}
+                              className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : align === a ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
+                              title={`Align ${a}`}
+                            >
+                              {a === 'left' && <AlignLeft className="w-3.5 h-3.5" />}
+                              {a === 'center' && <AlignCenter className="w-3.5 h-3.5" />}
+                              {a === 'right' && <AlignRight className="w-3.5 h-3.5" />}
+                              {a === 'justify' && <AlignJustify className="w-3.5 h-3.5" />}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="w-px h-4 bg-border/50 mx-1" />
+
+                        {/* Paragraph format placeholders */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed"
+                            title="Bullets (Requires rich text model)"
+                          >
+                            <List className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed"
+                            title="Numbering (Requires rich text model)"
+                          >
+                            <ListOrdered className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed"
+                            title="Line Spacing (Requires rich text model)"
+                          >
+                            <ArrowUpDown className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-
-                      <div className="w-px h-4 bg-border/50 mx-1" />
-
-                      {/* Alignments */}
-                      <div className="flex items-center gap-0.5">
-                        {['left', 'center', 'right', 'justify'].map(a => (
-                          <button
-                            key={a}
-                            disabled={!isFormatActive}
-                            onClick={() => patchElement(selectedElem.id, { textAlign: a })}
-                            className={`p-1.5 rounded transition-colors ${!isFormatActive ? 'opacity-50 cursor-not-allowed text-muted' : align === a ? 'bg-primary/20 text-primary' : 'hover:bg-card-sunken text-muted hover:text-text'}`}
-                            title={`Align ${a}`}
-                          >
-                            {a === 'left' && <AlignLeft className="w-3.5 h-3.5" />}
-                            {a === 'center' && <AlignCenter className="w-3.5 h-3.5" />}
-                            {a === 'right' && <AlignRight className="w-3.5 h-3.5" />}
-                            {a === 'justify' && <AlignJustify className="w-3.5 h-3.5" />}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="w-px h-4 bg-border/50 mx-1" />
-
-                      {/* Paragraph format placeholders */}
-                      <div className="flex items-center gap-0.5">
-                        <button className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed" title="Bullets (Requires rich text model)">
-                          <List className="w-3.5 h-3.5" />
-                        </button>
-                        <button className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed" title="Numbering (Requires rich text model)">
-                          <ListOrdered className="w-3.5 h-3.5" />
-                        </button>
-                        <button className="p-1.5 rounded text-muted opacity-50 cursor-not-allowed" title="Line Spacing (Requires rich text model)">
-                          <ArrowUpDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                    </div>
-                  </>
-                );
-              })()}
+                    </>
+                  )
+                })()}
 
               {activeRibbonTab === 'insert' && (
                 <>
                   <div className="flex items-center gap-1 border-r border-border/50 pr-4">
-                    <button onClick={() => addElementToSlide('table')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
+                    <button
+                      onClick={() => addElementToSlide('table')}
+                      className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors"
+                    >
                       <Table2 className="w-4 h-4" />
                       <span className="text-[9px]">Table</span>
                     </button>
-                    <button onClick={() => addElementToSlide('video')} className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors">
+                    <button
+                      onClick={() => addElementToSlide('video')}
+                      className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken transition-colors"
+                    >
                       <Video className="w-4 h-4" />
                       <span className="text-[9px]">Video</span>
                     </button>
@@ -1794,7 +2057,16 @@ export default function Slides({
                     <label className="flex flex-col items-center gap-0.5 p-1.5 px-3 rounded-lg text-muted hover:text-text hover:bg-card-sunken cursor-pointer transition-colors">
                       <Upload className="w-4 h-4" />
                       <span className="text-[9px]">Import PPTX</span>
-                      <input type="file" accept=".pptx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportPptx(f); e.target.value = '' }} />
+                      <input
+                        type="file"
+                        accept=".pptx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          if (f) handleImportPptx(f)
+                          e.target.value = ''
+                        }}
+                      />
                     </label>
                   </div>
                 </>
@@ -1820,7 +2092,9 @@ export default function Slides({
 
               {activeRibbonTab === 'transitions' && (
                 <div className="flex items-center gap-4">
-                  <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Slide Transition</span>
+                  <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">
+                    Slide Transition
+                  </span>
                   <div className="flex items-center gap-2">
                     {['fade', 'slide', 'zoom', 'none'].map((effect) => (
                       <button
@@ -1841,12 +2115,15 @@ export default function Slides({
 
       {/* Main 3-Column Workspace */}
       <div className="flex min-h-0 flex-1 overflow-hidden bg-card-sunken">
-
         {/* LEFT COLUMN: Premium Thumbnails Sidebar */}
         <div className="flex h-full w-60 shrink-0 flex-col overflow-hidden border-r border-border bg-card/95">
           <div className="px-4 py-3 flex justify-between items-center border-b border-border/40 shadow-sm z-10">
             <span className="text-xs font-extrabold text-text uppercase tracking-wider">Slides</span>
-            <button onClick={addSlide} className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-on-primary transition-colors flex items-center justify-center shadow-sm" title="New Slide">
+            <button
+              onClick={addSlide}
+              className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-on-primary transition-colors flex items-center justify-center shadow-sm"
+              title="New Slide"
+            >
               <Plus className="w-4 h-4" />
             </button>
           </div>
@@ -1855,7 +2132,11 @@ export default function Slides({
             {ensureArray(slides).length === 0 && (
               <div className="flex flex-col items-center justify-center h-40 text-center opacity-60">
                 <Presentation className="w-6 h-6 mb-2 text-muted" />
-                <p className="text-[10px] text-muted">No slides yet.<br />Click + to add.</p>
+                <p className="text-[10px] text-muted">
+                  No slides yet.
+                  <br />
+                  Click + to add.
+                </p>
               </div>
             )}
 
@@ -1873,8 +2154,9 @@ export default function Slides({
                     </div>
                   )}
                   <div
-                    className={`group relative flex items-start gap-2 rounded-lg transition ${dropTargetIndex === i ? 'bg-primary/10 ring-1 ring-primary/40' : ''
-                      } ${dragSlideIndex === i ? 'opacity-50' : ''}`}
+                    className={`group relative flex items-start gap-2 rounded-lg transition ${
+                      dropTargetIndex === i ? 'bg-primary/10 ring-1 ring-primary/40' : ''
+                    } ${dragSlideIndex === i ? 'opacity-50' : ''}`}
                     draggable
                     onDragStart={(e) => onThumbDragStart(i, e)}
                     onDragOver={(e) => onThumbDragOver(i, e)}
@@ -1889,7 +2171,10 @@ export default function Slides({
                     <div className="absolute right-2 top-2 z-40 hidden group-hover:flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-lg p-1 border border-slate-200 dark:border-slate-800 shadow-md">
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleRenameSlide(i) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRenameSlide(i)
+                        }}
                         className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded transition-colors"
                         title="Rename"
                       >
@@ -1897,7 +2182,10 @@ export default function Slides({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleCopySlide(i) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopySlide(i)
+                        }}
                         className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded transition-colors"
                         title="Copy"
                       >
@@ -1905,7 +2193,10 @@ export default function Slides({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDuplicateSlide(i) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDuplicateSlide(i)
+                        }}
                         className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded transition-colors"
                         title="Duplicate"
                       >
@@ -1913,7 +2204,10 @@ export default function Slides({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); toggleHideSlide(i) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleHideSlide(i)
+                        }}
                         className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded transition-colors"
                         title={s.hidden ? 'Show' : 'Hide'}
                       >
@@ -1921,7 +2215,10 @@ export default function Slides({
                       </button>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteSlide(i) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSlide(i)
+                        }}
                         className="p-1 hover:bg-red-500 hover:text-white text-red-500 rounded transition-colors"
                         title="Delete"
                       >
@@ -1935,8 +2232,9 @@ export default function Slides({
                         setActiveSlide(i)
                         socket.emit('change-slide', { roomId, slideIndex: i })
                       }}
-                      className={`relative flex aspect-[16/9] flex-1 cursor-pointer flex-col justify-between overflow-hidden rounded-xl border bg-gradient-to-br p-2 text-left ${theme.gradient} ${isActive ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-text/30'
-                        } ${s.hidden ? 'opacity-50 grayscale' : ''}`}
+                      className={`relative flex aspect-[16/9] flex-1 cursor-pointer flex-col justify-between overflow-hidden rounded-xl border bg-gradient-to-br p-2 text-left ${theme.gradient} ${
+                        isActive ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-text/30'
+                      } ${s.hidden ? 'opacity-50 grayscale' : ''}`}
                     >
                       <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${theme.accent}`} />
                       <div className="flex w-full items-start justify-between gap-1">
@@ -1968,7 +2266,6 @@ export default function Slides({
 
         {/* CENTER COLUMN: Canvas Area */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden relative">
-
           {slides.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center">
               <div className="w-20 h-20 bg-card rounded-full flex items-center justify-center shadow-sm mb-4 border border-border">
@@ -1976,7 +2273,10 @@ export default function Slides({
               </div>
               <h2 className="text-lg font-bold text-text mb-2">Start a new presentation</h2>
               <p className="text-xs text-muted mb-6">Add a blank slide or import a PPTX file to begin.</p>
-              <button onClick={addSlide} className="px-5 py-2 bg-primary text-on-primary text-xs font-semibold rounded-xl flex items-center gap-2 hover:bg-primary-hover transition-colors">
+              <button
+                onClick={addSlide}
+                className="px-5 py-2 bg-primary text-on-primary text-xs font-semibold rounded-xl flex items-center gap-2 hover:bg-primary-hover transition-colors"
+              >
                 <Plus className="w-4 h-4" /> Add First Slide
               </button>
             </div>
@@ -1989,7 +2289,6 @@ export default function Slides({
                   setEditingElemId(null)
                 }}
               >
-
                 {/* Fixed Center Alignment Guides */}
                 <div className="absolute inset-x-0 top-1/2 h-px bg-primary/20 pointer-events-none border-t border-dashed border-primary/30" />
                 <div className="absolute inset-y-0 left-1/2 w-px bg-primary/20 pointer-events-none border-l border-dashed border-primary/30" />
@@ -2009,18 +2308,31 @@ export default function Slides({
 
               {/* Canvas Bottom Controls (Zoom & Notes toggle) */}
               <div className="h-10 border-t border-border bg-card px-4 flex items-center justify-between z-10 shrink-0">
-                <button onClick={() => setShowNotes(!showNotes)} className={`flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded transition-colors ${showNotes ? 'bg-primary/10 text-primary' : 'text-muted hover:text-text hover:bg-card-sunken'}`}>
+                <button
+                  onClick={() => setShowNotes(!showNotes)}
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded transition-colors ${showNotes ? 'bg-primary/10 text-primary' : 'text-muted hover:text-text hover:bg-card-sunken'}`}
+                >
                   <StickyNote className="w-3.5 h-3.5" /> Notes
                 </button>
 
                 <div className="flex items-center gap-1 bg-card-sunken rounded-lg border border-border px-1">
-                  <button onClick={() => setZoom(z => Math.max(25, z - 25))} className="p-1 text-muted hover:text-text transition-colors">
+                  <button
+                    onClick={() => setZoom((z) => Math.max(25, z - 25))}
+                    className="p-1 text-muted hover:text-text transition-colors"
+                  >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-[10px] font-bold text-text w-10 text-center select-none cursor-pointer hover:text-primary" onClick={() => setZoom(100)} title="Reset Zoom">
+                  <span
+                    className="text-[10px] font-bold text-text w-10 text-center select-none cursor-pointer hover:text-primary"
+                    onClick={() => setZoom(100)}
+                    title="Reset Zoom"
+                  >
                     {zoom}%
                   </span>
-                  <button onClick={() => setZoom(z => Math.min(200, z + 25))} className="p-1 text-muted hover:text-text transition-colors">
+                  <button
+                    onClick={() => setZoom((z) => Math.min(200, z + 25))}
+                    className="p-1 text-muted hover:text-text transition-colors"
+                  >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -2034,7 +2346,9 @@ export default function Slides({
                       <StickyNote className="w-3.5 h-3.5 text-muted" />
                       <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Speaker Notes</span>
                     </div>
-                    <button onClick={() => setShowNotes(false)} className="text-muted hover:text-text p-1"><X className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setShowNotes(false)} className="text-muted hover:text-text p-1">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <textarea
                     value={activeSlideData.notes || ''}
@@ -2064,7 +2378,7 @@ export default function Slides({
                 <div>
                   <h3 className="text-[10px] font-bold text-muted mb-3 uppercase tracking-wider">Slide Layout</h3>
                   <div className="grid grid-cols-2 gap-2">
-                    {['title', 'split', 'image-left', 'normal'].map(l => (
+                    {['title', 'split', 'image-left', 'normal'].map((l) => (
                       <button
                         key={l}
                         onClick={() => handleSlideUpdate('layout', l)}
@@ -2082,7 +2396,7 @@ export default function Slides({
                 <div>
                   <h3 className="text-[10px] font-bold text-muted mb-3 uppercase tracking-wider">Slide Theme</h3>
                   <div className="space-y-2">
-                    {SLIDE_THEMES.map(t => (
+                    {SLIDE_THEMES.map((t) => (
                       <button
                         key={t.id}
                         onClick={() => setSelectedTheme(t.id)}
@@ -2116,16 +2430,17 @@ export default function Slides({
               </div>
             ) : (
               <div className="p-4 space-y-6">
-
                 {/* Text Typography (if applicable) */}
-                {['textbox', 'text', 'shape'].includes(ensureArray(slideElements).find(e => e.id === selectedElemId)?.type) && (
+                {['textbox', 'text', 'shape'].includes(
+                  ensureArray(slideElements).find((e) => e.id === selectedElemId)?.type
+                ) && (
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-[10px] font-bold text-muted uppercase tracking-wider">Typography</h3>
                     </div>
                     <div className="space-y-3">
                       <select
-                        value={ensureArray(slideElements).find(e => e.id === selectedElemId)?.fontFamily || 'inherit'}
+                        value={ensureArray(slideElements).find((e) => e.id === selectedElemId)?.fontFamily || 'inherit'}
                         onChange={(e) => patchElement(selectedElemId, { fontFamily: e.target.value })}
                         className="w-full bg-card-sunken border border-border rounded-lg px-2 py-1.5 text-xs text-text focus:border-primary focus:outline-none transition-colors"
                       >
@@ -2139,36 +2454,47 @@ export default function Slides({
                         <input
                           type="text"
                           placeholder="Size (e.g. 16px)"
-                          value={ensureArray(slideElements).find(e => e.id === selectedElemId)?.fontSize || '14px'}
+                          value={ensureArray(slideElements).find((e) => e.id === selectedElemId)?.fontSize || '14px'}
                           onChange={(e) => patchElement(selectedElemId, { fontSize: e.target.value })}
                           className="w-1/2 bg-card-sunken border border-border rounded-lg px-2 py-1.5 text-xs text-text focus:border-primary focus:outline-none transition-colors"
                         />
                         <button
                           onClick={() => {
-                            const cur = ensureArray(slideElements).find(e => e.id === selectedElemId)?.fontWeight;
-                            patchElement(selectedElemId, { fontWeight: cur === 'bold' ? 'normal' : 'bold' });
+                            const cur = ensureArray(slideElements).find((e) => e.id === selectedElemId)?.fontWeight
+                            patchElement(selectedElemId, { fontWeight: cur === 'bold' ? 'normal' : 'bold' })
                           }}
-                          className={`flex-1 rounded-lg border transition-colors flex items-center justify-center ${ensureArray(slideElements).find(e => e.id === selectedElemId)?.fontWeight === 'bold' ? 'bg-primary/10 border-primary text-primary' : 'bg-card-sunken border-border text-muted hover:text-text'}`}
+                          className={`flex-1 rounded-lg border transition-colors flex items-center justify-center ${ensureArray(slideElements).find((e) => e.id === selectedElemId)?.fontWeight === 'bold' ? 'bg-primary/10 border-primary text-primary' : 'bg-card-sunken border-border text-muted hover:text-text'}`}
                         >
                           <Bold className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
                       <div className="flex bg-card-sunken rounded-lg border border-border overflow-hidden">
-                        {['left', 'center', 'right'].map(align => (
+                        {['left', 'center', 'right'].map((align) => (
                           <button
                             key={align}
                             onClick={() => patchElement(selectedElemId, { textAlign: align })}
-                            className={`flex-1 py-1.5 flex justify-center items-center transition-colors ${ensureArray(slideElements).find(e => e.id === selectedElemId)?.textAlign === align ? 'bg-primary/20 text-primary' : 'text-muted hover:bg-card hover:text-text'}`}
+                            className={`flex-1 py-1.5 flex justify-center items-center transition-colors ${ensureArray(slideElements).find((e) => e.id === selectedElemId)?.textAlign === align ? 'bg-primary/20 text-primary' : 'text-muted hover:bg-card hover:text-text'}`}
                           >
-                            {align === 'left' ? <AlignLeft className="w-3.5 h-3.5" /> : align === 'center' ? <AlignCenter className="w-3.5 h-3.5" /> : <AlignRight className="w-3.5 h-3.5" />}
+                            {align === 'left' ? (
+                              <AlignLeft className="w-3.5 h-3.5" />
+                            ) : align === 'center' ? (
+                              <AlignCenter className="w-3.5 h-3.5" />
+                            ) : (
+                              <AlignRight className="w-3.5 h-3.5" />
+                            )}
                           </button>
                         ))}
                       </div>
 
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded border border-border overflow-hidden shrink-0">
-                          <input type="color" className="w-8 h-8 -m-1 cursor-pointer" value={ensureArray(slideElements).find(e => e.id === selectedElemId)?.color || '#000000'} onChange={(e) => patchElement(selectedElemId, { color: e.target.value })} />
+                          <input
+                            type="color"
+                            className="w-8 h-8 -m-1 cursor-pointer"
+                            value={ensureArray(slideElements).find((e) => e.id === selectedElemId)?.color || '#000000'}
+                            onChange={(e) => patchElement(selectedElemId, { color: e.target.value })}
+                          />
                         </div>
                         <span className="text-[10px] text-muted">Text Color</span>
                       </div>
@@ -2176,7 +2502,9 @@ export default function Slides({
                   </div>
                 )}
 
-                {['textbox', 'text', 'shape'].includes(ensureArray(slideElements).find(e => e.id === selectedElemId)?.type) && <hr className="border-border" />}
+                {['textbox', 'text', 'shape'].includes(
+                  ensureArray(slideElements).find((e) => e.id === selectedElemId)?.type
+                ) && <hr className="border-border" />}
 
                 {/* Appearance */}
                 <div>
@@ -2185,7 +2513,12 @@ export default function Slides({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded border border-border overflow-hidden shrink-0 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhYWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg==')]">
-                          <input type="color" className="w-8 h-8 -m-1 cursor-pointer" value={ensureArray(slideElements).find(e => e.id === selectedElemId)?.fill || '#ffffff'} onChange={(e) => patchElement(selectedElemId, { fill: e.target.value })} />
+                          <input
+                            type="color"
+                            className="w-8 h-8 -m-1 cursor-pointer"
+                            value={ensureArray(slideElements).find((e) => e.id === selectedElemId)?.fill || '#ffffff'}
+                            onChange={(e) => patchElement(selectedElemId, { fill: e.target.value })}
+                          />
                         </div>
                         <span className="text-[10px] font-medium text-text">Fill Color</span>
                       </div>
@@ -2194,7 +2527,14 @@ export default function Slides({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded border border-border overflow-hidden shrink-0">
-                          <input type="color" className="w-8 h-8 -m-1 cursor-pointer" value={ensureArray(slideElements).find(e => e.id === selectedElemId)?.borderColor || '#cccccc'} onChange={(e) => patchElement(selectedElemId, { borderColor: e.target.value })} />
+                          <input
+                            type="color"
+                            className="w-8 h-8 -m-1 cursor-pointer"
+                            value={
+                              ensureArray(slideElements).find((e) => e.id === selectedElemId)?.borderColor || '#cccccc'
+                            }
+                            onChange={(e) => patchElement(selectedElemId, { borderColor: e.target.value })}
+                          />
                         </div>
                         <span className="text-[10px] font-medium text-text">Border</span>
                       </div>
@@ -2203,7 +2543,7 @@ export default function Slides({
                         min="0"
                         max="20"
                         placeholder="Width"
-                        value={ensureArray(slideElements).find(e => e.id === selectedElemId)?.borderWidth ?? 1}
+                        value={ensureArray(slideElements).find((e) => e.id === selectedElemId)?.borderWidth ?? 1}
                         onChange={(e) => patchElement(selectedElemId, { borderWidth: parseInt(e.target.value) || 0 })}
                         className="w-12 bg-card-sunken border border-border rounded px-1.5 py-1 text-[10px] text-center text-text focus:border-primary focus:outline-none"
                       />
@@ -2213,8 +2553,10 @@ export default function Slides({
                       <span className="text-[10px] font-medium text-text shrink-0">Opacity</span>
                       <input
                         type="range"
-                        min="0" max="1" step="0.1"
-                        value={ensureArray(slideElements).find(e => e.id === selectedElemId)?.opacity ?? 1}
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={ensureArray(slideElements).find((e) => e.id === selectedElemId)?.opacity ?? 1}
                         onChange={(e) => patchElement(selectedElemId, { opacity: parseFloat(e.target.value) })}
                         className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
                       />
@@ -2232,7 +2574,7 @@ export default function Slides({
                       <span className="text-[9px] font-bold text-muted w-4">X</span>
                       <input
                         type="number"
-                        value={Math.round(ensureArray(slideElements).find(e => e.id === selectedElemId)?.x || 0)}
+                        value={Math.round(ensureArray(slideElements).find((e) => e.id === selectedElemId)?.x || 0)}
                         onChange={(e) => patchElement(selectedElemId, { x: parseInt(e.target.value) || 0 })}
                         className="w-full bg-transparent py-1.5 text-xs text-text focus:outline-none"
                       />
@@ -2241,7 +2583,7 @@ export default function Slides({
                       <span className="text-[9px] font-bold text-muted w-4">Y</span>
                       <input
                         type="number"
-                        value={Math.round(ensureArray(slideElements).find(e => e.id === selectedElemId)?.y || 0)}
+                        value={Math.round(ensureArray(slideElements).find((e) => e.id === selectedElemId)?.y || 0)}
                         onChange={(e) => patchElement(selectedElemId, { y: parseInt(e.target.value) || 0 })}
                         className="w-full bg-transparent py-1.5 text-xs text-text focus:outline-none"
                       />
@@ -2250,7 +2592,7 @@ export default function Slides({
                       <span className="text-[9px] font-bold text-muted w-4">W</span>
                       <input
                         type="number"
-                        value={Math.round(ensureArray(slideElements).find(e => e.id === selectedElemId)?.width || 0)}
+                        value={Math.round(ensureArray(slideElements).find((e) => e.id === selectedElemId)?.width || 0)}
                         onChange={(e) => patchElement(selectedElemId, { width: parseInt(e.target.value) || 0 })}
                         className="w-full bg-transparent py-1.5 text-xs text-text focus:outline-none"
                       />
@@ -2259,7 +2601,7 @@ export default function Slides({
                       <span className="text-[9px] font-bold text-muted w-4">H</span>
                       <input
                         type="number"
-                        value={Math.round(ensureArray(slideElements).find(e => e.id === selectedElemId)?.height || 0)}
+                        value={Math.round(ensureArray(slideElements).find((e) => e.id === selectedElemId)?.height || 0)}
                         onChange={(e) => patchElement(selectedElemId, { height: parseInt(e.target.value) || 0 })}
                         className="w-full bg-transparent py-1.5 text-xs text-text focus:outline-none"
                       />
@@ -2269,7 +2611,7 @@ export default function Slides({
                     <span className="text-[9px] font-bold text-muted w-8">Rotation</span>
                     <input
                       type="number"
-                      value={Math.round(ensureArray(slideElements).find(e => e.id === selectedElemId)?.rotation || 0)}
+                      value={Math.round(ensureArray(slideElements).find((e) => e.id === selectedElemId)?.rotation || 0)}
                       onChange={(e) => patchElement(selectedElemId, { rotation: parseInt(e.target.value) || 0 })}
                       className="w-full bg-transparent py-1.5 text-xs text-text focus:outline-none"
                     />
@@ -2279,7 +2621,10 @@ export default function Slides({
 
                 <hr className="border-border" />
 
-                <button onClick={() => deleteElement(selectedElemId)} className="w-full py-2 bg-danger/10 text-danger text-xs font-bold rounded-lg hover:bg-danger/20 flex items-center justify-center gap-2 transition-colors">
+                <button
+                  onClick={() => deleteElement(selectedElemId)}
+                  className="w-full py-2 bg-danger/10 text-danger text-xs font-bold rounded-lg hover:bg-danger/20 flex items-center justify-center gap-2 transition-colors"
+                >
                   <Trash2 className="w-3.5 h-3.5" /> Delete Element
                 </button>
               </div>

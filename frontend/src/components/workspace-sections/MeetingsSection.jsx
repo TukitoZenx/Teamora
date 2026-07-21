@@ -12,11 +12,5 @@ export default function MeetingsSection() {
     return () => setPortalTarget(null)
   }, [setPortalTarget])
 
-  return (
-    <div 
-      ref={ref} 
-      id="global-meeting-portal-target" 
-      className="w-full h-full min-h-[500px]" 
-    />
-  )
+  return <div ref={ref} id="global-meeting-portal-target" className="w-full h-full min-h-[500px]" />
 }

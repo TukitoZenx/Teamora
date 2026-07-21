@@ -4,7 +4,6 @@ import teamoraLogo from '../../../assets/hero.png'
 import AuthBrandPanel from './AuthBrandPanel'
 import { motion } from 'framer-motion'
 
-
 export default function AuthShell({ children }) {
   return (
     <main className="min-h-screen bg-background font-sans text-text md:grid md:grid-cols-[45%_55%] lg:grid-cols-[40%_60%]">
@@ -32,44 +31,44 @@ export default function AuthShell({ children }) {
                 {/* Glowing rotating aura */}
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-tr from-[#00d2ff] via-[#3a7bd5] to-[#ff00c8] rounded-full blur-xl opacity-40"
-                  animate={{ 
-                    rotate: 360, 
+                  animate={{
+                    rotate: 360,
                     scale: [1, 1.2, 1],
                     opacity: [0.3, 0.6, 0.3]
                   }}
-                  transition={{ 
+                  transition={{
                     rotate: { duration: 8, repeat: Infinity, ease: 'linear' },
                     scale: { duration: 4, repeat: Infinity, ease: 'easeInOut' },
                     opacity: { duration: 4, repeat: Infinity, ease: 'easeInOut' }
                   }}
                 />
-                
+
                 {/* The actual logo image animated */}
                 <motion.img
                   src={teamoraLogo}
                   alt="Teamora logo"
                   className="relative z-10 h-16 w-16 drop-shadow-2xl object-contain"
-                  animate={{ 
-                    y: [-3, 3, -3],
+                  animate={{
+                    y: [-3, 3, -3]
                   }}
-                  transition={{ 
-                    duration: 4, 
-                    repeat: Infinity, 
-                    ease: 'easeInOut' 
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: 'easeInOut'
                   }}
                   whileHover={{ scale: 1.1, rotate: 5 }}
                 />
               </div>
-              <span className="text-2xl font-bold tracking-tight text-text group-hover:text-primary transition-colors duration-300">Teamora</span>
+              <span className="text-2xl font-bold tracking-tight text-text group-hover:text-primary transition-colors duration-300">
+                Teamora
+              </span>
             </Link>
           </div>
 
           <div className="relative overflow-hidden rounded-card border border-border/50 bg-card/60 p-6 shadow-modal backdrop-blur-xl sm:p-8">
             <div className="absolute -left-4 -top-4 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
             <div className="absolute -bottom-4 -right-4 h-32 w-32 rounded-full bg-info/10 blur-2xl" />
-            <div className="relative z-10">
-              {children}
-            </div>
+            <div className="relative z-10">{children}</div>
           </div>
         </div>
       </section>

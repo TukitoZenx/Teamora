@@ -22,7 +22,6 @@ import WorkspaceModal from './WorkspaceModal'
 import ConfirmDialog from './ConfirmDialog'
 import Button from './ui/Button'
 
-
 const tabs = ['Recent', 'Pinned', 'Favorites', 'History']
 const sortOptions = [
   ['lastOpened', 'Last Opened'],
@@ -285,8 +284,6 @@ export default function Dashboard({
     }
   }
 
-
-
   const deleteWorkspace = async (workspace) => {
     // Already-archived (trash) workspaces cannot be deleted again via API —
     // remove them from history instead so the dashboard stays clean.
@@ -506,7 +503,13 @@ export default function Dashboard({
       )}
 
       {leaveWorkspace && <WorkspaceLeaveDialog onCancel={() => setLeaveWorkspace(null)} onLeave={handleLeave} />}
-      {workspaceToDelete && <WorkspaceDeleteDialog workspace={workspaceToDelete} onCancel={() => setWorkspaceToDelete(null)} onDelete={handleDelete} />}
+      {workspaceToDelete && (
+        <WorkspaceDeleteDialog
+          workspace={workspaceToDelete}
+          onCancel={() => setWorkspaceToDelete(null)}
+          onDelete={handleDelete}
+        />
+      )}
       {workspaceToRemove && (
         <ConfirmDialog
           title="Remove from History?"
@@ -683,7 +686,6 @@ function WorkspaceLauncherCard({
           </Button>
         ) : null}
       </div>
-
     </article>
   )
 }
