@@ -279,12 +279,21 @@ const upsertRecentWorkspace = async (userId, workspace, status, extra = {}) => {
 const cleanRecentWorkspace = (entry, userId, activeWorkspaceIds = new Set()) => {
   const workspaceId = getEntityId(entry.workspace)?.toString();
   const workspace = entry.workspace && typeof entry.workspace === 'object' ? entry.workspace : null;
-  const trashed = Boolean(workspace?.archivedAt || entry.status === 'trashed');
-  const active = !trashed && workspaceId && activeWorkspaceIds.has(workspaceId);
+  const closed = Boolean(workspace?.archivedAt);
+  // Trash only when explicitly deleted by owner — leave uses previously_joined.
+  const trashed = entry.status === 'trashed';
+  const active = !closed && workspaceId && activeWorkspaceIds.has(workspaceId);
   const pendingRequest = workspace?.joinRequests?.find((request) => {
     const requesterId = getEntityId(request.requester);
     return requesterId?.toString() === userId.toString() && request.status === 'pending';
   });
+  const hasApproval = workspace?.approvedMembers?.some((approval) => {
+    const id = getEntityId(approval.user);
+    return id?.toString() === userId.toString() && !approval.revokedAt && !approval.bannedAt;
+  });
+  const isOwnerRecord = getEntityId(workspace?.owner)?.toString() === userId.toString();
+  const canRejoinFreely = !active && !closed && Boolean(workspace) && (hasApproval || isOwnerRecord);
+
   const status = trashed
     ? 'trashed'
     : active
@@ -293,7 +302,10 @@ const cleanRecentWorkspace = (entry, userId, activeWorkspaceIds = new Set()) => 
         ? 'pending'
         : entry.status === 'active'
           ? 'removed'
-          : entry.status;
+          : entry.status === 'trashed'
+            ? 'trashed'
+            : entry.status || 'previously_joined';
+
   const statusLabel =
     status === 'trashed'
       ? 'Workspace Trash'
@@ -309,18 +321,53 @@ const cleanRecentWorkspace = (entry, userId, activeWorkspaceIds = new Set()) => 
     _id: workspaceId,
     workspaceId,
     name: workspace?.name || entry.name,
+    icon: workspace?.icon || entry.icon || '',
     owner: workspace?.owner || entry.owner,
     ownerName: workspace?.owner ? getDisplayName(workspace.owner) : entry.ownerName,
     inviteCode: workspace?.inviteCode || null,
     inviteLink: workspace?.inviteCode ? `${CLIENT_URL}/invite/${workspace.inviteCode}` : null,
+    visibility: workspace?.visibility || 'invite_only',
     status,
     statusLabel,
     canOpen: active,
-    canRequestAccess: !active && Boolean(workspace?.inviteCode),
+    canRequestAccess:
+      !active && !closed && Boolean(workspace?.inviteCode) && (canRejoinFreely || workspace?.visibility !== 'private'),
+    canRejoinFreely,
     lastSeenAt: entry.lastSeenAt,
     leftAt: entry.leftAt,
     requestedAt: entry.requestedAt
   };
+};
+
+const selectOwnershipSuccessor = (workspace, excludeUserId) => {
+  const exclude = excludeUserId?.toString();
+  const remaining = (workspace.members || [])
+    .map((memberId) => getEntityId(memberId)?.toString())
+    .filter((id) => id && id !== exclude);
+  if (remaining.length === 0) return null;
+
+  const approvalTime = (userId) => {
+    const approval = (workspace.approvedMembers || []).find(
+      (item) => getEntityId(item.user)?.toString() === userId && !item.revokedAt && !item.bannedAt
+    );
+    return approval?.approvedAt ? new Date(approval.approvedAt).getTime() : Number.MAX_SAFE_INTEGER;
+  };
+
+  remaining.sort((a, b) => approvalTime(a) - approvalTime(b));
+  return remaining[0];
+};
+
+const reassignPendingJoinNotifications = (workspace, fromUserId, toUserId) => {
+  if (!fromUserId || !toUserId) return;
+  const from = fromUserId.toString();
+  const to = toUserId.toString();
+  if (from === to) return;
+  (workspace.notifications || []).forEach((notification) => {
+    if (notification.type !== 'join_request') return;
+    if (getEntityId(notification.recipient)?.toString() !== from) return;
+    if (getEntityId(notification.requester)?.toString() === to) return;
+    notification.recipient = to;
+  });
 };
 
 const MAX_OWNED_WORKSPACES = 6;
@@ -539,14 +586,16 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
   }
 
   if (isWorkspaceMember(workspace, userId)) {
-    throw createError('You are already a member of this workspace', 409);
+    const populated = await populateWorkspace(Workspace.findById(workspace._id));
+    await upsertRecentWorkspace(userId, populated, 'active');
+    return {
+      joined: true,
+      workspace: cleanWorkspace(populated, userId)
+    };
   }
 
-  // Private workspaces cannot be joined through an invite code. Owners must
-  // switch visibility to invite-only (or add members via a future add-user flow).
-  if ((workspace.visibility || 'invite_only') === 'private') {
-    throw createError('This workspace is private and does not accept invite joins.', 403);
-  }
+  const ownerId = getEntityId(workspace.owner)?.toString();
+  const isCurrentOwner = ownerId === userId.toString();
 
   const autoJoin = async () => {
     if (!isWorkspaceMember(workspace, userId)) {
@@ -571,13 +620,23 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
     };
   };
 
-  // Owners can disable join approval in workspace settings. When off, invite
-  // holders join immediately instead of waiting for an accept/decline cycle.
-  if (workspace.joinApproval === false) {
+  // Owner always re-enters without requesting (never notify themselves).
+  if (isCurrentOwner) {
     return autoJoin();
   }
 
+  // Previously accepted members rejoin without a new permission request.
   if (hasActiveApproval(workspace, userId)) {
+    return autoJoin();
+  }
+
+  // Private workspaces cannot be joined through an invite code by new users.
+  if ((workspace.visibility || 'invite_only') === 'private') {
+    throw createError('This workspace is private and does not accept invite joins.', 403);
+  }
+
+  // Owners can disable join approval in workspace settings.
+  if (workspace.joinApproval === false) {
     return autoJoin();
   }
 
@@ -592,6 +651,10 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
       request: existingPending,
       workspace: await getInvitePreview(userId, workspace.inviteCode)
     };
+  }
+
+  if (!ownerId) {
+    throw createError('Workspace owner is unavailable', 500);
   }
 
   workspace.joinRequests.push({ requester: userId });
@@ -865,37 +928,53 @@ const leaveWorkspace = async (userId, workspaceId) => {
   const workspace = await Workspace.findById(workspaceId);
 
   if (!workspace || workspace.archivedAt) {
-    throw createError('Workspace not found', 404);
+    throw createError('Workspace not found or you no longer have access', 404);
   }
 
   const isMember = workspace.members.some((memberId) => memberId.toString() === userId.toString());
 
   if (!isMember) {
+    await upsertRecentWorkspace(userId, workspace, 'previously_joined');
     throw createError('You are not a member of this workspace', 404);
   }
 
   const isOwner = workspace.owner.toString() === userId.toString();
+  const previousOwnerId = workspace.owner.toString();
   workspace.members = workspace.members.filter((memberId) => memberId.toString() !== userId.toString());
 
-  // Revoke approval so a later invite request still goes through join approval
-  // (when enabled) instead of auto-joining via hasActiveApproval().
-  const leavingApproval = workspace.approvedMembers?.find(
-    (item) => getEntityId(item.user)?.toString() === userId.toString()
-  );
-  if (leavingApproval) {
-    leavingApproval.revokedAt = new Date();
+  // Keep approval permanently so accepted members (and former owners) can rejoin
+  // without another permission request. Only remove/ban should revoke access.
+  ensureApproval(workspace, userId);
+
+  // Cancel any pending join requests the leaver still has open.
+  for (let i = (workspace.joinRequests || []).length - 1; i >= 0; i -= 1) {
+    const request = workspace.joinRequests[i];
+    if (request.status !== 'pending') continue;
+    if (getEntityId(request.requester)?.toString() === userId.toString()) {
+      request.status = 'declined';
+      request.resolvedAt = new Date();
+    }
   }
 
-  // If the owner leaves and nobody else remains, archive the workspace so it
-  // still shows up in dashboard history instead of disappearing completely.
+  // Sole remaining member leaving: close workspace without putting them in Trash.
   if (isOwner && workspace.members.length === 0) {
+    for (let i = (workspace.notifications || []).length - 1; i >= 0; i -= 1) {
+      const notification = workspace.notifications[i];
+      if (notification.type !== 'join_request') continue;
+      if (getEntityId(notification.recipient)?.toString() === userId.toString()) {
+        if (typeof workspace.notifications[i].deleteOne === 'function') {
+          workspace.notifications[i].deleteOne();
+        }
+      }
+    }
+
     workspace.active = false;
     workspace.archivedAt = new Date();
     workspace.archivedBy = userId;
     await workspace.save();
 
     const populated = await populateWorkspace(Workspace.findById(workspace._id));
-    await upsertRecentWorkspace(userId, populated, 'trashed', {
+    await upsertRecentWorkspace(userId, populated, 'previously_joined', {
       leftAt: workspace.archivedAt,
       lastSeenAt: workspace.archivedAt
     });
@@ -912,14 +991,28 @@ const leaveWorkspace = async (userId, workspaceId) => {
   }
 
   let ownershipTransferred = false;
+  let newOwnerId = null;
 
-  // If the owner leaves but teammates remain, ownership must transfer to someone
-  // who is still a member. Otherwise the previous owner would keep owner-only
-  // privileges (update/delete workspace, manage members, resolve join requests)
-  // via assertOwner() even after no longer being a member — a broken-access-control bug.
+  // Transfer ownership to longest-tenured remaining member; reassign join requests.
   if (isOwner) {
-    workspace.owner = workspace.members[0];
+    const successor = selectOwnershipSuccessor(workspace, userId);
+    if (!successor) {
+      throw createError('Unable to transfer ownership — no eligible members remain', 500);
+    }
+    workspace.owner = successor;
+    reassignPendingJoinNotifications(workspace, previousOwnerId, successor);
     ownershipTransferred = true;
+    newOwnerId = successor.toString();
+  } else {
+    for (let i = (workspace.notifications || []).length - 1; i >= 0; i -= 1) {
+      const notification = workspace.notifications[i];
+      if (notification.type !== 'join_request') continue;
+      if (getEntityId(notification.recipient)?.toString() === userId.toString()) {
+        if (typeof workspace.notifications[i].deleteOne === 'function') {
+          workspace.notifications[i].deleteOne();
+        }
+      }
+    }
   }
 
   workspace.active = workspace.members.length > 0;
@@ -927,12 +1020,16 @@ const leaveWorkspace = async (userId, workspaceId) => {
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
   await upsertRecentWorkspace(userId, populated, 'previously_joined');
 
+  if (ownershipTransferred && newOwnerId) {
+    await upsertRecentWorkspace(newOwnerId, populated, 'active');
+  }
+
   return {
     success: true,
     workspaceDeleted: false,
     workspaceInactive: !workspace.active,
     ownershipTransferred,
-    newOwnerId: ownershipTransferred ? workspace.owner.toString() : null
+    newOwnerId
   };
 };
 

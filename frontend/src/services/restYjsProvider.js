@@ -34,6 +34,8 @@ export function connectRestYjsProvider(
   let pushing = false
   let lastPushedState = null
   let wsConnected = false
+  let wsPending = []
+  let wsFlushTimer = null
 
   const collab =
     workspaceId && key
@@ -97,15 +99,31 @@ export function connectRestYjsProvider(
     }, 350)
   }
 
-  const onLocalUpdate = (update, origin) => {
-    if (destroyed || origin === 'remote') return
-    pending.push(update)
-    // Immediate WS hint with this update for snappier peers (REST still debounced).
+  const flushWs = () => {
+    if (destroyed || wsPending.length === 0) return
+    const batch = wsPending
+    wsPending = []
     try {
-      collab?.sendYjsUpdate?.(toBase64(update))
+      const merged = Y.mergeUpdates(batch)
+      collab?.sendYjsUpdate?.(toBase64(merged))
     } catch {
       // ignore
     }
+  }
+
+  const scheduleWsFlush = () => {
+    if (wsFlushTimer) return
+    wsFlushTimer = window.setTimeout(() => {
+      wsFlushTimer = null
+      flushWs()
+    }, 50) // Batch ultra-fast drawing updates
+  }
+
+  const onLocalUpdate = (update, origin) => {
+    if (destroyed || origin === 'remote') return
+    pending.push(update)
+    wsPending.push(update)
+    scheduleWsFlush()
     scheduleFlush()
   }
 
@@ -136,6 +154,7 @@ export function connectRestYjsProvider(
       destroyed = true
       ydoc.off('update', onLocalUpdate)
       if (flushTimer) window.clearTimeout(flushTimer)
+      if (wsFlushTimer) window.clearTimeout(wsFlushTimer)
       if (pollTimer) window.clearInterval(pollTimer)
       collab?.destroy?.()
       return finalFlush

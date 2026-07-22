@@ -25,7 +25,13 @@ describe('Workspace Service - leaveWorkspace', () => {
       name: 'Teamora Test Workspace',
       owner: ownerId,
       members: [ownerId, nextOwnerId],
-      approvedMembers: [{ user: ownerId }, { user: nextOwnerId }],
+      memberRoles: [],
+      approvedMembers: [
+        { user: ownerId, approvedAt: new Date('2024-01-01') },
+        { user: nextOwnerId, approvedAt: new Date('2024-01-02') }
+      ],
+      notifications: [],
+      joinRequests: [],
       active: true,
       save: async function () {
         return this;
@@ -52,17 +58,28 @@ describe('Workspace Service - leaveWorkspace', () => {
     assert.equal(mockWorkspace.members.length, 1);
   });
 
-  test('should archive the workspace when the sole remaining member leaves', async () => {
+  test('should close workspace without trash when sole remaining member leaves', async () => {
     const soleMemberId = new mongoose.Types.ObjectId();
     const workspaceId = new mongoose.Types.ObjectId();
 
     let saveCalled = false;
+    let recentStatus = null;
+
+    mock.method(User, 'updateOne', async (_filter, update) => {
+      const entry = update?.$push?.recentWorkspaces?.$each?.[0];
+      if (entry?.status) recentStatus = entry.status;
+      return { acknowledged: true };
+    });
 
     const mockWorkspace = {
       _id: workspaceId,
       name: 'Solo Workspace',
       owner: soleMemberId,
       members: [soleMemberId],
+      memberRoles: [],
+      notifications: [],
+      joinRequests: [],
+      approvedMembers: [{ user: soleMemberId }],
       save: async function () {
         saveCalled = true;
         return this;
@@ -88,9 +105,11 @@ describe('Workspace Service - leaveWorkspace', () => {
     assert.equal(saveCalled, true);
     assert.ok(mockWorkspace.archivedAt instanceof Date);
     assert.equal(mockWorkspace.archivedBy.toString(), soleMemberId.toString());
+    // Leave must never mark history as trash.
+    assert.equal(recentStatus, 'previously_joined');
   });
 
-  test('should revoke approval when a non-owner leaves', async () => {
+  test('should keep permanent approval when a non-owner leaves so they can rejoin freely', async () => {
     const ownerId = new mongoose.Types.ObjectId();
     const memberId = new mongoose.Types.ObjectId();
     const workspaceId = new mongoose.Types.ObjectId();
@@ -100,7 +119,10 @@ describe('Workspace Service - leaveWorkspace', () => {
       name: 'Approval Workspace',
       owner: ownerId,
       members: [ownerId, memberId],
+      memberRoles: [],
       approvedMembers: [{ user: ownerId }, { user: memberId, revokedAt: null }],
+      notifications: [],
+      joinRequests: [],
       active: true,
       save: async function () {
         return this;
@@ -121,7 +143,7 @@ describe('Workspace Service - leaveWorkspace', () => {
 
     assert.equal(result.success, true);
     assert.equal(result.ownershipTransferred, false);
-    assert.ok(approval.revokedAt instanceof Date);
+    assert.equal(approval.revokedAt, null);
   });
 });
 

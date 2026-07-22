@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import * as Y from 'yjs'
-import Slides from '../Slides'
+const PresentationModule = lazy(() => import('../presentation/PresentationModule'))
 import useLocalCollabChannel from '../../hooks/useLocalCollabChannel'
 import { connectRestYjsProvider } from '../../services/restYjsProvider'
 
@@ -251,40 +251,20 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
     })
   }, [])
 
-  const handleSlideUpdate = useCallback(
-    (field, value) => {
-      setSlides((current) =>
-        current.map((slide, index) => (index === activeSlide ? { ...slide, [field]: value } : slide))
-      )
-    },
-    [activeSlide, setSlides]
-  )
-
-  const addSlide = useCallback(() => {
-    // Create the slide object once (outside updater) so Strict Mode double-invoke
-    // cannot produce two distinct slide ids / two new slides.
-    const slide = blankSlide()
-    setSlides((current) => {
-      if (current.some((s) => s?.id === slide.id)) return current
-      const next = [...current, slide]
-      queueMicrotask(() => setActiveSlide(next.length - 1))
-      return next
-    })
-  }, [setSlides])
 
   return (
-    <Slides
-      slides={slides}
-      setSlides={setSlides}
-      activeSlide={activeSlide}
-      setActiveSlide={setActiveSlide}
-      isPresenting={isPresenting}
-      setIsPresenting={setIsPresenting}
-      addSlide={addSlide}
-      handleSlideUpdate={handleSlideUpdate}
-      roomId={workspaceId}
-      socket={channel}
-      activeUsers={[]}
-    />
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-muted">Loading Presentation...</div>}>
+      <PresentationModule
+        slides={slides}
+        setSlides={setSlides}
+        activeSlide={activeSlide}
+        setActiveSlide={setActiveSlide}
+        isPresenting={isPresenting}
+        setIsPresenting={setIsPresenting}
+        roomId={workspaceId}
+        socket={channel}
+        activeUsers={[]}
+      />
+    </Suspense>
   )
 }

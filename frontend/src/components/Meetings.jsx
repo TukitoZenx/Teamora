@@ -397,9 +397,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
         setSelectedSpeaker(deviceId)
         toast.success('Speaker output device updated')
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [micActive, camActive]
+    [micActive, camActive, socketId, attachSpeakingMonitor, clearSpeakingMonitor]
   )
 
   useEffect(() => {

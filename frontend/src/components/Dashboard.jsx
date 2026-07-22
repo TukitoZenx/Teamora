@@ -681,7 +681,7 @@ function WorkspaceLauncherCard({
               onJoin()
             }}
           >
-            Join
+            {workspace.canRejoinFreely ? 'Rejoin' : 'Join'}
             <UserPlus className="h-4 w-4" />
           </Button>
         ) : null}

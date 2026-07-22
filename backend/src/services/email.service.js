@@ -6,11 +6,41 @@ const createEmailError = (message, statusCode = 503) => {
   return error;
 };
 
+const parseBoolean = (value, fallback) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+};
+
+/**
+ * Production email config checklist:
+ * - SMTP_USER / SMTP_PASS (required) — Gmail needs an App Password
+ * - SMTP_HOST (default smtp.gmail.com)
+ * - SMTP_PORT 465 (SSL) or 587 (STARTTLS)
+ * - SMTP_SECURE true for 465, false for 587
+ * - EMAIL_FROM allowed by provider
+ * - CLIENT_URL public frontend origin (reset links)
+ * Optional: SMTP_URL, EMAIL_DEV_LOG=true for local testing without SMTP
+ */
 const getEmailConfig = () => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, EMAIL_FROM, SMTP_FROM } = process.env;
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, EMAIL_FROM, SMTP_FROM, SMTP_URL, EMAIL_SMTP_URL } =
+    process.env;
+
+  const connectionUrl = (SMTP_URL || EMAIL_SMTP_URL || '').trim();
+  if (connectionUrl) {
+    return {
+      connectionUrl,
+      from: (EMAIL_FROM || SMTP_FROM || 'Teamora <no-reply@teamora.app>').trim()
+    };
+  }
 
   if (!SMTP_USER || !SMTP_PASS) {
-    throw createEmailError('Email service is not configured (Missing credentials).', 500);
+    throw createEmailError(
+      'Email service is not configured. Set SMTP_USER and SMTP_PASS (or SMTP_URL) in the server environment.',
+      500
+    );
   }
 
   const host = (SMTP_HOST || 'smtp.gmail.com').trim();
@@ -20,46 +50,69 @@ const getEmailConfig = () => {
     throw createEmailError('Email service port is invalid.', 500);
   }
 
-  const cleanPass = SMTP_PASS.replace(/\s+/g, '');
-  const cleanUser = SMTP_USER.trim();
+  const cleanPass = String(SMTP_PASS).replace(/\s+/g, '');
+  const cleanUser = String(SMTP_USER).trim();
+  const secure = parseBoolean(SMTP_SECURE, port === 465);
 
   return {
     host,
     port,
-    secure: SMTP_SECURE ? SMTP_SECURE === 'true' : port === 465,
+    secure,
+    requireTLS: !secure && port === 587,
     user: cleanUser,
     pass: cleanPass,
     from: (EMAIL_FROM || SMTP_FROM || cleanUser).trim()
   };
 };
 
+let cachedTransport = null;
+let cachedTransportKey = '';
+
+const getTransportKey = (config) =>
+  config.connectionUrl || `${config.host}:${config.port}:${config.secure}:${config.user}`;
+
 const getTransport = () => {
   const config = getEmailConfig();
+  const key = getTransportKey(config);
 
-  return nodemailer.createTransport({
-    // Use the explicit host/port/secure from config instead of the 'gmail'
-    // service shorthand so SMTP_HOST/SMTP_PORT/SMTP_SECURE are actually honored.
-    // Defaults (smtp.gmail.com:465, secure) match Gmail's settings exactly, so
-    // this is behavior-compatible with the previous hardcoded 'gmail' service
-    // while also supporting any other SMTP provider via env vars.
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: {
-      user: config.user,
-      pass: config.pass
-    },
-    // Increased timeouts to prevent Render/Cloud network drops
-    connectionTimeout: 60000,
-    greetingTimeout: 30000,
-    socketTimeout: 60000
-  });
+  if (cachedTransport && cachedTransportKey === key) {
+    return { transport: cachedTransport, config };
+  }
+
+  const transport = config.connectionUrl
+    ? nodemailer.createTransport(config.connectionUrl)
+    : nodemailer.createTransport({
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        requireTLS: config.requireTLS,
+        auth: {
+          user: config.user,
+          pass: config.pass
+        },
+        pool: true,
+        maxConnections: 2,
+        maxMessages: 50,
+        connectionTimeout: 60000,
+        greetingTimeout: 30000,
+        socketTimeout: 60000,
+        tls: {
+          rejectUnauthorized: parseBoolean(process.env.SMTP_TLS_REJECT_UNAUTHORIZED, true)
+        }
+      });
+
+  cachedTransport = transport;
+  cachedTransportKey = key;
+  return { transport, config };
 };
 
 const verifyPasswordResetEmailConfiguration = () => {
   getEmailConfig();
   return true;
 };
+
+const getClientLogoUrl = () =>
+  `${(process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '')}/teamora-favicon.png`;
 
 const buildResetEmail = ({ resetUrl }) => `
   <div style="margin:0;padding:32px;background:#f8fafc;font-family:Inter,Arial,sans-serif;color:#111111;">
@@ -82,18 +135,46 @@ const buildResetEmail = ({ resetUrl }) => `
   </div>
 `;
 
+const describeSmtpFailure = (error) => {
+  const code = error?.code || error?.responseCode || '';
+  const response = String(error?.response || error?.message || '');
+
+  if (code === 'EAUTH' || /invalid login|authentication failed|badcredentials/i.test(response)) {
+    return 'Email authentication failed. Check SMTP_USER/SMTP_PASS (Gmail requires an App Password).';
+  }
+  if (code === 'ESOCKET' || code === 'ETIMEDOUT' || code === 'ECONNECTION' || /timeout|connect/i.test(response)) {
+    return 'Could not connect to the email server. Check SMTP_HOST/SMTP_PORT and outbound network rules.';
+  }
+  if (/daily limit|rate|too many/i.test(response)) {
+    return 'Email provider rate limit reached. Try again later.';
+  }
+  return 'Unable to send reset email. Please try again later.';
+};
+
 const sendPasswordResetEmail = async ({ to, resetUrl }) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const allowDevLog = parseBoolean(process.env.EMAIL_DEV_LOG, !isProduction);
+
   let transport;
   let config;
 
   try {
-    config = getEmailConfig();
-    transport = getTransport();
+    ({ transport, config } = getTransport());
   } catch (error) {
     console.error('Teamora email configuration error:', {
       message: error.message,
-      statusCode: error.statusCode
+      statusCode: error.statusCode,
+      hasSmtpUser: Boolean(process.env.SMTP_USER),
+      hasSmtpPass: Boolean(process.env.SMTP_PASS),
+      hasSmtpUrl: Boolean(process.env.SMTP_URL || process.env.EMAIL_SMTP_URL),
+      clientUrl: process.env.CLIENT_URL || null
     });
+
+    if (allowDevLog && !isProduction) {
+      console.warn('[email-dev] SMTP not configured. Password reset link:', resetUrl);
+      return { delivered: false, devLogged: true };
+    }
+
     throw error;
   }
 
@@ -116,18 +197,25 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
     console.info('Teamora password reset email sent', {
       to,
       from: config.from,
+      messageId: info.messageId,
       smtpResponse: info.response
     });
+
+    return { delivered: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Teamora password reset email failed. Full error stack:', error.stack || error);
+    console.error('Teamora password reset email failed:', {
+      to,
+      code: error.code,
+      responseCode: error.responseCode,
+      message: error.message
+    });
     if (error.statusCode) throw error;
-    throw createEmailError('Unable to send reset email. Please try again later.', 503);
+    throw createEmailError(describeSmtpFailure(error), 503);
   }
 };
 
-const getClientLogoUrl = () => `${(process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '')}/teamora.png`;
-
 module.exports = {
   verifyPasswordResetEmailConfiguration,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  getEmailConfig
 };
