@@ -94,9 +94,7 @@ export function connectRestYjsProvider(
         // Payload too large — re-queuing would spam the console forever.
         blockedByPayload = true
         pending = []
-        console.warn(
-          '[collab] Content save rejected (413 Payload Too Large). Compress images or remove large assets.'
-        )
+        console.warn('[collab] Content save rejected (413 Payload Too Large). Compress images or remove large assets.')
       } else {
         // Transient / offline — re-queue.
         pending = batch.concat(pending)

@@ -565,7 +565,6 @@ export default function Whiteboard({
         </div>
 
         <div className="flex items-center gap-1.5">
-
           <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
@@ -687,7 +686,6 @@ export default function Whiteboard({
           )
         })}
       </div>
-
 
       {/* Infinite Canvas Container */}
       <div className="flex-1 overflow-hidden flex items-center justify-center relative bg-card-sunken transition-colors">
@@ -896,8 +894,6 @@ export default function Whiteboard({
             </div>
           ))}
         </div>
-
-
       </div>
     </div>
   )

@@ -1,9 +1,4 @@
-export default function PropertiesPanel({
-  selectedElems = [],
-  selectedElem,
-  onFormatElement,
-  onDeleteElement
-}) {
+export default function PropertiesPanel({ selectedElems = [], selectedElem, onFormatElement, onDeleteElement }) {
   if (!selectedElem && selectedElems.length === 0) {
     return (
       <div className="flex h-full w-56 shrink-0 flex-col items-center justify-center border-l border-border bg-card p-4 text-center text-muted xl:w-64">
@@ -12,9 +7,7 @@ export default function PropertiesPanel({
     )
   }
 
-  const isText = selectedElems.every(
-    (e) => e.type === 'textbox' || e.type === 'text' || e.type === 'shape'
-  )
+  const isText = selectedElems.every((e) => e.type === 'textbox' || e.type === 'text' || e.type === 'shape')
   const isShape = selectedElems.every((e) => e.type === 'shape')
   const isIcon = selectedElems.every((e) => e.type === 'icon')
   const isImage = selectedElems.every((e) => e.type === 'image')
@@ -185,9 +178,7 @@ export default function PropertiesPanel({
               />
             </div>
             {isShape && (
-              <p className="text-[10px] text-muted">
-                Double-click the shape on the canvas to type inside it.
-              </p>
+              <p className="text-[10px] text-muted">Double-click the shape on the canvas to type inside it.</p>
             )}
           </div>
         )}

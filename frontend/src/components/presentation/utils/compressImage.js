@@ -98,7 +98,12 @@ export async function compressSlidesImages(slides) {
     }
     const elements = []
     for (const el of slide.elements) {
-      if (el?.type === 'image' && typeof el.src === 'string' && el.src.startsWith('data:image/') && el.src.length > MAX_DATA_URL_CHARS) {
+      if (
+        el?.type === 'image' &&
+        typeof el.src === 'string' &&
+        el.src.startsWith('data:image/') &&
+        el.src.length > MAX_DATA_URL_CHARS
+      ) {
         try {
           const { dataUrl, width, height } = await compressImageToDataUrl(el.src)
           elements.push({

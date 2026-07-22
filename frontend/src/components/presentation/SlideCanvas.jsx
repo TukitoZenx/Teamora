@@ -102,13 +102,7 @@ export default function SlideCanvas({
             const rect = canvasRef.current.getBoundingClientRect()
             const displayW = Math.min(360, width)
             const displayH = Math.round(displayW * (height / Math.max(1, width)))
-            onImageDrop(
-              dataUrl,
-              e.clientX - rect.left,
-              e.clientY - rect.top,
-              displayW,
-              Math.max(80, displayH)
-            )
+            onImageDrop(dataUrl, e.clientX - rect.left, e.clientY - rect.top, displayW, Math.max(80, displayH))
           }
         } catch (err) {
           console.error('drop image failed', err)
@@ -119,14 +113,7 @@ export default function SlideCanvas({
 
   const renderElementBody = (el, isSelected) => {
     if (el.type === 'image') {
-      return (
-        <img
-          src={el.src}
-          className="pointer-events-none h-full w-full object-cover"
-          alt=""
-          draggable={false}
-        />
-      )
+      return <img src={el.src} className="pointer-events-none h-full w-full object-cover" alt="" draggable={false} />
     }
 
     if (el.type === 'icon') {
@@ -172,14 +159,10 @@ export default function SlideCanvas({
                   child.type === 'textbox' || child.type === 'shape' || child.type === 'icon'
                     ? child.fill || 'transparent'
                     : undefined,
-                borderColor: child.borderWidth
-                  ? child.borderColor || child.color
-                  : 'transparent',
+                borderColor: child.borderWidth ? child.borderColor || child.color : 'transparent',
                 opacity: child.opacity ?? 1,
                 borderRadius:
-                  child.borderRadius != null && child.borderRadius !== ''
-                    ? `${child.borderRadius}px`
-                    : '0px',
+                  child.borderRadius != null && child.borderRadius !== '' ? `${child.borderRadius}px` : '0px',
                 borderWidth: child.borderWidth ? `${child.borderWidth}px` : '0px',
                 borderStyle: child.borderWidth ? 'solid' : 'none',
                 overflow: 'hidden'
@@ -188,9 +171,7 @@ export default function SlideCanvas({
               {child.type === 'image' ? (
                 <img src={child.src} className="h-full w-full object-cover" alt="" />
               ) : child.type === 'icon' ? (
-                <div className="flex h-full w-full items-center justify-center text-2xl">
-                  {child.icon || '★'}
-                </div>
+                <div className="flex h-full w-full items-center justify-center text-2xl">{child.icon || '★'}</div>
               ) : child.type === 'shape' || child.type === 'textbox' || child.type === 'text' ? (
                 <div
                   className="h-full w-full overflow-hidden whitespace-pre-wrap break-words p-2"
@@ -279,9 +260,7 @@ export default function SlideCanvas({
                       if (e?.shiftKey) {
                         setSelectedElemIds?.((prev) => {
                           const list = Array.isArray(prev) ? prev : []
-                          return list.includes(id)
-                            ? list.filter((x) => x !== id)
-                            : [...list, id]
+                          return list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
                         })
                       } else {
                         setSelectedElemIds?.([id])
@@ -294,9 +273,7 @@ export default function SlideCanvas({
                   : (id, pos, delta) => {
                       try {
                         if (selectedIds.length > 1 && selectedIds.includes(id) && delta) {
-                          const activeElements = sortedElements.filter((x) =>
-                            selectedIds.includes(x.id)
-                          )
+                          const activeElements = sortedElements.filter((x) => selectedIds.includes(x.id))
                           const updates = activeElements.map((x) => ({
                             id: x.id,
                             x: (Number(x.x) || 0) + (Number(delta.x) || 0),
@@ -324,11 +301,7 @@ export default function SlideCanvas({
                       }
                     }
               }
-              onSetEditing={
-                isPresenting
-                  ? undefined
-                  : (editing) => setEditingElemId?.(editing ? el.id : null)
-              }
+              onSetEditing={isPresenting ? undefined : (editing) => setEditingElemId?.(editing ? el.id : null)}
               isForPresenting={isPresenting}
             >
               {renderElementBody(el, isSelected)}
@@ -338,9 +311,7 @@ export default function SlideCanvas({
 
         {sortedElements.length === 0 && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-muted opacity-50">
-            <h1 className="mb-4 text-2xl font-bold sm:text-4xl">
-              {activeSlideData?.title || 'Blank Slide'}
-            </h1>
+            <h1 className="mb-4 text-2xl font-bold sm:text-4xl">{activeSlideData?.title || 'Blank Slide'}</h1>
             <p className="text-sm">Add text, shapes, images, or icons from the toolbar.</p>
           </div>
         )}

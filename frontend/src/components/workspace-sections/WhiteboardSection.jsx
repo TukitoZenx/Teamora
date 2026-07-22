@@ -287,8 +287,7 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
         }
         if (event === 'update-whiteboard-pages') {
           const pages = Array.isArray(value?.pages) ? value.pages : []
-          const activePageId =
-            typeof value?.activePageId === 'string' ? value.activePageId : pages[0]?.id || 'page-1'
+          const activePageId = typeof value?.activePageId === 'string' ? value.activePageId : pages[0]?.id || 'page-1'
           if (pages.length === 0) return
           ydoc.transact(() => {
             meta.set(
@@ -413,7 +412,9 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
   }, [workspaceId, activeFile?.id, channel])
 
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-muted">Loading Whiteboard...</div>}>
+    <Suspense
+      fallback={<div className="h-full flex items-center justify-center text-muted">Loading Whiteboard...</div>}
+    >
       <Whiteboard
         key={fileId}
         canvasRef={canvasRef}

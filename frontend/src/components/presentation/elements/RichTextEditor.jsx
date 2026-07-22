@@ -4,14 +4,7 @@ import { useRef, useEffect, useCallback } from 'react'
  * Content-editable text for text boxes and shapes.
  * Editable only when isEditing (double-click) so drag/resize works on select.
  */
-export default function RichTextEditor({
-  el,
-  isSelected,
-  isPresenting,
-  isEditing,
-  onChange,
-  centered = false
-}) {
+export default function RichTextEditor({ el, isSelected, isPresenting, isEditing, onChange, centered = false }) {
   const contentRef = useRef(null)
   const lastEmittedRef = useRef(el?.text || '')
   // Only true after double-click — NOT on mere selection (selection must allow drag)

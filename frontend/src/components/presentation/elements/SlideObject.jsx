@@ -217,15 +217,13 @@ function SlideObject({
     borderColor: el.borderWidth ? el.borderColor || el.color || 'transparent' : 'transparent',
     opacity: el.opacity ?? 1,
     boxShadow: el.shadow || 'none',
-    borderRadius:
-      el.borderRadius != null && el.borderRadius !== '' ? `${el.borderRadius}px` : '0px',
+    borderRadius: el.borderRadius != null && el.borderRadius !== '' ? `${el.borderRadius}px` : '0px',
     borderWidth: el.borderWidth ? `${el.borderWidth}px` : '0px',
     borderStyle: el.borderWidth ? 'solid' : 'none',
     boxSizing: 'border-box'
   }
 
-  const handleClass =
-    'absolute z-[70] h-3 w-3 rounded-sm border-2 border-primary bg-white shadow pointer-events-auto'
+  const handleClass = 'absolute z-[70] h-3 w-3 rounded-sm border-2 border-primary bg-white shadow pointer-events-auto'
 
   const showHandles = isSelected && !isEditing && !isForPresenting
   const isBox = el.type === 'textbox' || el.type === 'text' || el.type === 'shape'

@@ -22,8 +22,7 @@ const boxStyle = (el) => ({
   transform: `rotate(${el.rotation || 0}deg)`,
   opacity: el.opacity ?? 1,
   boxShadow: el.shadow || 'none',
-  borderRadius:
-    el.borderRadius != null && el.borderRadius !== '' ? `${el.borderRadius}px` : '0px',
+  borderRadius: el.borderRadius != null && el.borderRadius !== '' ? `${el.borderRadius}px` : '0px',
   borderWidth: el.borderWidth ? `${el.borderWidth}px` : '0px',
   borderStyle: el.borderWidth ? 'solid' : 'none',
   borderColor: el.borderWidth ? el.borderColor || el.color || 'transparent' : 'transparent',
@@ -37,14 +36,7 @@ const boxStyle = (el) => ({
 
 function ElementContent({ el }) {
   if (el.type === 'image') {
-    return (
-      <img
-        src={el.src}
-        alt=""
-        className="pointer-events-none h-full w-full object-cover"
-        draggable={false}
-      />
-    )
+    return <img src={el.src} alt="" className="pointer-events-none h-full w-full object-cover" draggable={false} />
   }
 
   if (el.type === 'icon') {
@@ -59,7 +51,12 @@ function ElementContent({ el }) {
   }
 
   if (el.type === 'shape') {
-    const hasText = Boolean(el.text && String(el.text).replace(/<[^>]+>/g, '').trim())
+    const hasText = Boolean(
+      el.text &&
+      String(el.text)
+        .replace(/<[^>]+>/g, '')
+        .trim()
+    )
     return (
       <div className="pointer-events-none flex h-full w-full items-center justify-center overflow-hidden p-2">
         {hasText ? (
@@ -94,13 +91,7 @@ function ElementContent({ el }) {
   )
 }
 
-export default function PresentSlideView({
-  slide,
-  theme,
-  presentScale = 1,
-  revision = 0,
-  appDark = false
-}) {
+export default function PresentSlideView({ slide, theme, presentScale = 1, revision = 0, appDark = false }) {
   const elements = useMemo(() => {
     const list = Array.isArray(slide?.elements) ? [...slide.elements] : []
     list.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
@@ -108,14 +99,11 @@ export default function PresentSlideView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slide?.elements, slide?.id, revision])
 
-  const gradient =
-    theme?.gradient || (appDark ? 'from-slate-900 to-slate-950' : 'from-white to-slate-50')
+  const gradient = theme?.gradient || (appDark ? 'from-slate-900 to-slate-950' : 'from-white to-slate-50')
   const accent = theme?.accent || 'from-primary to-indigo-500'
 
   return (
-    <div
-      className={`flex h-full w-full items-center justify-center overflow-hidden ${appDark ? 'dark' : ''}`}
-    >
+    <div className={`flex h-full w-full items-center justify-center overflow-hidden ${appDark ? 'dark' : ''}`}>
       <div
         key={`present-slide-${slide?.id || 'x'}-r${revision}-${appDark ? 'd' : 'l'}`}
         className={`relative overflow-hidden rounded-lg bg-gradient-to-br ${gradient}`}
@@ -128,9 +116,7 @@ export default function PresentSlideView({
           aspectRatio: '16 / 9'
         }}
       >
-        <div
-          className={`pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`}
-        />
+        <div className={`pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
 
         {elements.map((el) => (
           <div key={el.id} style={boxStyle(el)}>

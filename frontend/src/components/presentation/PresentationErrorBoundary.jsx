@@ -35,8 +35,7 @@ export default class PresentationErrorBoundary extends React.Component {
           </div>
           <h2 className="text-lg font-bold text-text">Presentation editor hit an error</h2>
           <p className="max-w-md text-sm text-muted">
-            Your workspace is still open. You can reset the editor and continue without losing the rest of
-            the app.
+            Your workspace is still open. You can reset the editor and continue without losing the rest of the app.
           </p>
           {this.state.message ? (
             <p className="max-w-lg break-words font-mono text-[11px] text-muted/80">{this.state.message}</p>
