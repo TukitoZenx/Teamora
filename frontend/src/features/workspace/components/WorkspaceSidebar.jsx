@@ -54,6 +54,7 @@ export default function WorkspaceSidebar({
 
   return (
     <aside
+      data-workspace-sidebar="true"
       className={`flex h-full flex-col border-r border-border bg-card transition-[width] duration-slow ease-in-out ${collapsed ? 'w-sidebar-collapsed' : 'w-sidebar'} ${className}`}
     >
       <div className="flex h-16 items-center justify-between border-b border-border px-4">

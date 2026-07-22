@@ -445,6 +445,31 @@ html[data-density='compact'] .teamora-content-fade {
   animation: teamora-content-fade var(--tw-duration-fast) var(--tw-ease-standard) both;
 }
 
+/* Presentation fullscreen: hide all app chrome so only the slide is visible */
+html[data-presentation-mode='true'],
+html[data-presentation-mode='true'] body {
+  overflow: hidden !important;
+}
+
+html[data-presentation-mode='true'] header,
+html[data-presentation-mode='true'] [data-app-navbar],
+html[data-presentation-mode='true'] [data-workspace-sidebar],
+html[data-presentation-mode='true'] aside {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+html[data-presentation-mode='true'] #presentation-fullscreen-root {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 2147483000 !important;
+  background: #000 !important;
+}
+
 /* Page shell: standard app frame under fixed navbar */
 .teamora-page {
   min-height: calc(100vh - var(--tw-navbar-height));

@@ -114,7 +114,7 @@ export default function WorkspaceLayout({
       </div>
 
       {sidebarOpen && (
-        <div className="fixed inset-0 z-sidebar lg:hidden">
+        <div className="fixed inset-0 z-sidebar lg:hidden" data-workspace-sidebar="true">
           <button
             type="button"
             className="absolute inset-0 teamora-scrim"

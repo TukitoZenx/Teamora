@@ -170,25 +170,42 @@ export default function Whiteboard({
       drawStrokeOnCanvas(startX, startY, endX, endY, color, size, opacity)
     })
 
-    socket.on('receive-whiteboard-elements', (elementsList) => {
+    const onElements = (elementsList) => {
       if (Array.isArray(elementsList)) {
         setElements(elementsList)
+        // Reconstruct missing page tabs from element pageIds (multi-page restore)
+        setPages((current) => {
+          const known = new Set((current || []).map((p) => p.id))
+          const next = Array.isArray(current) && current.length > 0 ? [...current] : [{ id: 'page-1', name: 'Page 1' }]
+          if (next.length === 0) next.push({ id: 'page-1', name: 'Page 1' })
+          let added = false
+          for (const el of elementsList) {
+            const pid = el?.pageId || 'page-1'
+            if (!known.has(pid)) {
+              known.add(pid)
+              next.push({ id: pid, name: `Page ${next.length + 1}` })
+              added = true
+            }
+          }
+          return added ? next : current
+        })
       } else {
         console.warn('Warning: received whiteboard elements is not an array:', elementsList)
         setElements([])
       }
-    })
+    }
+    socket.on('receive-whiteboard-elements', onElements)
 
     const onPages = (payload) => {
       if (Array.isArray(payload?.pages) && payload.pages.length > 0) {
         setPages(payload.pages)
-        if (payload.activePageId && payload.pages.some((p) => p.id === payload.activePageId)) {
-          // Don't force remote active page unless we don't have it
-          setActivePageId((current) => {
-            if (payload.pages.some((p) => p.id === current)) return current
+        setActivePageId((current) => {
+          if (payload.pages.some((p) => p.id === current)) return current
+          if (payload.activePageId && payload.pages.some((p) => p.id === payload.activePageId)) {
             return payload.activePageId
-          })
-        }
+          }
+          return payload.pages[0].id
+        })
       } else if (Array.isArray(payload) && payload.length > 0) {
         setPages(payload)
       }
@@ -198,7 +215,7 @@ export default function Whiteboard({
     return () => {
       socket.off('receive-clear-board')
       socket.off('receive-draw-line')
-      socket.off('receive-whiteboard-elements')
+      socket.off('receive-whiteboard-elements', onElements)
       socket.off('receive-whiteboard-pages', onPages)
     }
   }, [socket, canvasRef, drawStrokeOnCanvas, activePageId])
@@ -375,9 +392,12 @@ export default function Whiteboard({
     setUndoStack((prev) => [...prev, ensureArray(elements)])
     setRedoStack([])
     setElements(remaining)
+    elementsRef.current = remaining
     setSelectedElementId(null)
     clearCanvasOnly()
     socket.emit('update-whiteboard-elements', { roomId, elements: remaining })
+    // Page-scoped clear on collab layer
+    socket.emit('clear-board', { roomId, pageId: activePageId })
     toast.success('This page was cleared')
   }
 
@@ -386,12 +406,18 @@ export default function Whiteboard({
     const nextPages = [...pages, page]
     setPages(nextPages)
     setActivePageId(page.id)
-    // Broadcast page list so collaborators see the new page immediately.
+    // Persist page list (Yjs meta) so pages survive leaving the whiteboard
     socket?.emit?.('update-whiteboard-pages', { roomId, pages: nextPages, activePageId: page.id })
     // New page starts blank (no elements inherit; canvas redraws empty for new id).
     clearCanvasOnly()
     toast.success(`${page.name} added (blank)`)
   }
+
+  // Persist active page whenever user switches tabs (helps restore session)
+  useEffect(() => {
+    if (!socket || !activePageId || !Array.isArray(pages) || pages.length === 0) return
+    socket.emit?.('update-whiteboard-pages', { roomId, pages, activePageId })
+  }, [activePageId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUndo = () => {
     if (undoStack.length === 0) return

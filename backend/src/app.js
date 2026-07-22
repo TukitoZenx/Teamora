@@ -99,10 +99,10 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
-// Cap JSON body size. 2mb supports workspace content blobs (docs/files) while
-// still bounding memory; avatars remain capped server-side at ~200k chars.
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// Cap JSON body size. 12mb allows presentation decks with a few compressed
+// images (base64). Avatars remain capped server-side separately.
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 app.use(requireJsonContentType);
 app.use(cookieParser());
 app.use(sessionMiddleware);

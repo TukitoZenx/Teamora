@@ -6,15 +6,20 @@ export default function PropertiesPanel({
 }) {
   if (!selectedElem && selectedElems.length === 0) {
     return (
-      <div className="w-64 bg-card border-l border-border shrink-0 h-full p-4 text-center flex flex-col items-center justify-center text-muted">
+      <div className="flex h-full w-56 shrink-0 flex-col items-center justify-center border-l border-border bg-card p-4 text-center text-muted xl:w-64">
         <span className="text-sm">Select an object to edit its properties.</span>
       </div>
     )
   }
 
-  const isText = selectedElems.every(e => e.type === 'textbox' || e.type === 'text')
-  const isShape = selectedElems.every(e => e.type === 'shape')
+  const isText = selectedElems.every(
+    (e) => e.type === 'textbox' || e.type === 'text' || e.type === 'shape'
+  )
+  const isShape = selectedElems.every((e) => e.type === 'shape')
+  const isIcon = selectedElems.every((e) => e.type === 'icon')
+  const isImage = selectedElems.every((e) => e.type === 'image')
   const isMultiple = selectedElems.length > 1
+  const first = selectedElem || selectedElems[0]
 
   const handleChange = (key, value) => {
     onFormatElement({ [key]: value })
@@ -22,16 +27,15 @@ export default function PropertiesPanel({
 
   const handleAlign = (type) => {
     if (!isMultiple) return
-    const minX = Math.min(...selectedElems.map(e => e.x))
-    const maxX = Math.max(...selectedElems.map(e => e.x + (e.width || 0)))
-    const minY = Math.min(...selectedElems.map(e => e.y))
-    const maxY = Math.max(...selectedElems.map(e => e.y + (e.height || 0)))
-    
+    const minX = Math.min(...selectedElems.map((e) => e.x))
+    const maxX = Math.max(...selectedElems.map((e) => e.x + (e.width || 0)))
+    const minY = Math.min(...selectedElems.map((e) => e.y))
+    const maxY = Math.max(...selectedElems.map((e) => e.y + (e.height || 0)))
     const centerX = (minX + maxX) / 2
     const centerY = (minY + maxY) / 2
 
-    const updates = selectedElems.map(e => {
-      let update = { id: e.id }
+    const updates = selectedElems.map((e) => {
+      const update = { id: e.id }
       if (type === 'left') update.x = minX
       if (type === 'center') update.x = centerX - (e.width || 0) / 2
       if (type === 'right') update.x = maxX - (e.width || 0)
@@ -45,96 +49,76 @@ export default function PropertiesPanel({
 
   const handleDistribute = (axis) => {
     if (selectedElems.length < 3) return
-    let sorted = [...selectedElems]
+    const sorted = [...selectedElems]
     if (axis === 'horizontal') {
       sorted.sort((a, b) => a.x - b.x)
       const minX = sorted[0].x
       const maxX = sorted[sorted.length - 1].x + (sorted[sorted.length - 1].width || 0)
       const totalWidth = sorted.reduce((sum, e) => sum + (e.width || 0), 0)
       const gap = (maxX - minX - totalWidth) / (sorted.length - 1)
-      
       let currentX = minX
-      const updates = sorted.map(e => {
-        const newX = currentX
-        currentX += (e.width || 0) + gap
-        return { id: e.id, x: newX }
-      })
-      onFormatElement(updates)
+      onFormatElement(
+        sorted.map((e) => {
+          const newX = currentX
+          currentX += (e.width || 0) + gap
+          return { id: e.id, x: newX }
+        })
+      )
     } else {
       sorted.sort((a, b) => a.y - b.y)
       const minY = sorted[0].y
       const maxY = sorted[sorted.length - 1].y + (sorted[sorted.length - 1].height || 0)
       const totalHeight = sorted.reduce((sum, e) => sum + (e.height || 0), 0)
       const gap = (maxY - minY - totalHeight) / (sorted.length - 1)
-      
       let currentY = minY
-      const updates = sorted.map(e => {
-        const newY = currentY
-        currentY += (e.height || 0) + gap
-        return { id: e.id, y: newY }
-      })
-      onFormatElement(updates)
+      onFormatElement(
+        sorted.map((e) => {
+          const newY = currentY
+          currentY += (e.height || 0) + gap
+          return { id: e.id, y: newY }
+        })
+      )
     }
   }
 
+  const num = (v, fallback = 0) => (Number.isFinite(Number(v)) ? Number(v) : fallback)
+
   return (
-    <div className="w-64 bg-card border-l border-border flex flex-col shrink-0 h-full overflow-y-auto custom-scrollbar text-sm">
-      <div className="p-3 border-b border-border bg-card-sunken/30">
+    <div className="custom-scrollbar flex h-full w-56 shrink-0 flex-col overflow-y-auto border-l border-border bg-card text-sm xl:w-64">
+      <div className="border-b border-border bg-card-sunken/30 p-3">
         <h3 className="font-bold text-text">
-          {isMultiple ? `Multiple (${selectedElems.length})` : `Format ${selectedElem?.type}`}
+          {isMultiple ? `Multiple (${selectedElems.length})` : `Format ${first?.type || 'object'}`}
         </h3>
       </div>
 
-      <div className="p-4 flex flex-col gap-5">
-        
-        {/* Dimensions & Position (Common) */}
-        {!isMultiple && (
+      <div className="flex flex-col gap-5 p-4">
+        {!isMultiple && first && (
           <div className="space-y-3">
-            <h4 className="font-semibold text-xs text-muted uppercase tracking-wider">Transform</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">Transform</h4>
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-muted mb-1 block">X Position</label>
-                <input 
-                  type="number" 
-                  value={Math.round(selectedElem.x) || 0} 
-                  onChange={(e) => handleChange('x', parseInt(e.target.value))}
-                  className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-muted mb-1 block">Y Position</label>
-                <input 
-                  type="number" 
-                  value={Math.round(selectedElem.y) || 0} 
-                  onChange={(e) => handleChange('y', parseInt(e.target.value))}
-                  className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-muted mb-1 block">Width</label>
-                <input 
-                  type="number" 
-                  value={Math.round(selectedElem.width) || 0} 
-                  onChange={(e) => handleChange('width', parseInt(e.target.value))}
-                  className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-muted mb-1 block">Height</label>
-                <input 
-                  type="number" 
-                  value={Math.round(selectedElem.height) || 0} 
-                  onChange={(e) => handleChange('height', parseInt(e.target.value))}
-                  className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
-                />
-              </div>
+              {[
+                ['X', 'x', Math.round(first.x) || 0],
+                ['Y', 'y', Math.round(first.y) || 0],
+                ['Width', 'width', Math.round(first.width) || 0],
+                ['Height', 'height', Math.round(first.height) || 0]
+              ].map(([label, key, value]) => (
+                <div key={key}>
+                  <label className="mb-1 block text-[10px] text-muted">{label}</label>
+                  <input
+                    type="number"
+                    value={value}
+                    onChange={(e) => handleChange(key, parseInt(e.target.value, 10) || 0)}
+                    className="w-full rounded border border-border bg-card-sunken px-2 py-1 text-xs text-text"
+                  />
+                </div>
+              ))}
               <div className="col-span-2">
-                <label className="text-[10px] text-muted mb-1 block">Rotation (°)</label>
-                <input 
-                  type="number" 
-                  value={selectedElem.rotation || 0} 
-                  onChange={(e) => handleChange('rotation', parseInt(e.target.value))}
-                  className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
+                <label className="mb-1 block text-[10px] text-muted">Rotation (°)</label>
+                <input
+                  type="number"
+                  value={first.rotation || 0}
+                  onChange={(e) => handleChange('rotation', parseInt(e.target.value, 10) || 0)}
+                  className="w-full rounded border border-border bg-card-sunken px-2 py-1 text-xs text-text"
                 />
               </div>
             </div>
@@ -143,122 +127,137 @@ export default function PropertiesPanel({
 
         {isMultiple && (
           <div className="space-y-3">
-            <h4 className="font-semibold text-xs text-muted uppercase tracking-wider">Align</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">Align</h4>
             <div className="grid grid-cols-3 gap-1">
-              <button onClick={() => handleAlign('left')} className="p-1 text-xs bg-card-sunken hover:bg-slate-200 rounded border border-border">Left</button>
-              <button onClick={() => handleAlign('center')} className="p-1 text-xs bg-card-sunken hover:bg-slate-200 rounded border border-border">Center</button>
-              <button onClick={() => handleAlign('right')} className="p-1 text-xs bg-card-sunken hover:bg-slate-200 rounded border border-border">Right</button>
-              <button onClick={() => handleAlign('top')} className="p-1 text-xs bg-card-sunken hover:bg-slate-200 rounded border border-border">Top</button>
-              <button onClick={() => handleAlign('middle')} className="p-1 text-xs bg-card-sunken hover:bg-slate-200 rounded border border-border">Middle</button>
-              <button onClick={() => handleAlign('bottom')} className="p-1 text-xs bg-card-sunken hover:bg-slate-200 rounded border border-border">Bottom</button>
+              {['left', 'center', 'right', 'top', 'middle', 'bottom'].map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => handleAlign(a)}
+                  className="rounded border border-border bg-card-sunken p-1 text-xs capitalize hover:bg-slate-200 dark:hover:bg-slate-700"
+                >
+                  {a}
+                </button>
+              ))}
             </div>
             {selectedElems.length >= 3 && (
               <div className="grid grid-cols-2 gap-1 pt-2">
-                <button onClick={() => handleDistribute('horizontal')} className="p-1 text-[10px] bg-card-sunken hover:bg-slate-200 rounded border border-border">Distribute H</button>
-                <button onClick={() => handleDistribute('vertical')} className="p-1 text-[10px] bg-card-sunken hover:bg-slate-200 rounded border border-border">Distribute V</button>
+                <button
+                  type="button"
+                  onClick={() => handleDistribute('horizontal')}
+                  className="rounded border border-border bg-card-sunken p-1 text-[10px] hover:bg-slate-200"
+                >
+                  Distribute H
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDistribute('vertical')}
+                  className="rounded border border-border bg-card-sunken p-1 text-[10px] hover:bg-slate-200"
+                >
+                  Distribute V
+                </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Text Properties */}
-        {isText && (
+        {(isText || isIcon) && (
           <div className="space-y-3">
-            <h4 className="font-semibold text-xs text-muted uppercase tracking-wider">Typography</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">
+              {isShape ? 'Shape Text' : 'Typography'}
+            </h4>
             <div>
-              <label className="text-[10px] text-muted mb-1 block">Font Size</label>
-              <input 
-                type="number" 
-                value={parseInt(selectedElem.fontSize) || 16} 
+              <label className="mb-1 block text-[10px] text-muted">Font Size</label>
+              <input
+                type="number"
+                value={parseInt(first?.fontSize, 10) || 16}
                 onChange={(e) => handleChange('fontSize', `${e.target.value}px`)}
-                className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
+                className="w-full rounded border border-border bg-card-sunken px-2 py-1 text-xs text-text"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted mb-1 block">Text Color</label>
-              <input 
-                type="color" 
-                value={selectedElem.color || '#000000'} 
+              <label className="mb-1 block text-[10px] text-muted">Text Color</label>
+              <input
+                type="color"
+                value={first?.color || '#000000'}
                 onChange={(e) => handleChange('color', e.target.value)}
-                className="w-full h-8 rounded cursor-pointer" 
+                className="h-8 w-full cursor-pointer rounded"
               />
             </div>
+            {isShape && (
+              <p className="text-[10px] text-muted">
+                Double-click the shape on the canvas to type inside it.
+              </p>
+            )}
           </div>
         )}
 
-        {/* Appearance (Shape & Text Box) */}
-        {(isShape || isText) && (
+        {(isShape || isText || isIcon) && !isImage && (
           <div className="space-y-3">
-            <h4 className="font-semibold text-xs text-muted uppercase tracking-wider">Appearance</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">Appearance</h4>
             <div>
-              <label className="text-[10px] text-muted mb-1 block">Fill Color</label>
-              <input 
-                type="color" 
-                value={selectedElem.fill || '#ffffff'} 
+              <label className="mb-1 block text-[10px] text-muted">Fill Color</label>
+              <input
+                type="color"
+                value={first?.fill && first.fill !== 'transparent' ? first.fill : '#ffffff'}
                 onChange={(e) => handleChange('fill', e.target.value)}
-                className="w-full h-8 rounded cursor-pointer" 
+                className="h-8 w-full cursor-pointer rounded"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted mb-1 block">Border Color</label>
-              <input 
-                type="color" 
-                value={selectedElem.borderColor || '#000000'} 
+              <label className="mb-1 block text-[10px] text-muted">Border Color</label>
+              <input
+                type="color"
+                value={first?.borderColor || '#000000'}
                 onChange={(e) => handleChange('borderColor', e.target.value)}
-                className="w-full h-8 rounded cursor-pointer" 
+                className="h-8 w-full cursor-pointer rounded"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted mb-1 block">Border Width (px)</label>
-              <input 
-                type="number" 
-                value={selectedElem.borderWidth || 0} 
-                onChange={(e) => handleChange('borderWidth', parseInt(e.target.value))}
-                className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
+              <label className="mb-1 block text-[10px] text-muted">Border Width (px)</label>
+              <input
+                type="number"
+                value={num(first?.borderWidth, 0)}
+                onChange={(e) => handleChange('borderWidth', parseInt(e.target.value, 10) || 0)}
+                className="w-full rounded border border-border bg-card-sunken px-2 py-1 text-xs text-text"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted mb-1 block">Border Radius (px)</label>
-              <input 
-                type="number" 
-                value={selectedElem.borderRadius || 0} 
-                onChange={(e) => handleChange('borderRadius', parseInt(e.target.value))}
-                className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
+              <label className="mb-1 block text-[10px] text-muted">Border Radius (px)</label>
+              <input
+                type="number"
+                value={num(first?.borderRadius, 0)}
+                onChange={(e) => handleChange('borderRadius', parseInt(e.target.value, 10) || 0)}
+                className="w-full rounded border border-border bg-card-sunken px-2 py-1 text-xs text-text"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted mb-1 block">Opacity (0 - 1)</label>
-              <input 
-                type="number" 
+              <label className="mb-1 block text-[10px] text-muted">Opacity (0 – 1)</label>
+              <input
+                type="number"
                 step="0.1"
                 min="0"
                 max="1"
-                value={selectedElem.opacity !== undefined ? selectedElem.opacity : 1} 
+                value={first?.opacity !== undefined ? first.opacity : 1}
                 onChange={(e) => handleChange('opacity', parseFloat(e.target.value))}
-                className="w-full bg-card-sunken border border-border rounded px-2 py-1 text-xs text-text" 
+                className="w-full rounded border border-border bg-card-sunken px-2 py-1 text-xs text-text"
               />
             </div>
           </div>
         )}
 
-        <div className="pt-4 border-t border-border">
+        <div className="border-t border-border pt-4">
           <button
+            type="button"
             onClick={() => {
-              if (isMultiple) {
-                // If the panel has an onDeleteElements, we should call that. But we handle this via onFormatElement?
-                // Actually, PresentationModule handles DeleteElements separately. We should pass it down.
-                // For now, if we pass a special format command:
-                onFormatElement({ deleteMulti: true }) // Not ideal but PropertiesPanel only takes onDeleteElement (single ID).
-              } else {
-                onDeleteElement(selectedElem.id)
-              }
+              if (isMultiple) onFormatElement({ deleteMulti: true })
+              else if (first) onDeleteElement(first.id)
             }}
-            className="w-full py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors font-semibold text-xs"
+            className="w-full rounded-lg bg-red-500/10 py-2 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500 hover:text-white"
           >
             Delete {isMultiple ? 'Elements' : 'Element'}
           </button>
         </div>
-
       </div>
     </div>
   )
