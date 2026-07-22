@@ -6,7 +6,9 @@ const { mergeFilesPayload } = require('./filesContent');
 const { mergeCommentsPayload, mergeVersionsPayload, mergeMessagesPayload } = require('./listMerge');
 
 const MAX_KEY_LENGTH = 200;
-const MAX_JSON_CHARS = 1_500_000; // ~1.5MB serialized — keeps Mongo docs safe
+// ~8MB serialized — presentations with a few compressed images need headroom.
+// Client compresses images before save; this is a hard ceiling only.
+const MAX_JSON_CHARS = 8_000_000;
 
 const createError = (message, statusCode = 400) => {
   const error = new Error(message);

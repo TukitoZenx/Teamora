@@ -193,7 +193,10 @@ export default function WorkspaceNavbar({
 
   if (mobileSearchOpen) {
     return (
-      <header className="fixed inset-x-0 top-0 z-navbar h-navbar border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6">
+      <header
+        data-app-navbar="true"
+        className="fixed inset-x-0 top-0 z-navbar h-navbar border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6"
+      >
         <div className="flex h-full w-full items-center gap-3">
           <button
             type="button"
@@ -244,7 +247,10 @@ export default function WorkspaceNavbar({
   }
 
   return (
-    <header className="fixed inset-x-0 top-0 z-navbar h-navbar border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6">
+    <header
+      data-app-navbar="true"
+      className="fixed inset-x-0 top-0 z-navbar h-navbar border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6"
+    >
       <div className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
         <div className="flex min-w-0 items-center gap-3">
           <button

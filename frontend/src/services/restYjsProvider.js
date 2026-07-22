@@ -65,8 +65,15 @@ export function connectRestYjsProvider(
         )
       : null
 
+  let blockedByPayload = false
+
   const flush = async () => {
     if (destroyed || pushing || pending.length === 0 || !workspaceId) return
+    // Do not retry forever when server rejects oversize payloads (413).
+    if (blockedByPayload) {
+      pending = []
+      return
+    }
     pushing = true
     const batch = pending
     pending = []
@@ -80,12 +87,23 @@ export function connectRestYjsProvider(
         update: updateB64
       })
       lastPushedState = toBase64(Y.encodeStateAsUpdate(ydoc))
-    } catch {
-      // Re-queue on failure (offline).
-      pending = batch.concat(pending)
+      blockedByPayload = false
+    } catch (err) {
+      const status = err?.response?.status
+      if (status === 413) {
+        // Payload too large — re-queuing would spam the console forever.
+        blockedByPayload = true
+        pending = []
+        console.warn(
+          '[collab] Content save rejected (413 Payload Too Large). Compress images or remove large assets.'
+        )
+      } else {
+        // Transient / offline — re-queue.
+        pending = batch.concat(pending)
+      }
     } finally {
       pushing = false
-      if (pending.length > 0 && !destroyed) {
+      if (pending.length > 0 && !destroyed && !blockedByPayload) {
         flushTimer = window.setTimeout(flush, 400)
       }
     }

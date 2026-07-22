@@ -24,7 +24,12 @@ const elementsFromMap = (elementsMap) => {
   elementsMap.forEach((value, key) => {
     if (!value || typeof value !== 'object') return
     const id = typeof value.id === 'string' ? value.id : key
-    list.push({ ...value, id })
+    // Deep-clone points arrays so path strokes aren't shared by reference
+    const el = { ...value, id }
+    if (Array.isArray(value.points)) {
+      el.points = value.points.map((p) => (p && typeof p === 'object' ? { ...p } : p))
+    }
+    list.push(el)
   })
   list.sort((a, b) => {
     const ao = Number.isFinite(a.order) ? a.order : 0
@@ -33,6 +38,57 @@ const elementsFromMap = (elementsMap) => {
     return String(a.id).localeCompare(String(b.id))
   })
   return list
+}
+
+/** Build a stable pages list from meta + element pageIds (never drop multi-page data). */
+const resolvePagesFromMetaAndElements = (meta, elements) => {
+  let pages = []
+  try {
+    const raw = meta?.get?.('pages')
+    if (Array.isArray(raw) && raw.length > 0) {
+      pages = raw
+        .filter((p) => p && typeof p === 'object' && p.id)
+        .map((p, i) => ({
+          id: String(p.id),
+          name: typeof p.name === 'string' && p.name ? p.name : `Page ${i + 1}`
+        }))
+    }
+  } catch {
+    pages = []
+  }
+
+  const known = new Set(pages.map((p) => p.id))
+  const fromElements = new Set()
+  for (const el of Array.isArray(elements) ? elements : []) {
+    const pid = el?.pageId || 'page-1'
+    fromElements.add(pid)
+  }
+
+  // Ensure every pageId used by elements has a tab
+  let extraIndex = pages.length
+  for (const pid of fromElements) {
+    if (!known.has(pid)) {
+      extraIndex += 1
+      pages.push({ id: pid, name: `Page ${extraIndex}` })
+      known.add(pid)
+    }
+  }
+
+  if (pages.length === 0) {
+    pages = [{ id: 'page-1', name: 'Page 1' }]
+  }
+
+  let activePageId = pages[0].id
+  try {
+    const stored = meta?.get?.('activePageId')
+    if (typeof stored === 'string' && pages.some((p) => p.id === stored)) {
+      activePageId = stored
+    }
+  } catch {
+    // keep pages[0]
+  }
+
+  return { pages, activePageId }
 }
 
 /**
@@ -155,6 +211,21 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
     const rebuildFromMap = () => {
       localSnapshot = elementsFromMap(elementsMap)
       deliver('receive-whiteboard-elements', localSnapshot)
+      // Always re-publish pages so multi-page state survives remount / navigation
+      const { pages, activePageId } = resolvePagesFromMetaAndElements(meta, localSnapshot)
+      // If meta was empty but elements reference other pages, persist reconstructed pages
+      try {
+        const stored = meta.get('pages')
+        if (!Array.isArray(stored) || stored.length === 0) {
+          ydoc.transact(() => {
+            meta.set('pages', pages)
+            meta.set('activePageId', activePageId)
+          }, 'local')
+        }
+      } catch {
+        // ignore
+      }
+      deliver('receive-whiteboard-pages', { pages, activePageId })
     }
 
     const scheduleRebuild = () => {
@@ -167,6 +238,9 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
 
     const onMapChange = () => scheduleRebuild()
     elementsMap.observe(onMapChange)
+    // Pages live in meta — rebuild UI when meta changes too
+    const onMetaChange = () => scheduleRebuild()
+    meta.observe(onMetaChange)
 
     const markDirty = () => {
       onDirtyChangeRef.current?.(true)
@@ -189,10 +263,45 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
       emit(event, value) {
         if (event === 'update-whiteboard-elements') {
           const next = Array.isArray(value?.elements) ? value.elements : Array.isArray(value) ? value : []
-          applyLocalElementsArray(ydoc, elementsMap, next, localSnapshot)
-          localSnapshot = next
-            .map((el, index) => (el && typeof el === 'object' ? { ...el, order: index } : null))
+          // Deep-copy path points so later mutations don't corrupt the Yjs snapshot
+          const normalized = next
+            .map((el, index) => {
+              if (!el || typeof el !== 'object' || !el.id) return null
+              const copy = { ...el, order: index, pageId: el.pageId || 'page-1' }
+              if (Array.isArray(el.points)) {
+                copy.points = el.points.map((p) => (p && typeof p === 'object' ? { ...p } : p))
+              }
+              return copy
+            })
             .filter(Boolean)
+          applyLocalElementsArray(ydoc, elementsMap, normalized, localSnapshot)
+          localSnapshot = normalized
+          // Keep pages meta in sync with any new pageIds on elements
+          const { pages, activePageId } = resolvePagesFromMetaAndElements(meta, normalized)
+          ydoc.transact(() => {
+            meta.set('pages', pages)
+            if (value?.activePageId) meta.set('activePageId', value.activePageId)
+            else if (!meta.get('activePageId')) meta.set('activePageId', activePageId)
+          }, 'local')
+          return
+        }
+        if (event === 'update-whiteboard-pages') {
+          const pages = Array.isArray(value?.pages) ? value.pages : []
+          const activePageId =
+            typeof value?.activePageId === 'string' ? value.activePageId : pages[0]?.id || 'page-1'
+          if (pages.length === 0) return
+          ydoc.transact(() => {
+            meta.set(
+              'pages',
+              pages.map((p, i) => ({
+                id: String(p.id || `page-${i + 1}`),
+                name: typeof p.name === 'string' ? p.name : `Page ${i + 1}`
+              }))
+            )
+            meta.set('activePageId', activePageId)
+          }, 'local')
+          deliver('receive-whiteboard-pages', { pages, activePageId })
+          channel.emit('update-whiteboard-pages', value)
           return
         }
         if (event === 'draw-line') {
@@ -200,9 +309,23 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
           return
         }
         if (event === 'clear-board') {
-          ydoc.transact(() => {
-            Array.from(elementsMap.keys()).forEach((key) => elementsMap.delete(key))
-          })
+          // Prefer page-scoped clear when pageId provided
+          const pageId = value?.pageId
+          if (pageId) {
+            ydoc.transact(() => {
+              Array.from(elementsMap.entries()).forEach(([key, el]) => {
+                if ((el?.pageId || 'page-1') === pageId) elementsMap.delete(key)
+              })
+            }, 'local')
+            localSnapshot = elementsFromMap(elementsMap)
+            deliver('receive-whiteboard-elements', localSnapshot)
+          } else {
+            ydoc.transact(() => {
+              Array.from(elementsMap.keys()).forEach((key) => elementsMap.delete(key))
+            }, 'local')
+            localSnapshot = []
+            deliver('receive-whiteboard-elements', [])
+          }
           channel.emit('clear-board', value)
           return
         }
@@ -216,6 +339,10 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
         listeners.get(event).add(handler)
         if (event === 'receive-whiteboard-elements') {
           handler(elementsFromMap(elementsMap))
+        }
+        if (event === 'receive-whiteboard-pages') {
+          const els = elementsFromMap(elementsMap)
+          handler(resolvePagesFromMetaAndElements(meta, els))
         }
       },
       off(event, handler) {
@@ -273,6 +400,7 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
       if (dirtyTimer) window.clearTimeout(dirtyTimer)
       if (rebuildRaf != null) window.cancelAnimationFrame(rebuildRaf)
       elementsMap.unobserve(onMapChange)
+      meta.unobserve(onMetaChange)
       ydoc.off('update', onDocUpdate)
       try {
         provider.flush?.()
