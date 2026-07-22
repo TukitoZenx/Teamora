@@ -613,6 +613,7 @@ export default function WorkspaceHome({
           onSelectTab={(fileId) => {
             const file = workspaceFiles.find((item) => item.id === fileId)
             if (file) openWorkspaceFile(file)
+            else setActiveTabId(fileId)
           }}
           onCloseTab={closeWorkspaceTab}
           onReorderTab={reorderWorkspaceTab}
@@ -991,7 +992,7 @@ function WorkspaceFileTabs({
 
   return (
     <div className="mb-3 shrink-0 rounded-card border border-border bg-card shadow-card">
-      <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-border px-2 py-1.5">
+      <div className="flex min-h-11 items-center gap-1 overflow-x-auto no-scrollbar border-b border-border px-2 py-1.5">
         {tabFiles.length === 0 ? (
           <span className="px-3 text-xs font-medium text-muted/65">Open files appear here</span>
         ) : (
@@ -1076,7 +1077,7 @@ function WorkspaceFileTabs({
             {folderMenuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 top-full z-50 mt-1 max-h-64 min-w-[200px] overflow-y-auto rounded-xl border border-border bg-card py-1 shadow-dropdown"
+                className="absolute right-0 top-full z-[1200] mt-1 max-h-64 min-w-[200px] overflow-y-auto rounded-xl border border-border bg-card py-1 shadow-dropdown teamora-scroll"
               >
                 <div className="border-b border-border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted">
                   Active folder
@@ -1160,8 +1161,8 @@ function WorkspaceOverview({
   ]
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-y-auto">
-      <div className="rounded-card border border-border bg-card p-5 shadow-card">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto gap-5 pb-8 no-scrollbar">
+      <div className="rounded-card border border-border bg-card p-5 shadow-card shrink-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-input bg-primary/10 text-xl font-bold text-primary">
@@ -1192,7 +1193,7 @@ function WorkspaceOverview({
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-card border border-border bg-card p-5 shadow-card">
           <h2 className="text-sm font-semibold text-text">Recent Files</h2>
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-3">
             {recentFiles.length === 0 ? (
               <p className="rounded-button border border-dashed border-border p-4 text-sm text-muted">
                 Files created by teammates will appear here.
@@ -1329,7 +1330,7 @@ function WorkspaceChat({ messages, userName, onSend }) {
         </div>
       </div>
 
-      <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-card-sunken p-5">
+      <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-card-sunken p-5 pb-8 no-scrollbar">
         {messages.length === 0 ? (
           <div className="rounded-card border border-dashed border-border bg-card p-8 text-center text-sm text-muted">
             Start a workspace conversation.
@@ -1510,7 +1511,7 @@ function WorkspaceSettings({
   }
 
   return (
-    <section className="h-full space-y-6 overflow-y-auto">
+    <section className="h-full space-y-6 overflow-y-auto pb-8 no-scrollbar">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-primary">Workspace Settings</p>
@@ -1781,7 +1782,7 @@ function SettingToggle({ label, description, checked, disabled, onChange }) {
 
 function MembersAndRequests({ workspace, isOwner, pendingRequests, onCopyInviteLink, onResolveRequest }) {
   return (
-    <section className="h-full space-y-6 overflow-y-auto">
+    <section className="h-full space-y-6 overflow-y-auto pb-8 no-scrollbar">
       <div>
         <p className="text-sm font-semibold text-primary">Workspace Settings</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-text">Members</h1>

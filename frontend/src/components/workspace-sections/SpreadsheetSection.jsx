@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import * as Y from 'yjs'
-import Spreadsheet from '../Spreadsheet'
+const Spreadsheet = lazy(() => import('../Spreadsheet'))
 import useLocalCollabChannel from '../../hooks/useLocalCollabChannel'
 import { connectRestYjsProvider } from '../../services/restYjsProvider'
 
@@ -245,16 +245,18 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
   }, [])
 
   return (
-    <Spreadsheet
-      grid={grid}
-      activeCell={activeCell}
-      setActiveCell={setActiveCell}
-      handleCellChange={handleCellChange}
-      spreadsheetCells={{}}
-      socket={channel}
-      roomId={workspaceId}
-      roomSettings={roomSettings}
-      setRoomSettings={setRoomSettings}
-    />
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-muted">Loading Spreadsheet...</div>}>
+      <Spreadsheet
+        grid={grid}
+        activeCell={activeCell}
+        setActiveCell={setActiveCell}
+        handleCellChange={handleCellChange}
+        spreadsheetCells={{}}
+        socket={channel}
+        roomId={workspaceId}
+        roomSettings={roomSettings}
+        setRoomSettings={setRoomSettings}
+      />
+    </Suspense>
   )
 }

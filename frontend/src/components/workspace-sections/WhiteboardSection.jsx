@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import * as Y from 'yjs'
-import Whiteboard from '../Whiteboard'
+const Whiteboard = lazy(() => import('../Whiteboard'))
 import useLocalCollabChannel from '../../hooks/useLocalCollabChannel'
 import { connectRestYjsProvider } from '../../services/restYjsProvider'
 
@@ -285,20 +285,22 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
   }, [workspaceId, activeFile?.id, channel])
 
   return (
-    <Whiteboard
-      key={fileId}
-      canvasRef={canvasRef}
-      myColor={myColor}
-      setMyColor={setMyColor}
-      whiteboardTool={whiteboardTool}
-      setWhiteboardTool={setWhiteboardTool}
-      whiteboardSize={whiteboardSize}
-      setWhiteboardSize={setWhiteboardSize}
-      whiteboardCursors={{}}
-      socket={collabSocket}
-      roomId={workspaceId}
-      userName={userName}
-      onDirtyChange={onDirtyChange}
-    />
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-muted">Loading Whiteboard...</div>}>
+      <Whiteboard
+        key={fileId}
+        canvasRef={canvasRef}
+        myColor={myColor}
+        setMyColor={setMyColor}
+        whiteboardTool={whiteboardTool}
+        setWhiteboardTool={setWhiteboardTool}
+        whiteboardSize={whiteboardSize}
+        setWhiteboardSize={setWhiteboardSize}
+        whiteboardCursors={{}}
+        socket={collabSocket}
+        roomId={workspaceId}
+        userName={userName}
+        onDirtyChange={onDirtyChange}
+      />
+    </Suspense>
   )
 }

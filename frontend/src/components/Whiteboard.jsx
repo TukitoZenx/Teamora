@@ -6,27 +6,16 @@ import {
   Trash2,
   Undo2,
   Redo2,
-  ZoomIn,
-  ZoomOut,
-  Square,
-  Circle,
   Minus,
-  ArrowUpRight,
-  Type,
   Hand,
   MousePointer2,
   PenTool,
-  Grid3X3,
-  StickyNote,
   Sparkles,
-  LayoutGrid,
   Lock,
   Unlock,
   Copy,
   ArrowUp,
   ArrowDown,
-  Image as ImageIcon,
-  Triangle,
   Plus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -49,8 +38,8 @@ export default function Whiteboard({
   filesList = [],
   onDirtyChange
 }) {
-  const [showGrid, setShowGrid] = useState(true)
-  const [zoom, setZoom] = useState(100)
+  const showGrid = true
+  const zoom = 100
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
@@ -64,7 +53,7 @@ export default function Whiteboard({
   // Freehand drawing states (strokes persist as path elements per page)
   const [isDrawing, setIsDrawing] = useState(false)
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
-  const [brushOpacity, setBrushOpacity] = useState(1.0)
+  const brushOpacity = 1.0
   const strokePointsRef = useRef([])
   const strokeMetaRef = useRef(null)
 
@@ -360,11 +349,7 @@ export default function Whiteboard({
         height: 0
       }
       const next = [...(Array.isArray(elementsRef.current) ? elementsRef.current : []), pathElem]
-      setElements(next)
-      elementsRef.current = next
-      onDirtyChange?.(true)
-      socket.emit('update-whiteboard-elements', { roomId, elements: next })
-      window.setTimeout(() => onDirtyChange?.(false), 300)
+      saveElementsState(next)
     }
     strokePointsRef.current = []
     strokeMetaRef.current = null
@@ -378,6 +363,7 @@ export default function Whiteboard({
     setUndoStack((prev) => [...prev, currentElements])
     setRedoStack([])
     setElements(verifiedNew)
+    elementsRef.current = verifiedNew
     onDirtyChange?.(true)
     socket.emit('update-whiteboard-elements', { roomId, elements: verifiedNew })
     window.setTimeout(() => onDirtyChange?.(false), 300)
@@ -432,8 +418,7 @@ export default function Whiteboard({
   const handleElementTextChange = (elemId, newText) => {
     const safeElements = Array.isArray(elements) ? elements : []
     const updated = safeElements.map((el) => (el.id === elemId ? { ...el, text: newText } : el))
-    setElements(updated)
-    socket.emit('update-whiteboard-elements', { roomId, elements: updated })
+    saveElementsState(updated)
   }
 
   // Element actions: lock, duplicate, layers
@@ -539,87 +524,6 @@ export default function Whiteboard({
     document.addEventListener('mouseup', handleMouseUp)
   }
 
-  const applyTemplate = (templateName) => {
-    let templateElements = []
-    if (templateName === 'retro') {
-      templateElements = [
-        {
-          id: 'ret-1',
-          type: 'sticky',
-          x: 200,
-          y: 150,
-          width: 180,
-          height: 180,
-          color: '#d1fae5',
-          borderColor: '#10b981',
-          text: 'What went well?'
-        },
-        {
-          id: 'ret-2',
-          type: 'sticky',
-          x: 450,
-          y: 150,
-          width: 180,
-          height: 180,
-          color: '#fee2e2',
-          borderColor: '#ef4444',
-          text: 'What went wrong?'
-        },
-        {
-          id: 'ret-3',
-          type: 'sticky',
-          x: 700,
-          y: 150,
-          width: 180,
-          height: 180,
-          color: '#fef3c7',
-          borderColor: '#f59e0b',
-          text: 'Action Items'
-        }
-      ]
-    } else if (templateName === 'brainstorm') {
-      templateElements = [
-        {
-          id: 'bs-1',
-          type: 'sticky',
-          x: 450,
-          y: 80,
-          width: 180,
-          height: 180,
-          color: '#e0e7ff',
-          borderColor: '#3b82f6',
-          text: 'Core Goal'
-        },
-        {
-          id: 'bs-2',
-          type: 'sticky',
-          x: 200,
-          y: 350,
-          width: 160,
-          height: 160,
-          color: '#f5f3ff',
-          borderColor: '#8b5cf6',
-          text: 'Idea A'
-        },
-        {
-          id: 'bs-3',
-          type: 'sticky',
-          x: 700,
-          y: 350,
-          width: 160,
-          height: 160,
-          color: '#fdf2f8',
-          borderColor: '#ec4899',
-          text: 'Idea B'
-        }
-      ]
-    }
-    const safeElements = Array.isArray(elements) ? elements : []
-    const updated = [...safeElements, ...templateElements]
-    saveElementsState(updated)
-    toast.success(`Template applied!`)
-  }
-
   return (
     <div
       ref={containerRef}
@@ -635,13 +539,7 @@ export default function Whiteboard({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setShowGrid(!showGrid)}
-            className={`p-2 rounded-lg transition-all cursor-pointer ${showGrid ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-primary/10 hover:text-primary'}`}
-            title="Toggle Grid"
-          >
-            <Grid3X3 className="w-4 h-4" />
-          </button>
+
           <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
@@ -659,29 +557,34 @@ export default function Whiteboard({
             <Redo2 className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-border mx-0.5" />
+          <div className="w-px h-5 bg-border mx-1" />
 
-          {/* Templates Menu */}
-          <div className="relative group">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border text-text rounded-xl text-xs font-semibold hover:bg-primary/10 hover:text-primary transition-all cursor-pointer">
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Templates</span>
-            </button>
-            <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-card py-1.5 min-w-[150px] hidden group-hover:block z-50">
+          {/* Inline Color & Size Picker */}
+          <div className="flex items-center gap-2 mr-2">
+            {colors.map((color) => (
               <button
-                onClick={() => applyTemplate('retro')}
-                className="w-full text-left px-4 py-2 text-xs hover:bg-primary/10 hover:text-primary text-text cursor-pointer"
-              >
-                Retro Board
-              </button>
-              <button
-                onClick={() => applyTemplate('brainstorm')}
-                className="w-full text-left px-4 py-2 text-xs hover:bg-primary/10 hover:text-primary text-text cursor-pointer"
-              >
-                Brainstorm Grid
-              </button>
-            </div>
+                key={color}
+                type="button"
+                onClick={() => setMyColor(color)}
+                style={{ backgroundColor: color }}
+                title={color}
+                className={`h-5 w-5 rounded-full border cursor-pointer transition-transform hover:scale-110 ${
+                  color === '#ffffff' ? 'border-border' : 'border-transparent'
+                } ${myColor === color ? 'ring-2 ring-primary ring-offset-1 ring-offset-card' : ''}`}
+              />
+            ))}
+            <input
+              type="range"
+              min="1"
+              max="40"
+              value={whiteboardSize}
+              onChange={(e) => setWhiteboardSize(parseInt(e.target.value, 10))}
+              className="ml-1 w-20 accent-primary cursor-pointer h-1"
+              title="Brush size"
+            />
           </div>
+
+          <div className="w-px h-5 bg-border mx-0.5" />
 
           <button
             onClick={handleClear}
@@ -719,30 +622,21 @@ export default function Whiteboard({
         ))}
       </div>
 
-      {/* Floating Drawing Tools — below page tabs so it never covers Page 1 */}
-      <div className="absolute left-3 top-[7.25rem] z-20 mt-0 flex max-h-[calc(100%-9rem)] flex-col gap-1 overflow-y-auto rounded-2xl border border-border bg-card/95 p-2 shadow-card backdrop-blur-md">
+      {/* Floating Drawing Tools — essential drawing tools only */}
+      <div className="absolute left-3 top-[7.25rem] z-20 mt-0 flex flex-col gap-1.5">
         {[
           { id: 'select', icon: MousePointer2, label: 'Select' },
           { id: 'pen', icon: PenTool, label: 'Pen' },
-          { id: 'marker', icon: Paintbrush, label: 'Marker' },
           { id: 'pencil', icon: Minus, label: 'Pencil' },
           { id: 'highlighter', icon: Sparkles, label: 'Highlighter' },
           { id: 'eraser', icon: Eraser, label: 'Eraser' },
-          { id: 'sticky', icon: StickyNote, label: 'Sticky Note' },
-          { id: 'rect', icon: Square, label: 'Rectangle' },
-          { id: 'square', icon: Square, label: 'Square' },
-          { id: 'circle', icon: Circle, label: 'Circle' },
-          { id: 'triangle', icon: Triangle, label: 'Triangle' },
-          { id: 'arrow', icon: ArrowUpRight, label: 'Arrow' },
-          { id: 'line', icon: Minus, label: 'Line' },
-          { id: 'text', icon: Type, label: 'Text Block' },
-          { id: 'image', icon: ImageIcon, label: 'Image URL' },
           { id: 'pan', icon: Hand, label: 'Pan canvas' }
         ].map((tool) => {
           const isActive = whiteboardTool === tool.id
           return (
             <button
               key={tool.id}
+              type="button"
               onClick={() => {
                 setWhiteboardTool(tool.id)
                 if (tool.id === 'eraser') {
@@ -755,65 +649,19 @@ export default function Whiteboard({
                   setWhiteboardSize(3)
                 }
               }}
-              className={`p-2 rounded-xl transition-all relative group cursor-pointer ${
-                isActive ? 'bg-primary text-white shadow-sm' : 'text-muted hover:bg-primary/10 hover:text-primary'
+              className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-sm ${
+                isActive
+                  ? 'bg-primary text-white'
+                  : 'bg-card border border-border text-muted hover:bg-primary/10 hover:text-primary'
               }`}
               title={tool.label}
             >
               <tool.icon className="w-4 h-4" />
-              <span className="absolute left-12 bg-card border border-border text-text text-[10px] px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-30 shadow-card">
-                {tool.label}
-              </span>
             </button>
           )
         })}
       </div>
 
-      {/* Floating Color & Size & Opacity Picker */}
-      <div className="absolute right-4 top-16 bg-card/95 border border-border p-3.5 rounded-2xl shadow-card flex flex-col gap-3.5 z-20 backdrop-blur-md transition-colors mt-2">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">Color</span>
-          <div className="grid grid-cols-2 gap-2">
-            {colors.map((color) => (
-              <button
-                key={color}
-                onClick={() => setMyColor(color)}
-                style={{ backgroundColor: color }}
-                className={`w-5 h-5 rounded-full border cursor-pointer transition-transform hover:scale-110 relative ${
-                  color === '#ffffff' ? 'border-border' : 'border-card'
-                }  ${myColor === color ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">Size</span>
-          <input
-            type="range"
-            min="1"
-            max="40"
-            value={whiteboardSize}
-            onChange={(e) => setWhiteboardSize(parseInt(e.target.value))}
-            className="w-12 accent-primary cursor-pointer h-1"
-          />
-          <span className="text-[9px] font-mono text-center text-muted">{whiteboardSize}px</span>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] font-bold text-muted uppercase tracking-wider">Opacity</span>
-          <input
-            type="range"
-            min="0.1"
-            max="1"
-            step="0.05"
-            value={brushOpacity}
-            onChange={(e) => setBrushOpacity(parseFloat(e.target.value))}
-            className="w-12 accent-primary cursor-pointer h-1"
-          />
-          <span className="text-[9px] font-mono text-center text-muted">{Math.round(brushOpacity * 100)}%</span>
-        </div>
-      </div>
 
       {/* Infinite Canvas Container */}
       <div className="flex-1 overflow-hidden flex items-center justify-center relative bg-card-sunken transition-colors">
@@ -1023,22 +871,7 @@ export default function Whiteboard({
           ))}
         </div>
 
-        {/* Zoom Controls */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/95 border border-border px-4 py-2 rounded-full shadow-card flex items-center gap-3.5 z-20 backdrop-blur-md">
-          <button
-            onClick={() => setZoom((prev) => Math.max(prev - 25, 50))}
-            className="text-muted hover:text-primary p-1 cursor-pointer"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-semibold text-text w-10 text-center">{zoom}%</span>
-          <button
-            onClick={() => setZoom((prev) => Math.min(prev + 25, 200))}
-            className="text-muted hover:text-primary p-1 cursor-pointer"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-        </div>
+
       </div>
     </div>
   )
