@@ -6,17 +6,9 @@ import SlideCanvas from './SlideCanvas'
 import PresentSlideView from './PresentSlideView'
 import PropertiesPanel from './PropertiesPanel'
 import useSlideHistory from './hooks/useSlideHistory'
-import {
-  collectOpenTextEditorHtml,
-  applyTextEditorFlush,
-  deepCloneSlides
-} from './utils/flushTextEditors'
+import { collectOpenTextEditorHtml, applyTextEditorFlush, deepCloneSlides } from './utils/flushTextEditors'
 import { compressImageToDataUrl } from './utils/compressImage'
-import {
-  resolveSlideTheme,
-  isAppDarkMode,
-  defaultObjectColors
-} from './utils/slideThemes'
+import { resolveSlideTheme, isAppDarkMode, defaultObjectColors } from './utils/slideThemes'
 import { v4 as uuidv4 } from 'uuid'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -102,9 +94,7 @@ const createElementFromType = (type, extras = {}, isDark = isAppDarkMode()) => {
     return {
       ...base,
       type: 'image',
-      src:
-        extras.src ||
-        'https://images.unsplash.com/photo-1707343843437-caacff5cfa74?q=80&w=400&auto=format&fit=crop',
+      src: extras.src || 'https://images.unsplash.com/photo-1707343843437-caacff5cfa74?q=80&w=400&auto=format&fit=crop',
       width: extras.width ?? 300,
       height: extras.height ?? 200
     }
@@ -226,8 +216,7 @@ export default function PresentationModule({
   const activeSlideData = ensureArray(slides)[activeSlide] || { title: 'Blank Slide', elements: [] }
   const activeElementIds = new Set(ensureArray(activeSlideData.elements).map((el) => el.id))
   const effectiveSelectedIds = selectedElemIds.filter((id) => activeElementIds.has(id))
-  const selectedElems =
-    activeSlideData.elements?.filter((el) => effectiveSelectedIds.includes(el.id)) || []
+  const selectedElems = activeSlideData.elements?.filter((el) => effectiveSelectedIds.includes(el.id)) || []
   const selectedElem = selectedElems.length === 1 ? selectedElems[0] : null
 
   /** Structural edits (insert/delete/group) go through undo history. */
@@ -262,9 +251,7 @@ export default function PresentationModule({
             if (i !== activeSlideRef.current) return slide
             return {
               ...slide,
-              elements: ensureArray(slide.elements).map((el) =>
-                el.id === elementId ? { ...el, ...updates } : el
-              )
+              elements: ensureArray(slide.elements).map((el) => (el.id === elementId ? { ...el, ...updates } : el))
             }
           })
         )
@@ -295,10 +282,7 @@ export default function PresentationModule({
     [mapActiveElements]
   )
 
-  const handleDeleteElement = useCallback(
-    (elementId) => handleDeleteElements([elementId]),
-    [handleDeleteElements]
-  )
+  const handleDeleteElement = useCallback((elementId) => handleDeleteElements([elementId]), [handleDeleteElements])
 
   const handleCopy = useCallback(() => {
     const ids = selectedRef.current
@@ -424,8 +408,7 @@ export default function PresentationModule({
       }
       // Looks like a local path or bare filename — prompt to use Pictures instead
       const looksLikePath =
-        /^([a-zA-Z]:[\\/]|\\\\|\/|\.\/|\.\.\/)/.test(trimmed) ||
-        /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(trimmed)
+        /^([a-zA-Z]:[\\/]|\\\\|\/|\.\/|\.\.\/)/.test(trimmed) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(trimmed)
       if (looksLikePath && !trimmed.startsWith('http') && !trimmed.startsWith('data:')) {
         try {
           toast.error('Cannot paste a file path. Use Insert → Pictures, or copy the image itself (not the path).')
@@ -506,9 +489,7 @@ export default function PresentationModule({
       if (!elementIds?.length) return
       mapActiveElements((elements) => {
         const maxZ = Math.max(0, ...elements.map((e) => e.zIndex || 0))
-        return elements.map((e) =>
-          elementIds.includes(e.id) ? { ...e, zIndex: maxZ + 1 } : e
-        )
+        return elements.map((e) => (elementIds.includes(e.id) ? { ...e, zIndex: maxZ + 1 } : e))
       })
     },
     [mapActiveElements]
@@ -519,9 +500,7 @@ export default function PresentationModule({
       if (!elementIds?.length) return
       mapActiveElements((elements) => {
         const minZ = Math.min(0, ...elements.map((e) => e.zIndex || 0))
-        return elements.map((e) =>
-          elementIds.includes(e.id) ? { ...e, zIndex: minZ - 1 } : e
-        )
+        return elements.map((e) => (elementIds.includes(e.id) ? { ...e, zIndex: minZ - 1 } : e))
       })
     },
     [mapActiveElements]
@@ -635,11 +614,9 @@ export default function PresentationModule({
       }
       if (ids.length > 0) {
         // Direct patch for font/size/color so styles apply immediately
-        mapActiveElements(
-          (elements) =>
-            elements.map((el) => (ids.includes(el.id) ? { ...el, ...updates } : el)),
-          { history: false }
-        )
+        mapActiveElements((elements) => elements.map((el) => (ids.includes(el.id) ? { ...el, ...updates } : el)), {
+          history: false
+        })
       } else if (updates.fontFamily || updates.fontSize || updates.color) {
         try {
           toast.error('Select a text box or shape first, then change font/size')
@@ -714,23 +691,16 @@ export default function PresentationModule({
 
   const handleToggleVisibility = useCallback(
     (index) => {
-      commit((curr) =>
-        ensureArray(curr).map((slide, i) =>
-          i === index ? { ...slide, hidden: !slide.hidden } : slide
-        )
-      )
+      commit((curr) => ensureArray(curr).map((slide, i) => (i === index ? { ...slide, hidden: !slide.hidden } : slide)))
     },
     [commit]
   )
 
-  const handleChangeTheme = useCallback(
-    (nextId) => {
-      const id = nextId || 'default'
-      setThemeId(id)
-      setTheme(resolveSlideTheme(id, isAppDarkMode()))
-    },
-    []
-  )
+  const handleChangeTheme = useCallback((nextId) => {
+    const id = nextId || 'default'
+    setThemeId(id)
+    setTheme(resolveSlideTheme(id, isAppDarkMode()))
+  }, [])
 
   const enterPresentMode = useCallback(async () => {
     if (presentEntering) return
@@ -775,11 +745,7 @@ export default function PresentationModule({
 
     const onKey = (e) => {
       const tag = (e.target?.tagName || '').toLowerCase()
-      const inField =
-        e.target?.isContentEditable ||
-        tag === 'input' ||
-        tag === 'textarea' ||
-        tag === 'select'
+      const inField = e.target?.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select'
 
       const mod = e.ctrlKey || e.metaKey
 
@@ -823,15 +789,7 @@ export default function PresentationModule({
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [
-    isPresenting,
-    undo,
-    redo,
-    handleCopy,
-    handlePasteClipboard,
-    handleDuplicate,
-    handleDeleteElements
-  ])
+  }, [isPresenting, undo, redo, handleCopy, handlePasteClipboard, handleDuplicate, handleDeleteElements])
 
   // Present mode keyboard
   useEffect(() => {
@@ -882,8 +840,7 @@ export default function PresentationModule({
     setDragIndex(null)
   }
 
-  const presentSlideData =
-    deckForPresent[activeSlide] || activeSlideData || { title: 'Blank Slide', elements: [] }
+  const presentSlideData = deckForPresent[activeSlide] || activeSlideData || { title: 'Blank Slide', elements: [] }
 
   if (isPresenting) {
     // Portal to <body> + data-presentation-mode CSS hides navbar/sidebar completely
@@ -931,9 +888,7 @@ export default function PresentationModule({
         >
           <button
             type="button"
-            onClick={() =>
-              setActiveSlide(nextVisibleIndex(deckForPresent, activeSlide, -1))
-            }
+            onClick={() => setActiveSlide(nextVisibleIndex(deckForPresent, activeSlide, -1))}
             disabled={nextVisibleIndex(deckForPresent, activeSlide, -1) === activeSlide}
             className="rounded-full p-1.5 text-white hover:bg-white/20 disabled:opacity-50"
             aria-label="Previous slide"
@@ -1043,9 +998,7 @@ export default function PresentationModule({
               height: Math.max(24, Number(bounds?.height) || 24)
             })
           }
-          onElementRotate={(id, rotation) =>
-            patchElement(id, { rotation: Number(rotation) || 0 })
-          }
+          onElementRotate={(id, rotation) => patchElement(id, { rotation: Number(rotation) || 0 })}
           onElementDelete={handleDeleteElement}
           onElementsDelete={handleDeleteElements}
           onElementTextChange={(id, text) => {

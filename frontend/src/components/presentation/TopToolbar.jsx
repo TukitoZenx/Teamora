@@ -127,7 +127,8 @@ export default function TopToolbar({
         } else if (command === 'fontSize' && formatValue) {
           // execCommand fontSize only accepts 1–7; map px → nearest step, then wrap with span for exact px
           const px = parseInt(formatValue, 10) || 16
-          const step = px <= 12 ? '1' : px <= 14 ? '2' : px <= 16 ? '3' : px <= 18 ? '4' : px <= 24 ? '5' : px <= 32 ? '6' : '7'
+          const step =
+            px <= 12 ? '1' : px <= 14 ? '2' : px <= 16 ? '3' : px <= 18 ? '4' : px <= 24 ? '5' : px <= 32 ? '6' : '7'
           document.execCommand('fontSize', false, step)
           // Prefer exact size via CSS on selection if possible
           try {
@@ -367,10 +368,7 @@ export default function TopToolbar({
                 </ToolBtn>
               </div>
               <div className="mt-1 flex items-center gap-0.5">
-                <ToolBtn
-                  onClick={() => handleFormatCommand('justifyLeft', 'textAlign', 'left')}
-                  title="Align left"
-                >
+                <ToolBtn onClick={() => handleFormatCommand('justifyLeft', 'textAlign', 'left')} title="Align left">
                   <AlignLeft className="h-4 w-4" />
                 </ToolBtn>
                 <ToolBtn
@@ -379,16 +377,10 @@ export default function TopToolbar({
                 >
                   <AlignCenter className="h-4 w-4" />
                 </ToolBtn>
-                <ToolBtn
-                  onClick={() => handleFormatCommand('justifyRight', 'textAlign', 'right')}
-                  title="Align right"
-                >
+                <ToolBtn onClick={() => handleFormatCommand('justifyRight', 'textAlign', 'right')} title="Align right">
                   <AlignRight className="h-4 w-4" />
                 </ToolBtn>
-                <ToolBtn
-                  onClick={() => handleFormatCommand('justifyFull', 'textAlign', 'justify')}
-                  title="Justify"
-                >
+                <ToolBtn onClick={() => handleFormatCommand('justifyFull', 'textAlign', 'justify')} title="Justify">
                   <AlignJustify className="h-4 w-4" />
                 </ToolBtn>
               </div>
@@ -420,9 +412,7 @@ export default function TopToolbar({
                     <input
                       type="color"
                       className="absolute inset-0 cursor-pointer opacity-0"
-                      onChange={(e) =>
-                        onFormatElement?.({ borderColor: e.target.value, borderWidth: 2 })
-                      }
+                      onChange={(e) => onFormatElement?.({ borderColor: e.target.value, borderWidth: 2 })}
                     />
                   </label>
                 </div>

@@ -54,9 +54,7 @@ function SidebarThumbnails({
         <h2 className="text-[10px] font-bold uppercase tracking-wider text-text sm:text-xs">
           Slides
           {slides.length > 0 && (
-            <span className="ml-1 font-medium normal-case tracking-normal text-muted">
-              ({slides.length})
-            </span>
+            <span className="ml-1 font-medium normal-case tracking-normal text-muted">({slides.length})</span>
           )}
         </h2>
         <button
@@ -80,9 +78,7 @@ function SidebarThumbnails({
         }}
         role="listbox"
         aria-label="Slides list"
-        aria-activedescendant={
-          slides[activeSlide]?.id ? `slide-thumb-${slides[activeSlide].id}` : undefined
-        }
+        aria-activedescendant={slides[activeSlide]?.id ? `slide-thumb-${slides[activeSlide].id}` : undefined}
       >
         {slides.length === 0 && (
           <div className="rounded border border-dashed border-border p-4 text-center text-xs text-muted">
@@ -114,11 +110,7 @@ function SidebarThumbnails({
               aria-selected={isActive}
             >
               <div className="mb-0.5 flex items-center justify-between sm:mb-1">
-                <span
-                  className={`text-[10px] font-bold tabular-nums ${
-                    isActive ? 'text-primary' : 'text-muted'
-                  }`}
-                >
+                <span className={`text-[10px] font-bold tabular-nums ${isActive ? 'text-primary' : 'text-muted'}`}>
                   {i + 1}
                 </span>
                 <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">

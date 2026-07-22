@@ -245,7 +245,9 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
   }, [])
 
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-muted">Loading Spreadsheet...</div>}>
+    <Suspense
+      fallback={<div className="h-full flex items-center justify-center text-muted">Loading Spreadsheet...</div>}
+    >
       <Spreadsheet
         grid={grid}
         activeCell={activeCell}

@@ -99,9 +99,7 @@ const slidesFromMap = (slidesMap) => {
 
 const writeSlidesToYjs = (ydoc, slidesMap, nextArray, prevArray) => {
   const next = ensureSlideIds(nextArray)
-  const prevIds = new Set(
-    (Array.isArray(prevArray) ? prevArray : []).map((s) => s?.id).filter(Boolean)
-  )
+  const prevIds = new Set((Array.isArray(prevArray) ? prevArray : []).map((s) => s?.id).filter(Boolean))
   const nextIds = new Set()
 
   try {
@@ -111,9 +109,7 @@ const writeSlidesToYjs = (ydoc, slidesMap, nextArray, prevArray) => {
         // Store plain object reference copy — Yjs will encode on update
         slidesMap.set(slide.id, {
           ...slide,
-          elements: Array.isArray(slide.elements)
-            ? slide.elements.map((el) => ({ ...el }))
-            : [],
+          elements: Array.isArray(slide.elements) ? slide.elements.map((el) => ({ ...el })) : [],
           order: index
         })
       })
@@ -349,16 +345,19 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
     [scheduleYjsFlush]
   )
 
-  const persistSlides = useCallback(async (snapshot) => {
-    const list = ensureSlideIds(snapshot)
-    slidesRef.current = list
-    setSlidesState(list)
-    if (yjsFlushTimerRef.current) {
-      window.clearTimeout(yjsFlushTimerRef.current)
-      yjsFlushTimerRef.current = null
-    }
-    flushToYjs(list)
-  }, [flushToYjs])
+  const persistSlides = useCallback(
+    async (snapshot) => {
+      const list = ensureSlideIds(snapshot)
+      slidesRef.current = list
+      setSlidesState(list)
+      if (yjsFlushTimerRef.current) {
+        window.clearTimeout(yjsFlushTimerRef.current)
+        yjsFlushTimerRef.current = null
+      }
+      flushToYjs(list)
+    },
+    [flushToYjs]
+  )
 
   const resetEditor = useCallback(() => {
     setIsPresenting(false)
@@ -370,11 +369,7 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
   return (
     <PresentationErrorBoundary onReset={resetEditor}>
       <Suspense
-        fallback={
-          <div className="flex h-full items-center justify-center text-muted">
-            Loading Presentation...
-          </div>
-        }
+        fallback={<div className="flex h-full items-center justify-center text-muted">Loading Presentation...</div>}
       >
         <PresentationModule
           key={`presentation-editor-${editorKey}`}
