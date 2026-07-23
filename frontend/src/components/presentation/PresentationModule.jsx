@@ -131,7 +131,6 @@ export default function PresentationModule({
   const [selectedElemIds, setSelectedElemIds] = useState([])
   const [editingElemId, setEditingElemId] = useState(null)
   const [activeTool] = useState(null)
-  const [themeId, setThemeId] = useState('default')
   // Slide design is independent of app Light/Dark chrome.
   const [theme, setTheme] = useState(() => resolveSlideTheme('default'))
   const [presentScale, setPresentScale] = useState(1)
@@ -678,9 +677,7 @@ export default function PresentationModule({
   )
 
   const handleChangeTheme = useCallback((nextId) => {
-    const id = nextId || 'default'
-    setThemeId(id)
-    setTheme(resolveSlideTheme(id))
+    setTheme(resolveSlideTheme(nextId || 'default'))
   }, [])
 
   const enterPresentMode = useCallback(async () => {
