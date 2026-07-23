@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
 import SlideObject from './elements/SlideObject'
 import RichTextEditor from './elements/RichTextEditor'
+import { sanitizeHtml } from '../../utils/sanitizeHtml'
 
 export default function SlideCanvas({
   activeSlideData,
@@ -184,7 +185,7 @@ export default function SlideCanvas({
                     textAlign: child.textAlign || (child.type === 'shape' ? 'center' : 'left'),
                     color: child.color || '#000000'
                   }}
-                  dangerouslySetInnerHTML={{ __html: child.text || '' }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(child.text || '') }}
                 />
               ) : null}
             </div>

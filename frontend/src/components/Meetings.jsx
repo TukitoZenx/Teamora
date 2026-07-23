@@ -29,7 +29,6 @@ import toast from 'react-hot-toast'
 import { describeIceSetup } from '../services/webrtcIce'
 import { MeetingPeerManager } from '../services/meetingPeerManager'
 import { dismissMeetingNotifications } from './utils/notifications'
-import api from '../services/api'
 import { useMeeting } from '../contexts/MeetingContext'
 
 const REACTIONS = ['👍', '👏', '❤️', '😂', '🎉', '👋']
@@ -822,14 +821,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
         organizer: userName,
         startedAt: new Date().toISOString()
       })
-      // Intentionally NOT calling addWorkspaceNotification here so the organizer doesn't get notified of their own meeting
-      api
-        .post(`/chat/workspace/${roomId}/messages`, {
-          content: `🎥 **${userName || 'Someone'}** started a meeting. Join now!`,
-          isSystem: true
-        })
-        .catch((err) => console.error('Failed to post meeting start chat message:', err))
-
+      // Peers learn about the meeting via socket `meeting-started` +
+      // useMeetingNotifications. Organizer is not self-notified.
       setMeetingParticipants((prev) => ({
         ...prev,
         [socketId]: {

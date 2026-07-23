@@ -94,15 +94,21 @@ export default function useAuthForm(mode) {
 
     setSubmitting(true)
     try {
+      let nextUser = null
       if (isSignup) {
-        await register(form)
+        nextUser = await register(form)
         toast.success('Account created successfully.')
       } else {
-        await login({ email: form.email, password: form.password })
+        nextUser = await login({ email: form.email, password: form.password })
         toast.success('Welcome back!')
       }
 
-      navigate('/dashboard')
+      // Avoid a dashboard flash for incomplete Google/local profiles.
+      if (nextUser && nextUser.profileComplete === false) {
+        navigate('/complete-profile', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     } catch (authError) {
       setError(getFriendlyAuthError(authError.message))
     } finally {

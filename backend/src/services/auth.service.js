@@ -8,6 +8,8 @@ const normalizeEmail = (email) => email.trim().toLowerCase();
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 const USERNAME_PATTERN = /^[a-z0-9_][a-z0-9_.-]{2,39}$/;
 const MIN_PASSWORD_LENGTH = 8;
+/** bcrypt only uses 72 bytes; reject absurd lengths to prevent CPU DoS. */
+const MAX_PASSWORD_LENGTH = 72;
 const MAX_AVATAR_LENGTH = 200_000;
 const RESET_TOKEN_EXPIRY_MS = 1000 * 60 * 15;
 const RESET_SUCCESS_MESSAGE = "If an account exists, we've sent a password reset email.";
@@ -25,9 +27,12 @@ const sanitizeAvatar = (avatar) => {
     throw createError('Avatar image is too large. Please use an image under 150 KB.');
   }
 
-  // Only allow empty, absolute http(s) URLs, or data:image/* URLs (profile crop).
-  if (!/^https?:\/\//i.test(cleanAvatar) && !/^data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(cleanAvatar)) {
-    throw createError('Avatar must be an image URL or image data');
+  // Only allow empty, absolute http(s) URLs, or raster data:image URLs (no SVG — XSS risk).
+  if (
+    !/^https?:\/\//i.test(cleanAvatar) &&
+    !/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(cleanAvatar)
+  ) {
+    throw createError('Avatar must be a PNG, JPEG, GIF, or WebP image URL or data URL');
   }
 
   return cleanAvatar;
@@ -81,6 +86,10 @@ const validateRegistrationInput = ({ fullName, username, email, password }) => {
     throw createError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
   }
 
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    throw createError(`Password must be at most ${MAX_PASSWORD_LENGTH} characters`);
+  }
+
   return {
     fullName: cleanFullName,
     username: cleanUsername,
@@ -94,6 +103,10 @@ const validateLoginInput = ({ email, password }) => {
 
   if (typeof password !== 'string' || !password) {
     throw createError('Password is required');
+  }
+
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    throw createError(`Password must be at most ${MAX_PASSWORD_LENGTH} characters`);
   }
 
   if (!EMAIL_PATTERN.test(cleanEmail)) {
@@ -117,6 +130,10 @@ const validatePassword = (password) => {
 
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw createError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    throw createError(`Password must be at most ${MAX_PASSWORD_LENGTH} characters`);
   }
 };
 

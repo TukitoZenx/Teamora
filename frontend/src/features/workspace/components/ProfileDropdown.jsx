@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { LogOut, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../../hooks/useAuth'
+import { useMeeting } from '../../../contexts/MeetingContext'
 import Avatar from '../../../components/ui/Avatar'
 import { DropdownItem, DropdownMenu } from '../../../components/ui/Dropdown'
 
@@ -14,6 +15,7 @@ const getDisplayName = (user) => {
 
 export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace }) {
   const { user, logout } = useAuth()
+  const { leaveMeeting } = useMeeting()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -42,11 +44,13 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
   const handleLogout = async () => {
     setOpen(false)
     try {
+      leaveMeeting()
       await logout()
     } catch (error) {
       toast.error(error.message)
     } finally {
       sessionStorage.removeItem('teamora-google-auth-started')
+      sessionStorage.removeItem('teamora-global-active-meeting')
       navigate('/', { replace: true })
     }
   }

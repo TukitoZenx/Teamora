@@ -6,8 +6,8 @@ import useMeetingSignaling from '../hooks/useMeetingSignaling'
 import Meetings from './Meetings'
 
 export default function GlobalMeetings() {
-  const { inMeeting, activeMeetingWorkspace, portalTarget } = useMeeting()
-  const { user } = useAuth()
+  const { inMeeting, activeMeetingWorkspace, portalTarget, leaveMeeting } = useMeeting()
+  const { user, authenticated } = useAuth()
   const location = useLocation()
 
   const match = location.pathname.match(/\/workspace\/([^/]+)\/meetings/)
@@ -16,8 +16,15 @@ export default function GlobalMeetings() {
   const userName = user?.fullName || user?.username || user?.email || 'User'
 
   const isMaximized = location.pathname === `/workspace/${workspaceId}/meetings`
-  const shouldConnect = (inMeeting || isMaximized) && workspaceId
+  // Never keep meeting media/signaling up when logged out.
+  const shouldConnect = authenticated && (inMeeting || isMaximized) && workspaceId
   const socket = useMeetingSignaling(shouldConnect ? workspaceId : null, userName)
+
+  useEffect(() => {
+    if (!authenticated && inMeeting) {
+      leaveMeeting()
+    }
+  }, [authenticated, inMeeting, leaveMeeting])
 
   const [delayedRender, setDelayedRender] = useState(false)
   const [rect, setRect] = useState(null)

@@ -156,6 +156,13 @@ export default function App() {
     }
   }, [authenticated, location.pathname, location.search])
 
+  // Visiting /dashboard or settings must not keep a leftover workspace shell mounted.
+  useEffect(() => {
+    if (location.pathname === '/dashboard' || location.pathname.startsWith('/settings')) {
+      setActiveWorkspace(null)
+    }
+  }, [location.pathname])
+
   useEffect(() => {
     if (!authenticated || !user || user.provider !== 'google') return
 
@@ -418,13 +425,12 @@ export default function App() {
           toast.success('You have left the workspace.')
         }
       } catch (error) {
-        const message = error?.response?.data?.message || error?.message || 'Failed to leave workspace'
+        const message = error?.message || 'Failed to leave workspace'
         toast.error(message)
         throw error
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
+    [activeMeetingWorkspace?._id, leaveMeeting, loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
   )
 
   const fetchWorkspace = useCallback(
@@ -692,7 +698,7 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to={authenticated ? '/dashboard' : '/'} replace />} />
       </Routes>
-      <GlobalMeetings />
+      {authenticated ? <GlobalMeetings /> : null}
     </>
   )
 }
@@ -718,29 +724,28 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
-  const loadInvite = useCallback(async () => {
-    setLoading(true)
-    try {
-      const { data } = await api.get(`/api/v1/workspaces/invite/${inviteCode}`)
-      setWorkspace(data.workspace)
-    } catch (error) {
-      toast.error(error.message)
-      navigate('/dashboard', { replace: true })
-    } finally {
-      setLoading(false)
-    }
-  }, [inviteCode, navigate])
-
   useEffect(() => {
     let cancelled = false
-    queueMicrotask(() => {
-      if (!cancelled) loadInvite()
-    })
+    setLoading(true)
+
+    api
+      .get(`/api/v1/workspaces/invite/${inviteCode}`)
+      .then(({ data }) => {
+        if (!cancelled) setWorkspace(data.workspace)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        toast.error(error.message)
+        navigate('/dashboard', { replace: true })
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
 
     return () => {
       cancelled = true
     }
-  }, [loadInvite])
+  }, [inviteCode, navigate])
 
   const requestAccess = async () => {
     setSubmitting(true)
@@ -851,17 +856,24 @@ function InfoTile({ label, value }) {
 }
 
 function PublicRoute({ children, loading, authenticated, profileComplete }) {
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-live="polite">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-muted border-t-primary" />
-      </div>
-    )
+  // Guests see auth UI immediately — do not block on slow /me.
+  // Only wait when a cached/live session may need redirect away from auth pages.
+  if (authenticated) {
+    if (loading) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-live="polite">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-muted border-t-primary" />
+        </div>
+      )
+    }
+    return profileComplete ? <Navigate to="/dashboard" replace /> : <Navigate to="/complete-profile" replace />
   }
 
-  if (!authenticated) return children
-  return profileComplete ? <Navigate to="/dashboard" replace /> : <Navigate to="/complete-profile" replace />
+  return children
 }
+
+const SAFE_RESTORE_PATH =
+  /^\/(dashboard|settings(?:\/[a-z0-9-]+)?|workspace(?:\/[a-zA-Z0-9_-]+(?:\/[a-z0-9-]+)?)?)$/
 
 function RootRoute({ loading, authenticated, profileComplete }) {
   if (loading) {
@@ -871,8 +883,13 @@ function RootRoute({ loading, authenticated, profileComplete }) {
   if (!authenticated) return <LandingPage />
 
   const lastPage = localStorage.getItem(LAST_PAGE_KEY)
-  const blockedRestorePages = ['/', '/signin', '/signup', '/forgot-password', '/complete-profile']
-  if (profileComplete && lastPage && !blockedRestorePages.includes(lastPage)) {
+  const blockedRestorePages = ['/', '/signin', '/signup', '/forgot-password', '/complete-profile', '/reset-password']
+  if (
+    profileComplete &&
+    lastPage &&
+    !blockedRestorePages.some((p) => lastPage === p || lastPage.startsWith('/reset-password')) &&
+    SAFE_RESTORE_PATH.test(lastPage)
+  ) {
     return <Navigate to={lastPage} replace />
   }
 

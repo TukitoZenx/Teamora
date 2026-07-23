@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react'
+import { sanitizeHtml } from '../../../utils/sanitizeHtml'
 
 /**
  * Content-editable text for text boxes and shapes.
@@ -87,7 +88,7 @@ export default function RichTextEditor({ el, isSelected, isPresenting, isEditing
           centered ? 'flex items-center justify-center' : ''
         }`}
         style={style}
-        dangerouslySetInnerHTML={{ __html: el?.text || '' }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(el?.text || '') }}
       />
     )
   }
