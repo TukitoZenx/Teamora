@@ -429,6 +429,29 @@ html[data-density='compact'] .teamora-content-fade {
   }
 }
 
+@keyframes teamora-loading-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(240%);
+  }
+}
+
+.teamora-loading-bar {
+  animation: teamora-loading-slide 1.15s ease-in-out infinite;
+}
+
+@keyframes teamora-loading-ring {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.teamora-loading-ring {
+  animation: teamora-loading-ring 0.95s linear infinite;
+}
+
 .skeleton-shimmer {
   background: linear-gradient(
     90deg,
