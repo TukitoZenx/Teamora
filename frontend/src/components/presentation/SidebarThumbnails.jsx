@@ -1,12 +1,165 @@
-import { useEffect, useRef, memo } from 'react'
+import { useEffect, useRef, useState, memo, useMemo } from 'react'
 import { Plus, Copy, Trash2, Eye, EyeOff } from 'lucide-react'
+import { sanitizeHtml } from '../../utils/sanitizeHtml'
+
+/** Design size of the main slide canvas (matches PresentSlideView / SlideCanvas). */
+const SLIDE_W = 850
+const SLIDE_H = (850 * 9) / 16
+
+const stripHtml = (html) =>
+  String(html || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
 /**
- * PowerPoint-like slide rail:
- * - Smooth scrolling when slides overflow (2–3+)
- * - Scrollbar hidden while scroll remains active
- * - Responsive widths for mobile / tablet / desktop
- * - Auto-scroll active thumbnail into view
+ * Mini slide preview: same layout as the editor canvas, scaled to the thumbnail.
+ * So the sidebar matches what the user sees on the big slide.
+ */
+function SlideMiniPreview({ slide, theme }) {
+  const containerRef = useRef(null)
+  const [scale, setScale] = useState(0.15)
+
+  useEffect(() => {
+    const node = containerRef.current
+    if (!node) return undefined
+
+    const update = () => {
+      const w = node.clientWidth || 1
+      setScale(w / SLIDE_W)
+    }
+    update()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update)
+      return () => window.removeEventListener('resize', update)
+    }
+
+    const ro = new ResizeObserver(update)
+    ro.observe(node)
+    return () => ro.disconnect()
+  }, [])
+
+  const elements = useMemo(() => {
+    const list = Array.isArray(slide?.elements) ? [...slide.elements] : []
+    list.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+    return list
+  }, [slide?.elements])
+
+  const gradient = theme?.gradient || 'from-white to-slate-50'
+  const accent = theme?.accent || 'from-primary to-indigo-500'
+  const isEmpty = elements.length === 0
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+      <div
+        className={`absolute left-0 top-0 bg-gradient-to-br ${gradient}`}
+        style={{
+          width: SLIDE_W,
+          height: SLIDE_H,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left'
+        }}
+      >
+        <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
+
+        {elements.map((el) => (
+          <div
+            key={el.id || `${el.x}-${el.y}-${el.type}`}
+            style={{
+              position: 'absolute',
+              left: el.x ?? 0,
+              top: el.y ?? 0,
+              width: el.width ?? 0,
+              height: el.height ?? 0,
+              zIndex: el.zIndex ?? 1,
+              transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+              opacity: el.opacity ?? 1,
+              borderRadius:
+                el.borderRadius != null && el.borderRadius !== ''
+                  ? `${el.borderRadius}px`
+                  : el.shape === 'circle'
+                    ? '50%'
+                    : '0px',
+              borderWidth: el.borderWidth ? `${el.borderWidth}px` : '0px',
+              borderStyle: el.borderWidth ? 'solid' : 'none',
+              borderColor: el.borderWidth ? el.borderColor || el.color || 'transparent' : 'transparent',
+              background:
+                el.type === 'image'
+                  ? undefined
+                  : el.fill || (el.type === 'shape' ? '#e2e8f0' : 'transparent'),
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              pointerEvents: 'none'
+            }}
+          >
+            {el.type === 'image' && el.src ? (
+              <img src={el.src} alt="" className="h-full w-full object-cover" draggable={false} />
+            ) : el.type === 'icon' ? (
+              <div
+                className="flex h-full w-full items-center justify-center"
+                style={{ fontSize: Math.min(el.width || 40, el.height || 40) * 0.55 }}
+              >
+                {el.icon || el.text || '★'}
+              </div>
+            ) : el.type === 'shape' ? (
+              stripHtml(el.text) ? (
+                <div
+                  className="flex h-full w-full items-center justify-center overflow-hidden p-1 text-center"
+                  style={{
+                    color: el.color || '#000',
+                    fontSize: el.fontSize || '16px',
+                    fontWeight: el.fontWeight || 'normal',
+                    fontFamily: el.fontFamily || 'Inter, sans-serif',
+                    lineHeight: 1.2
+                  }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(el.text) }}
+                />
+              ) : null
+            ) : el.type === 'group' ? (
+              (el.children || []).map((child) => (
+                <div
+                  key={child.id || `${child.x}-${child.y}`}
+                  style={{
+                    position: 'absolute',
+                    left: child.x ?? 0,
+                    top: child.y ?? 0,
+                    width: child.width ?? 0,
+                    height: child.height ?? 0,
+                    background: child.fill || 'transparent',
+                    overflow: 'hidden'
+                  }}
+                />
+              ))
+            ) : (
+              <div
+                className="h-full w-full overflow-hidden p-1"
+                style={{
+                  color: el.color || '#000',
+                  fontSize: el.fontSize || '16px',
+                  fontWeight: el.fontWeight || 'normal',
+                  fontFamily: el.fontFamily || 'Inter, sans-serif',
+                  textAlign: el.textAlign || 'left',
+                  lineHeight: 1.2
+                }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(el.text || '') }}
+              />
+            )}
+          </div>
+        ))}
+
+        {isEmpty && (
+          <div className="absolute inset-0 flex items-center justify-center px-8 text-center text-2xl font-semibold text-slate-400">
+            {slide?.title || 'Blank slide'}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * PowerPoint-like slide rail with real mini previews of each slide.
  */
 function SidebarThumbnails({
   slides = [],
@@ -24,17 +177,14 @@ function SidebarThumbnails({
   const listRef = useRef(null)
   const activeRef = useRef(null)
 
-  // Keep the active slide thumbnail in view when navigating.
   useEffect(() => {
     const node = activeRef.current
     const list = listRef.current
     if (!node || !list) return
 
-    // Prefer native scrollIntoView with nearest block to avoid jarring jumps.
     try {
       node.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
     } catch {
-      // Fallback for older environments
       const listRect = list.getBoundingClientRect()
       const nodeRect = node.getBoundingClientRect()
       if (nodeRect.top < listRect.top) {
@@ -90,7 +240,6 @@ function SidebarThumbnails({
           const isActive = activeSlide === i
           const isHidden = Boolean(s?.hidden)
           const slideKey = s?.id || `slide-${i}`
-          const elementCount = Array.isArray(s?.elements) ? s.elements.length : 0
 
           return (
             <div
@@ -105,7 +254,6 @@ function SidebarThumbnails({
               }}
               onDrop={(e) => onDrop?.(e, i)}
               className="group relative cursor-grab active:cursor-grabbing"
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '0 90px' }}
               role="option"
               aria-selected={isActive}
             >
@@ -162,39 +310,14 @@ function SidebarThumbnails({
                     ? 'border-primary shadow-md ring-2 ring-primary/20'
                     : 'border-border/60 hover:border-border hover:shadow-sm'
                 } ${isHidden ? 'opacity-40 grayscale' : 'opacity-100'}`}
+                title={s?.title || `Slide ${i + 1}`}
               >
-                <div
-                  className={`pointer-events-none relative flex h-full w-full flex-col items-center justify-center bg-gradient-to-br p-1 ${
-                    theme?.gradient || 'from-white to-slate-50'
-                  }`}
-                >
-                  <div
-                    className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${
-                      theme?.accent || 'from-primary to-indigo-500'
-                    }`}
-                  />
-                  <div
-                    className={`w-full truncate px-1 text-center text-[6px] font-bold sm:text-[7px] ${
-                      theme?.isDark ? 'text-slate-200' : 'text-slate-800'
-                    }`}
-                  >
-                    {s?.title || 'Untitled'}
+                <SlideMiniPreview slide={s} theme={theme} />
+                {isHidden && (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/15">
+                    <EyeOff className="h-3.5 w-3.5 text-slate-700" />
                   </div>
-                  {elementCount > 0 && (
-                    <div
-                      className={`mt-0.5 text-[5px] font-medium sm:text-[6px] ${
-                        theme?.isDark ? 'text-slate-400' : 'text-slate-500'
-                      }`}
-                    >
-                      {elementCount} object{elementCount === 1 ? '' : 's'}
-                    </div>
-                  )}
-                  {isHidden && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                      <EyeOff className="h-3 w-3 text-slate-600" />
-                    </div>
-                  )}
-                </div>
+                )}
               </button>
             </div>
           )

@@ -1,5 +1,6 @@
 import React from 'react'
-import { AlertTriangle, RotateCcw, Home } from 'lucide-react' // icon of error , when an app crashes, we can use this icon to show the error message to the user.
+import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
+import TeamoraLogo from './ui/TeamoraLogo'
 
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 
@@ -41,6 +42,7 @@ export default class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="flex min-h-screen w-screen flex-col items-center justify-center bg-background p-6 font-sans text-text">
+          <TeamoraLogo size="lg" className="mb-4" />
           <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-danger/30 bg-danger/10 text-danger">
             <AlertTriangle className="h-8 w-8" aria-hidden />
           </div>

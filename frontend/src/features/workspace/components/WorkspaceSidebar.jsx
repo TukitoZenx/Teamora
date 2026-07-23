@@ -18,6 +18,7 @@ import {
   Video
 } from 'lucide-react'
 import SidebarItem from './SidebarItem'
+import TeamoraLogo from '../../../components/ui/TeamoraLogo'
 
 const groups = [
   [{ key: 'home', label: 'Home', icon: Home }],
@@ -68,15 +69,9 @@ export default function WorkspaceSidebar({
             onBlur={() => setShowExpandButton(false)}
           >
             <div
-              className={`flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm transition-all duration-normal ease-standard ${collapsed && showExpandButton ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
+              className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 shadow-sm transition-all duration-normal ease-standard ${collapsed && showExpandButton ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
             >
-              <svg viewBox="0 0 48 48" className="h-5 w-5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="4" y="4" width="40" height="40" rx="12" fill="currentColor" />
-                <path d="M16 14H32" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
-                <path d="M20 14V34" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
-                <path d="M28 14V34" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
-                <path d="M20 24H28" stroke="var(--tw-on-primary)" strokeWidth="2.6" strokeLinecap="round" />
-              </svg>
+              <TeamoraLogo size="md" className="h-9 w-9" rounded="rounded-2xl" />
             </div>
 
             {collapsed && (

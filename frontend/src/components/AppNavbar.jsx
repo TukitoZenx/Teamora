@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Sun, Moon } from 'lucide-react'
 import ProfileDropdown from '../features/workspace/components/ProfileDropdown'
 import NotificationButton from './ui/NotificationButton'
-import teamoraLogo from '../assets/hero.png'
+import TeamoraLogo from './ui/TeamoraLogo'
 
 export default function AppNavbar({ onDashboard }) {
   const [theme, setTheme] = useState(() => {
@@ -58,7 +58,7 @@ export default function AppNavbar({ onDashboard }) {
           className="flex min-w-0 items-center gap-3 rounded-xl text-left transition duration-normal hover:opacity-80"
           title="Dashboard"
         >
-          <img src={teamoraLogo} alt="Teamora" className="h-9 w-9 shrink-0 rounded-xl object-contain" />
+          <TeamoraLogo size="md" />
           <span className="block text-sm font-semibold tracking-tight text-text">Teamora</span>
         </button>
 

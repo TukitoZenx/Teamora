@@ -18,6 +18,7 @@ import WorkspaceLayout from './features/workspace/components/WorkspaceLayout'
 import { addWorkspaceNotification } from './components/utils/notifications'
 import GlobalMeetings from './components/GlobalMeetings'
 import { useMeeting } from './contexts/MeetingContext'
+import TeamoraLogo from './components/ui/TeamoraLogo'
 
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 const LAST_PAGE_KEY = 'teamora-last-page'
@@ -900,8 +901,9 @@ function PublicRoute({ children, loading, authenticated, profileComplete }) {
   if (authenticated) {
     if (loading) {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-live="polite">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary-muted border-t-primary" />
+        <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background" role="status" aria-live="polite">
+          <TeamoraLogo size="lg" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-muted border-t-primary" />
         </div>
       )
     }
