@@ -47,14 +47,8 @@ export default function AuthBrandPanel({ mode = 'signin' }) {
       />
 
       {/* Floating orbs */}
-      <div
-        aria-hidden
-        className="absolute -left-16 top-1/4 h-64 w-64 rounded-full bg-primary/30 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="absolute bottom-20 right-10 h-48 w-48 rounded-full bg-info/20 blur-3xl"
-      />
+      <div aria-hidden className="absolute -left-16 top-1/4 h-64 w-64 rounded-full bg-primary/30 blur-3xl" />
+      <div aria-hidden className="absolute bottom-20 right-10 h-48 w-48 rounded-full bg-info/20 blur-3xl" />
 
       <div className="relative z-10 flex h-full flex-col justify-between px-10 py-10 xl:px-16 xl:py-12">
         <Link to="/" className="group flex w-fit items-center gap-3">
@@ -80,8 +74,8 @@ export default function AuthBrandPanel({ mode = 'signin' }) {
             </span>
           </h1>
           <p className="mt-6 max-w-md text-base leading-relaxed text-white/65 xl:text-lg">
-            Docs, sheets, whiteboards, slides, and meetings — everything your team needs to create and ship
-            faster, together.
+            Docs, sheets, whiteboards, slides, and meetings — everything your team needs to create and ship faster,
+            together.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-2">

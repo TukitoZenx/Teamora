@@ -161,7 +161,11 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
       }
       if (msg.type === 'error') {
         log('WS rejected', msg.message || 'unknown error')
-        if (String(msg.message || '').toLowerCase().includes('not a workspace member')) {
+        if (
+          String(msg.message || '')
+            .toLowerCase()
+            .includes('not a workspace member')
+        ) {
           destroyed = true
           try {
             window.dispatchEvent(

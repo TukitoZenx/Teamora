@@ -19,14 +19,44 @@ import teamoraLogo from '../assets/hero.png'
 
 /** Real Teamora workspace tools only (matches product sidebar). */
 const features = [
-  { id: 'documents', title: 'Documents', desc: 'Rich text docs with live cursors and multi-file tabs.', icon: FileText },
-  { id: 'spreadsheet', title: 'Spreadsheet', desc: 'Shared grids, formulas, and .xlsx import/export.', icon: TableProperties },
-  { id: 'presentation', title: 'Presentation', desc: 'Slides, themes, and full-screen present mode.', icon: Presentation },
-  { id: 'whiteboard', title: 'Whiteboard', desc: 'Multi-page board with pen, pencil, highlighter, and eraser.', icon: Paintbrush },
+  {
+    id: 'documents',
+    title: 'Documents',
+    desc: 'Rich text docs with live cursors and multi-file tabs.',
+    icon: FileText
+  },
+  {
+    id: 'spreadsheet',
+    title: 'Spreadsheet',
+    desc: 'Shared grids, formulas, and .xlsx import/export.',
+    icon: TableProperties
+  },
+  {
+    id: 'presentation',
+    title: 'Presentation',
+    desc: 'Slides, themes, and full-screen present mode.',
+    icon: Presentation
+  },
+  {
+    id: 'whiteboard',
+    title: 'Whiteboard',
+    desc: 'Multi-page board with pen, pencil, highlighter, and eraser.',
+    icon: Paintbrush
+  },
   { id: 'meetings', title: 'Meetings', desc: 'Video calls with mic, camera, and screen share.', icon: Video },
-  { id: 'shared-files', title: 'Shared Files', desc: 'Folders, uploads, and open files in the right editor.', icon: Folder },
+  {
+    id: 'shared-files',
+    title: 'Shared Files',
+    desc: 'Folders, uploads, and open files in the right editor.',
+    icon: Folder
+  },
   { id: 'calendar', title: 'Calendar', desc: 'Month view for tasks with dates, times, and reminders.', icon: Calendar },
-  { id: 'tasks', title: 'All Tasks', desc: 'Task list with status, priority, assignee, and filters.', icon: CheckSquare },
+  {
+    id: 'tasks',
+    title: 'All Tasks',
+    desc: 'Task list with status, priority, assignee, and filters.',
+    icon: CheckSquare
+  },
   { id: 'chat', title: 'Chat', desc: 'Workspace chat with optional attachments.', icon: MessageSquare },
   { id: 'members', title: 'Members', desc: 'Invite by link or code; owners can approve join requests.', icon: Users }
 ]
@@ -331,9 +361,7 @@ export default function LandingPage() {
                           </span>
                           <span className="ml-auto text-[10px] font-medium text-muted">Page 1</span>
                         </div>
-                        <div
-                          className="relative flex flex-1 items-center justify-center bg-[radial-gradient(color-mix(in_srgb,var(--tw-border)_70%,transparent)_1px,transparent_1px)] [background-size:14px_14px] p-6"
-                        >
+                        <div className="relative flex flex-1 items-center justify-center bg-[radial-gradient(color-mix(in_srgb,var(--tw-border)_70%,transparent)_1px,transparent_1px)] [background-size:14px_14px] p-6">
                           <svg className="h-28 w-full max-w-sm" viewBox="0 0 320 100" fill="none" aria-hidden>
                             <path
                               d="M20 70 C 60 18, 100 90, 150 40 S 240 15, 300 55"

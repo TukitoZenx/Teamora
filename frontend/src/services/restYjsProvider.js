@@ -25,16 +25,7 @@ const fromBase64 = (b64) => {
  */
 export function connectRestYjsProvider(
   ydoc,
-  {
-    workspaceId,
-    key,
-    pollMs = 1200,
-    user,
-    onAwareness,
-    onPeerLeave,
-    onWsStatus,
-    onWorkspaceDeleted
-  }
+  { workspaceId, key, pollMs = 1200, user, onAwareness, onPeerLeave, onWsStatus, onWorkspaceDeleted }
 ) {
   let destroyed = false
   let pending = []

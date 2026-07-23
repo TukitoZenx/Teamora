@@ -28,10 +28,7 @@ const sanitizeAvatar = (avatar) => {
   }
 
   // Only allow empty, absolute http(s) URLs, or raster data:image URLs (no SVG — XSS risk).
-  if (
-    !/^https?:\/\//i.test(cleanAvatar) &&
-    !/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(cleanAvatar)
-  ) {
+  if (!/^https?:\/\//i.test(cleanAvatar) && !/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(cleanAvatar)) {
     throw createError('Avatar must be a PNG, JPEG, GIF, or WebP image URL or data URL');
   }
 

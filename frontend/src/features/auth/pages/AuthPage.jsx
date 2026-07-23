@@ -8,9 +8,7 @@ import useAuthForm from '../hooks/useAuthForm'
 
 function AuthAlert({ children, variant = 'danger' }) {
   const styles =
-    variant === 'danger'
-      ? 'border-danger/20 bg-danger/10 text-danger'
-      : 'border-success/20 bg-success/10 text-success'
+    variant === 'danger' ? 'border-danger/20 bg-danger/10 text-danger' : 'border-success/20 bg-success/10 text-success'
 
   return (
     <div className={`rounded-input border px-3.5 py-3 text-sm leading-relaxed ${styles}`} role="alert">
@@ -27,9 +25,7 @@ function StepIndicator({ step }) {
           <div
             className={[
               'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition duration-normal',
-              n <= step
-                ? 'bg-primary text-on-primary shadow-sm'
-                : 'border border-border bg-card text-muted'
+              n <= step ? 'bg-primary text-on-primary shadow-sm' : 'border border-border bg-card text-muted'
             ].join(' ')}
           >
             {n}
@@ -63,11 +59,7 @@ export default function AuthPage({ mode }) {
     updateField
   } = useAuthForm(mode)
 
-  const title = isSignup
-    ? signupStep === 1
-      ? 'Create your account'
-      : 'Almost there'
-    : 'Welcome back'
+  const title = isSignup ? (signupStep === 1 ? 'Create your account' : 'Almost there') : 'Welcome back'
   const subtitle = isSignup
     ? signupStep === 1
       ? 'Join your team in one unified workspace.'
@@ -83,9 +75,7 @@ export default function AuthPage({ mode }) {
             to="/signin"
             className={[
               'rounded-control px-3 py-2.5 text-center text-sm font-semibold transition duration-normal',
-              !isSignup
-                ? 'bg-card text-text shadow-sm'
-                : 'text-muted hover:text-text'
+              !isSignup ? 'bg-card text-text shadow-sm' : 'text-muted hover:text-text'
             ].join(' ')}
           >
             Sign in
@@ -94,9 +84,7 @@ export default function AuthPage({ mode }) {
             to="/signup"
             className={[
               'rounded-control px-3 py-2.5 text-center text-sm font-semibold transition duration-normal',
-              isSignup
-                ? 'bg-card text-text shadow-sm'
-                : 'text-muted hover:text-text'
+              isSignup ? 'bg-card text-text shadow-sm' : 'text-muted hover:text-text'
             ].join(' ')}
           >
             Sign up
@@ -112,9 +100,7 @@ export default function AuthPage({ mode }) {
             transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
           >
             <div className="mb-7">
-              <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">
-                {title}
-              </h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">{title}</h1>
               <p className="mt-2 text-sm leading-relaxed text-muted">{subtitle}</p>
             </div>
 
@@ -130,9 +116,7 @@ export default function AuthPage({ mode }) {
 
                 <div className="my-6 flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-                    or email
-                  </span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">or email</span>
                   <div className="h-px flex-1 bg-border" />
                 </div>
               </>
@@ -167,10 +151,7 @@ export default function AuthPage({ mode }) {
                   onChange={(event) => updateField('password', event.target.value)}
                   placeholder="Enter your password"
                   hint={
-                    <Link
-                      to="/forgot-password"
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
+                    <Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">
                       Forgot password?
                     </Link>
                   }
@@ -256,10 +237,7 @@ export default function AuthPage({ mode }) {
 
             <p className="mt-8 text-center text-sm text-muted">
               {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-              <Link
-                to={isSignup ? '/signin' : '/signup'}
-                className="font-semibold text-primary hover:underline"
-              >
+              <Link to={isSignup ? '/signin' : '/signup'} className="font-semibold text-primary hover:underline">
                 {isSignup ? 'Sign in' : 'Create one'}
               </Link>
             </p>

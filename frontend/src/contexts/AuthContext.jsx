@@ -111,21 +111,18 @@ export function AuthProvider({ children }) {
 
   useEffect(() => onUnauthorized(() => clearSession()), [clearSession])
 
-  const login = useCallback(
-    async (payload) => {
-      const authenticatedUser = await authService.login(payload)
-      initialUserRequest = null
-      setUser(authenticatedUser)
-      cachedUserRef.current = authenticatedUser
-      cacheUser(authenticatedUser)
-      sessionValidatedRef.current = true
-      setSessionValidated(true)
-      sessionCheckedRef.current = true
-      setLoading(false)
-      return authenticatedUser
-    },
-    []
-  )
+  const login = useCallback(async (payload) => {
+    const authenticatedUser = await authService.login(payload)
+    initialUserRequest = null
+    setUser(authenticatedUser)
+    cachedUserRef.current = authenticatedUser
+    cacheUser(authenticatedUser)
+    sessionValidatedRef.current = true
+    setSessionValidated(true)
+    sessionCheckedRef.current = true
+    setLoading(false)
+    return authenticatedUser
+  }, [])
 
   const register = useCallback(async (payload) => {
     const authenticatedUser = await authService.register(payload)
