@@ -134,8 +134,45 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
         flushPendingEvents()
         return
       }
+      if (msg.type === 'workspace-deleted' && msg.workspaceId === workspaceId) {
+        destroyed = true
+        if (reconnectTimer) {
+          window.clearTimeout(reconnectTimer)
+          reconnectTimer = null
+        }
+        try {
+          window.dispatchEvent(
+            new CustomEvent('teamora-workspace-deleted', {
+              detail: {
+                workspaceId,
+                message: msg.message || 'This workspace was deleted by the owner.'
+              }
+            })
+          )
+        } catch {
+          // ignore
+        }
+        try {
+          meetingWs.close()
+        } catch {
+          // ignore
+        }
+        return
+      }
       if (msg.type === 'error') {
         log('WS rejected', msg.message || 'unknown error')
+        if (String(msg.message || '').toLowerCase().includes('not a workspace member')) {
+          destroyed = true
+          try {
+            window.dispatchEvent(
+              new CustomEvent('teamora-workspace-deleted', {
+                detail: { workspaceId, message: 'This workspace was deleted by the owner.' }
+              })
+            )
+          } catch {
+            // ignore
+          }
+        }
         meetingWs?.close()
         return
       }

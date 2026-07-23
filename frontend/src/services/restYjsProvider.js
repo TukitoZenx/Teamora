@@ -25,7 +25,16 @@ const fromBase64 = (b64) => {
  */
 export function connectRestYjsProvider(
   ydoc,
-  { workspaceId, key, pollMs = 1200, user, onAwareness, onPeerLeave, onWsStatus }
+  {
+    workspaceId,
+    key,
+    pollMs = 1200,
+    user,
+    onAwareness,
+    onPeerLeave,
+    onWsStatus,
+    onWorkspaceDeleted
+  }
 ) {
   let destroyed = false
   let pending = []
@@ -36,6 +45,22 @@ export function connectRestYjsProvider(
   let wsConnected = false
   let wsPending = []
   let wsFlushTimer = null
+
+  const handleWorkspaceDeleted = (msg) => {
+    destroyed = true
+    pending = []
+    wsPending = []
+    try {
+      window.dispatchEvent(
+        new CustomEvent('teamora-workspace-deleted', {
+          detail: { workspaceId, message: msg?.message }
+        })
+      )
+    } catch {
+      // ignore
+    }
+    onWorkspaceDeleted?.(msg)
+  }
 
   const collab =
     workspaceId && key
@@ -52,7 +77,9 @@ export function connectRestYjsProvider(
             },
             onAwareness: (msg) => onAwareness?.(msg),
             onPeerLeave: (clientId) => onPeerLeave?.(clientId),
+            onWorkspaceDeleted: handleWorkspaceDeleted,
             onStatus: (status) => {
+              if (status === 'workspace-deleted') return
               wsConnected = status === 'joined' || status === 'open'
               onWsStatus?.(status)
               // Tighten / loosen poll when WS availability changes.
@@ -89,8 +116,12 @@ export function connectRestYjsProvider(
       lastPushedState = toBase64(Y.encodeStateAsUpdate(ydoc))
       blockedByPayload = false
     } catch (err) {
-      const status = err?.response?.status
-      if (status === 413) {
+      const status = err?.status || err?.response?.status
+      if (status === 404 || status === 403) {
+        // Workspace deleted or access revoked — stop collab and notify the app shell.
+        pending = []
+        handleWorkspaceDeleted({ workspaceId, message: err?.message })
+      } else if (status === 413) {
         // Payload too large — re-queuing would spam the console forever.
         blockedByPayload = true
         pending = []

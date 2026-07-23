@@ -173,11 +173,19 @@ function SidebarThumbnails({
                       theme?.accent || 'from-primary to-indigo-500'
                     }`}
                   />
-                  <div className="w-full truncate px-1 text-center text-[6px] font-bold text-slate-800 dark:text-slate-200 sm:text-[7px]">
+                  <div
+                    className={`w-full truncate px-1 text-center text-[6px] font-bold sm:text-[7px] ${
+                      theme?.isDark ? 'text-slate-200' : 'text-slate-800'
+                    }`}
+                  >
                     {s?.title || 'Untitled'}
                   </div>
                   {elementCount > 0 && (
-                    <div className="mt-0.5 text-[5px] font-medium text-slate-500 sm:text-[6px]">
+                    <div
+                      className={`mt-0.5 text-[5px] font-medium sm:text-[6px] ${
+                        theme?.isDark ? 'text-slate-400' : 'text-slate-500'
+                      }`}
+                    >
                       {elementCount} object{elementCount === 1 ? '' : 's'}
                     </div>
                   )}

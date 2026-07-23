@@ -25,6 +25,8 @@ export default function WorkspaceLayout({
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const isOwner = getOwnerId(workspace)?.toString() === getUserId(user)?.toString()
+  // Anyone (including host) can leave anytime; ownership is never transferred.
+  const canLeave = true
 
   const selectItem = (item) => {
     setSidebarOpen(false)
@@ -51,10 +53,6 @@ export default function WorkspaceLayout({
 
   const requestLeaveWorkspace = () => {
     setSidebarOpen(false)
-    if (isOwner) {
-      handleLeaveWorkspace()
-      return
-    }
     setShowLeaveConfirm(true)
   }
 
@@ -107,6 +105,7 @@ export default function WorkspaceLayout({
           onLeaveWorkspace={requestLeaveWorkspace}
           onDeleteWorkspace={requestDeleteWorkspace}
           isOwner={isOwner}
+          canLeave={canLeave}
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebarCollapsed}
           className="fixed bottom-0 left-0 top-navbar"
@@ -128,6 +127,7 @@ export default function WorkspaceLayout({
             onLeaveWorkspace={requestLeaveWorkspace}
             onDeleteWorkspace={requestDeleteWorkspace}
             isOwner={isOwner}
+            canLeave={canLeave}
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleSidebarCollapsed}
             className="absolute bottom-0 left-0 top-0 shadow-md"

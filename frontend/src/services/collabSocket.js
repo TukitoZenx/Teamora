@@ -102,6 +102,35 @@ export function connectCollabSocket(opts, handlers = {}) {
       }
       if (msg.type === 'peer-leave' && msg.clientId) {
         handlers.onPeerLeave?.(msg.clientId)
+        return
+      }
+      if (msg.type === 'workspace-deleted' && msg.workspaceId === workspaceId) {
+        destroyed = true
+        if (reconnectTimer) {
+          window.clearTimeout(reconnectTimer)
+          reconnectTimer = null
+        }
+        handlers.onWorkspaceDeleted?.(msg)
+        status('workspace-deleted')
+        try {
+          ws.close()
+        } catch {
+          // ignore
+        }
+        return
+      }
+      if (msg.type === 'error') {
+        // e.g. not a member after delete — stop reconnect thrash
+        if (String(msg.message || '').toLowerCase().includes('not a workspace member')) {
+          destroyed = true
+          handlers.onWorkspaceDeleted?.(msg)
+          status('error')
+          try {
+            ws.close()
+          } catch {
+            // ignore
+          }
+        }
       }
     }
 

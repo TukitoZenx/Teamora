@@ -508,16 +508,33 @@ const deleteWorkspace = async (userId, workspaceId) => {
   }
 
   assertOwner(workspace, userId);
-  workspace.active = false;
-  workspace.archivedAt = new Date();
-  workspace.archivedBy = userId;
-  await workspace.save();
 
-  const populated = await populateWorkspace(Workspace.findById(workspace._id));
+  // Snapshot members before clearing so every former member gets trash history.
   const historyUserIds = new Set([
     ...workspace.members.map((memberId) => memberId.toString()),
     workspace.owner.toString()
   ]);
+
+  workspace.active = false;
+  workspace.archivedAt = new Date();
+  workspace.archivedBy = userId;
+  // Drop all members so membership checks fail even if archivedAt is missed.
+  // Owner field is kept for audit ("created by") but they are not an active member.
+  workspace.members = [];
+  // Invalidate invite so join links cannot reopen a deleted workspace.
+  workspace.inviteCode = `DEL${Date.now().toString(36).toUpperCase().slice(-8)}`;
+  // Clear pending access requests.
+  if (Array.isArray(workspace.joinRequests)) {
+    workspace.joinRequests.forEach((request) => {
+      if (request.status === 'pending') {
+        request.status = 'declined';
+        request.resolvedAt = new Date();
+      }
+    });
+  }
+  await workspace.save();
+
+  const populated = await populateWorkspace(Workspace.findById(workspace._id));
 
   await Promise.all(
     Array.from(historyUserIds).map((memberId) =>
@@ -529,6 +546,14 @@ const deleteWorkspace = async (userId, workspaceId) => {
   );
 
   await markLegacyRoomArchived(workspaceId, userId, workspace.archivedAt);
+
+  // Kick every live collab/meeting socket still sitting in this workspace.
+  try {
+    const { forceCloseWorkspace } = require('../collab/wsHub');
+    forceCloseWorkspace(workspaceId);
+  } catch {
+    // Hub may not be attached in tests.
+  }
 };
 
 const getInvitePreview = async (userId, inviteCode) => {
@@ -939,8 +964,11 @@ const leaveWorkspace = async (userId, workspaceId) => {
   }
 
   const isOwner = workspace.owner.toString() === userId.toString();
-  const previousOwnerId = workspace.owner.toString();
-  workspace.members = workspace.members.filter((memberId) => memberId.toString() !== userId.toString());
+  const remainingMembers = workspace.members.filter((memberId) => memberId.toString() !== userId.toString());
+
+  // Host may leave at any time without permission. Ownership never transfers —
+  // `workspace.owner` stays the original creator even after they leave members.
+  workspace.members = remainingMembers;
 
   // Keep approval permanently so accepted members (and former owners) can rejoin
   // without another permission request. Only remove/ban should revoke access.
@@ -956,8 +984,8 @@ const leaveWorkspace = async (userId, workspaceId) => {
     }
   }
 
-  // Sole remaining member leaving: close workspace without putting them in Trash.
-  if (isOwner && workspace.members.length === 0) {
+  // Last person leaving (usually sole owner): close the workspace.
+  if (workspace.members.length === 0) {
     for (let i = (workspace.notifications || []).length - 1; i >= 0; i -= 1) {
       const notification = workspace.notifications[i];
       if (notification.type !== 'join_request') continue;
@@ -971,6 +999,7 @@ const leaveWorkspace = async (userId, workspaceId) => {
     workspace.active = false;
     workspace.archivedAt = new Date();
     workspace.archivedBy = userId;
+    // Owner field stays the creator — never reassigned on leave.
     await workspace.save();
 
     const populated = await populateWorkspace(Workspace.findById(workspace._id));
@@ -990,20 +1019,8 @@ const leaveWorkspace = async (userId, workspaceId) => {
     };
   }
 
-  let ownershipTransferred = false;
-  let newOwnerId = null;
-
-  // Transfer ownership to longest-tenured remaining member; reassign join requests.
-  if (isOwner) {
-    const successor = selectOwnershipSuccessor(workspace, userId);
-    if (!successor) {
-      throw createError('Unable to transfer ownership — no eligible members remain', 500);
-    }
-    workspace.owner = successor;
-    reassignPendingJoinNotifications(workspace, previousOwnerId, successor);
-    ownershipTransferred = true;
-    newOwnerId = successor.toString();
-  } else {
+  // Members remain: drop leaver from roster only. Ownership is never shifted.
+  if (!isOwner) {
     for (let i = (workspace.notifications || []).length - 1; i >= 0; i -= 1) {
       const notification = workspace.notifications[i];
       if (notification.type !== 'join_request') continue;
@@ -1020,16 +1037,12 @@ const leaveWorkspace = async (userId, workspaceId) => {
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
   await upsertRecentWorkspace(userId, populated, 'previously_joined');
 
-  if (ownershipTransferred && newOwnerId) {
-    await upsertRecentWorkspace(newOwnerId, populated, 'active');
-  }
-
   return {
     success: true,
     workspaceDeleted: false,
     workspaceInactive: !workspace.active,
-    ownershipTransferred,
-    newOwnerId
+    ownershipTransferred: false,
+    newOwnerId: null
   };
 };
 

@@ -46,6 +46,7 @@ export default function WorkspaceSidebar({
   onLeaveWorkspace,
   onDeleteWorkspace,
   isOwner = false,
+  canLeave = true, // host may leave anytime; ownership is never transferred
   collapsed = false,
   onToggleCollapse,
   className = ''
@@ -127,13 +128,15 @@ export default function WorkspaceSidebar({
       <div className="sticky bottom-0 border-t border-border bg-card p-2">
         {isOwner ? (
           <div className="space-y-1">
-            <SidebarItem
-              icon={DoorOpen}
-              label="Leave Workspace"
-              danger
-              collapsed={collapsed}
-              onClick={onLeaveWorkspace}
-            />
+            {canLeave && (
+              <SidebarItem
+                icon={DoorOpen}
+                label="Leave Workspace"
+                danger
+                collapsed={collapsed}
+                onClick={onLeaveWorkspace}
+              />
+            )}
             <SidebarItem
               icon={Trash2}
               label="Delete Workspace"

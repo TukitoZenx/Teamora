@@ -317,16 +317,8 @@ export default function Dashboard({
   }
 
   const leaveWorkspaceRequest = async (workspace) => {
-    if (!isOwnedBy(workspace, user)) {
-      setLeaveWorkspace(workspace)
-      return
-    }
-
-    try {
-      await onLeaveWorkspace(workspace.workspaceId)
-    } catch (error) {
-      toast.error(error.message)
-    }
+    // Host or member can leave anytime; backend keeps creator ownership (no transfer).
+    setLeaveWorkspace(workspace)
   }
 
   const handleLeave = async () => {

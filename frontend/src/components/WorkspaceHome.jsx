@@ -154,6 +154,47 @@ export default function WorkspaceHome({
   const workspaceId = workspace?._id || workspace?.workspaceId
   // Real-time meeting start notifications for all workspace members
   useMeetingNotifications(workspaceId, getDisplayName(user))
+
+  // Detect owner delete while this member is still editing (API heartbeat).
+  useEffect(() => {
+    if (!workspaceId) return undefined
+
+    let cancelled = false
+    const checkAlive = async () => {
+      try {
+        await api.get(`/api/v1/workspaces/${workspaceId}`)
+      } catch (error) {
+        if (cancelled) return
+        if (error?.status === 404 || error?.status === 403) {
+          try {
+            window.dispatchEvent(
+              new CustomEvent('teamora-workspace-deleted', {
+                detail: {
+                  workspaceId,
+                  message: 'This workspace was deleted by the owner.'
+                }
+              })
+            )
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+
+    const interval = window.setInterval(checkAlive, 12_000)
+    const onFocus = () => checkAlive()
+    window.addEventListener('focus', onFocus)
+    // Immediate check shortly after mount so a mid-delete open is caught.
+    const kickoff = window.setTimeout(checkAlive, 1500)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+      window.clearTimeout(kickoff)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [workspaceId])
   const { joinMeeting, activeMeeting, activeMeetingWorkspace, inMeeting } = useMeeting()
   const [workspaceFiles, setWorkspaceFiles] = useState(() => {
     if (!workspaceId) return []
@@ -1711,6 +1752,12 @@ function WorkspaceSettings({
                 <DoorOpen className="h-4 w-4" />
                 Leave Workspace
               </button>
+              {isOwner && (
+                <p className="text-xs leading-relaxed text-muted">
+                  You can leave anytime. Ownership stays with you (the creator) — it is not transferred to other
+                  members.
+                </p>
+              )}
               {isOwner && (
                 <button
                   type="button"

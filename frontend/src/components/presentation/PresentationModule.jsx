@@ -8,7 +8,7 @@ import PropertiesPanel from './PropertiesPanel'
 import useSlideHistory from './hooks/useSlideHistory'
 import { collectOpenTextEditorHtml, applyTextEditorFlush, deepCloneSlides } from './utils/flushTextEditors'
 import { compressImageToDataUrl } from './utils/compressImage'
-import { resolveSlideTheme, isAppDarkMode, defaultObjectColors } from './utils/slideThemes'
+import { resolveSlideTheme, defaultObjectColors } from './utils/slideThemes'
 import { v4 as uuidv4 } from 'uuid'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -36,9 +36,9 @@ const reIdElement = (el) => {
   return copy
 }
 
-const createElementFromType = (type, extras = {}, isDark = isAppDarkMode()) => {
+const createElementFromType = (type, extras = {}, isDarkSlide = false) => {
   const rawType = type === 'text' ? 'textbox' : type
-  const colors = defaultObjectColors(isDark)
+  const colors = defaultObjectColors(isDarkSlide)
   const base = {
     id: uuidv4(),
     x: extras.x ?? 120 + Math.round(Math.random() * 40),
@@ -132,8 +132,8 @@ export default function PresentationModule({
   const [editingElemId, setEditingElemId] = useState(null)
   const [activeTool] = useState(null)
   const [themeId, setThemeId] = useState('default')
-  const [appDark, setAppDark] = useState(() => isAppDarkMode())
-  const [theme, setTheme] = useState(() => resolveSlideTheme('default', isAppDarkMode()))
+  // Slide design is independent of app Light/Dark chrome.
+  const [theme, setTheme] = useState(() => resolveSlideTheme('default'))
   const [presentScale, setPresentScale] = useState(1)
   const [presentRevision, setPresentRevision] = useState(0)
   const [presentEntering, setPresentEntering] = useState(false)
@@ -159,25 +159,6 @@ export default function PresentationModule({
   useEffect(() => {
     editingRef.current = editingElemId
   }, [editingElemId])
-
-  // Follow app Light/Dark theme for slide backgrounds
-  useEffect(() => {
-    const syncAppTheme = () => {
-      const dark = isAppDarkMode()
-      setAppDark(dark)
-      setTheme(resolveSlideTheme(themeId, dark))
-    }
-    syncAppTheme()
-    window.addEventListener('teamora-appearance-changed', syncAppTheme)
-    window.addEventListener('storage', syncAppTheme)
-    const mo = new MutationObserver(syncAppTheme)
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => {
-      window.removeEventListener('teamora-appearance-changed', syncAppTheme)
-      window.removeEventListener('storage', syncAppTheme)
-      mo.disconnect()
-    }
-  }, [themeId])
 
   useEffect(() => {
     if (!isPresenting) return undefined
@@ -264,12 +245,12 @@ export default function PresentationModule({
 
   const handleInsertElement = useCallback(
     (type, extras = {}) => {
-      const newElement = createElementFromType(type, extras, appDark)
+      const newElement = createElementFromType(type, extras, theme?.isDark)
       mapActiveElements((elements) => [...elements, newElement])
       setSelectedElemIds([newElement.id])
       setEditingElemId(null)
     },
-    [mapActiveElements, appDark]
+    [mapActiveElements, theme?.isDark]
   )
 
   const handleDeleteElements = useCallback(
@@ -699,7 +680,7 @@ export default function PresentationModule({
   const handleChangeTheme = useCallback((nextId) => {
     const id = nextId || 'default'
     setThemeId(id)
-    setTheme(resolveSlideTheme(id, isAppDarkMode()))
+    setTheme(resolveSlideTheme(id))
   }, [])
 
   const enterPresentMode = useCallback(async () => {
@@ -878,7 +859,6 @@ export default function PresentationModule({
             theme={theme}
             presentScale={presentScale}
             revision={presentRevision}
-            appDark={appDark}
           />
         </div>
 

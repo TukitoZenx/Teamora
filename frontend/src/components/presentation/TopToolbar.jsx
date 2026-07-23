@@ -553,10 +553,7 @@ export default function TopToolbar({
                 title={t.label}
               >
                 <div
-                  className={`mb-1 h-8 w-12 rounded border border-border bg-gradient-to-br dark:hidden ${t.gradient}`}
-                />
-                <div
-                  className={`mb-1 hidden h-8 w-12 rounded border border-border bg-gradient-to-br dark:block ${t.darkGradient || t.gradient}`}
+                  className={`mb-1 h-8 w-12 rounded border border-border bg-gradient-to-br ${t.gradient}`}
                 />
                 <span className="text-[10px]">{t.label}</span>
               </button>

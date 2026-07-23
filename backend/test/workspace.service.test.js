@@ -15,20 +15,20 @@ describe('Workspace Service - leaveWorkspace', () => {
     mock.restoreAll();
   });
 
-  test('should transfer ownership to the next member when owner leaves a multi-member workspace', async () => {
+  test('owner can leave anytime without transferring ownership to remaining members', async () => {
     const ownerId = new mongoose.Types.ObjectId();
-    const nextOwnerId = new mongoose.Types.ObjectId();
+    const memberId = new mongoose.Types.ObjectId();
     const workspaceId = new mongoose.Types.ObjectId();
 
     const mockWorkspace = {
       _id: workspaceId,
       name: 'Teamora Test Workspace',
       owner: ownerId,
-      members: [ownerId, nextOwnerId],
+      members: [ownerId, memberId],
       memberRoles: [],
       approvedMembers: [
         { user: ownerId, approvedAt: new Date('2024-01-01') },
-        { user: nextOwnerId, approvedAt: new Date('2024-01-02') }
+        { user: memberId, approvedAt: new Date('2024-01-02') }
       ],
       notifications: [],
       joinRequests: [],
@@ -39,7 +39,6 @@ describe('Workspace Service - leaveWorkspace', () => {
     };
 
     mock.method(Workspace, 'findById', () => {
-      // Return query object supporting chainable populate calls
       const mockQuery = {
         populate: () => mockQuery,
         then: (onResolve) => Promise.resolve(mockWorkspace).then(onResolve),
@@ -51,11 +50,12 @@ describe('Workspace Service - leaveWorkspace', () => {
     const result = await workspaceService.leaveWorkspace(ownerId, workspaceId.toString());
 
     assert.equal(result.success, true);
-    assert.equal(result.workspaceDeleted, false);
-    assert.equal(result.ownershipTransferred, true);
-    assert.equal(result.newOwnerId, nextOwnerId.toString());
-    assert.equal(mockWorkspace.owner.toString(), nextOwnerId.toString());
+    assert.equal(result.ownershipTransferred, false);
+    assert.equal(result.newOwnerId, null);
+    // Creator remains host of record; no member is promoted.
+    assert.equal(mockWorkspace.owner.toString(), ownerId.toString());
     assert.equal(mockWorkspace.members.length, 1);
+    assert.equal(mockWorkspace.members[0].toString(), memberId.toString());
   });
 
   test('should close workspace without trash when sole remaining member leaves', async () => {

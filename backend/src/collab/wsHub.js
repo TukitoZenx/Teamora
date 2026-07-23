@@ -10,11 +10,23 @@ const Workspace = require('../models/Workspace');
 
 const roomKey = (workspaceId, key) => `${workspaceId}::${key}`;
 
+/** Set by attachCollabWs so services can kick clients when a workspace is deleted. */
+let activeHub = null;
+
 const isWorkspaceMember = (workspace, userId) =>
   workspace.members.some((memberId) => {
     const id = memberId._id || memberId;
     return id.toString() === userId.toString();
   });
+
+/**
+ * Notify and disconnect every collab/meeting socket for a deleted workspace.
+ * Safe no-op if the hub is not attached (e.g. unit tests).
+ */
+const forceCloseWorkspace = (workspaceId) => {
+  if (!activeHub || !workspaceId) return;
+  activeHub.forceCloseWorkspace(String(workspaceId));
+};
 
 const runSession = (sessionMiddleware, req) =>
   new Promise((resolve, reject) => {
@@ -41,6 +53,51 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
   const rooms = new Map();
   /** @type {Map<string, Object>} */
   const activeMeetings = new Map();
+
+  const forceCloseWorkspaceInner = (workspaceId) => {
+    const id = String(workspaceId || '');
+    if (!id) return;
+
+    activeMeetings.delete(id);
+
+    const prefix = `${id}::`;
+    const toClose = [];
+    for (const [rk, set] of rooms.entries()) {
+      if (!rk.startsWith(prefix)) continue;
+      toClose.push([rk, set]);
+    }
+
+    const payload = JSON.stringify({
+      type: 'workspace-deleted',
+      workspaceId: id,
+      message: 'This workspace was deleted by the owner'
+    });
+
+    for (const [rk, set] of toClose) {
+      for (const peer of set) {
+        try {
+          if (peer.readyState === WebSocket.OPEN) {
+            peer.send(payload);
+          }
+        } catch {
+          // ignore send errors
+        }
+        try {
+          peer.rooms?.clear?.();
+          peer.close(4000, 'workspace deleted');
+        } catch {
+          try {
+            peer.terminate();
+          } catch {
+            // ignore
+          }
+        }
+      }
+      rooms.delete(rk);
+    }
+  };
+
+  activeHub = { forceCloseWorkspace: forceCloseWorkspaceInner };
 
   const leaveAll = (ws) => {
     if (!ws.rooms) return;
@@ -348,5 +405,6 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
 
 module.exports = {
   attachCollabWs,
+  forceCloseWorkspace,
   roomKey
 };
