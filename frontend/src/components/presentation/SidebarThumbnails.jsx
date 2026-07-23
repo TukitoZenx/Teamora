@@ -44,7 +44,7 @@ function SlideMiniPreview({ slide, theme }) {
     const list = Array.isArray(slide?.elements) ? [...slide.elements] : []
     list.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
     return list
-  }, [slide?.elements])
+  }, [slide])
 
   const gradient = theme?.gradient || 'from-white to-slate-50'
   const accent = theme?.accent || 'from-primary to-indigo-500'

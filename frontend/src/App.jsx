@@ -157,13 +157,6 @@ export default function App() {
     }
   }, [authenticated, location.pathname, location.search])
 
-  // Visiting /dashboard or settings must not keep a leftover workspace shell mounted.
-  useEffect(() => {
-    if (location.pathname === '/dashboard' || location.pathname.startsWith('/settings')) {
-      setActiveWorkspace(null)
-    }
-  }, [location.pathname])
-
   useEffect(() => {
     if (!authenticated || !user || user.provider !== 'google') return
 
@@ -470,7 +463,7 @@ export default function App() {
         throw error
       }
     },
-    [activeMeetingWorkspace?._id, leaveMeeting, loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
+    [activeMeetingWorkspace, leaveMeeting, loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
   )
 
   const fetchWorkspace = useCallback(
@@ -527,8 +520,10 @@ export default function App() {
     navigate('/dashboard', { replace: true })
   }, [navigate])
 
-  const renderAppFrame = ({ forceWorkspace = false, workspacePage = 'home' } = {}) => {
-    const currentWorkspace = forceWorkspace ? null : activeWorkspace
+  const renderAppFrame = ({ forceWorkspace = false, forceDashboard = false, workspacePage = 'home' } = {}) => {
+    // forceDashboard: always show dashboard even if activeWorkspace is still set
+    // (e.g. browser back to /dashboard without clearing workspace state).
+    const currentWorkspace = forceDashboard || forceWorkspace ? null : activeWorkspace
 
     if (currentWorkspace) {
       return (
@@ -607,7 +602,7 @@ export default function App() {
     </ProtectedRoute>
   )
 
-  const DashboardRoute = renderAppFrame()
+  const DashboardRoute = renderAppFrame({ forceDashboard: true })
 
   return (
     <>
@@ -766,21 +761,28 @@ function InviteWorkspacePage({ onOpenWorkspace }) {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
 
-    api
-      .get(`/api/v1/workspaces/invite/${inviteCode}`)
-      .then(({ data }) => {
-        if (!cancelled) setWorkspace(data.workspace)
-      })
-      .catch((error) => {
-        if (cancelled) return
-        toast.error(error.message)
-        navigate('/dashboard', { replace: true })
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    // Defer setState so we don't call it synchronously in the effect body
+    // (react-hooks/set-state-in-effect). inviteCode changes still re-fetch cleanly.
+    queueMicrotask(() => {
+      if (cancelled) return
+      setLoading(true)
+      setWorkspace(null)
+
+      api
+        .get(`/api/v1/workspaces/invite/${inviteCode}`)
+        .then(({ data }) => {
+          if (!cancelled) setWorkspace(data.workspace)
+        })
+        .catch((error) => {
+          if (cancelled) return
+          toast.error(error.message)
+          navigate('/dashboard', { replace: true })
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    })
 
     return () => {
       cancelled = true
