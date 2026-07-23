@@ -34,28 +34,38 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthShell>
+    <AuthShell mode="signin">
       <Link
         to="/signin"
-        className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+        className="mb-7 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Sign In
+        Back to Sign in
       </Link>
 
-      <div className="mb-10 text-center">
-        <h2 className="text-4xl font-medium tracking-tight text-text">Forgot your password?</h2>
-        <p className="mt-4 text-base text-muted">Enter your email and we'll send you a password reset link.</p>
+      <div className="mb-7">
+        <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">
+          Forgot password?
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Enter your email and we&apos;ll send you a reset link if an account exists.
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-card border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div
+          className="mb-4 rounded-input border border-danger/20 bg-danger/10 px-3.5 py-3 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 rounded-card border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
+        <div
+          className="mb-4 rounded-input border border-success/20 bg-success/10 px-3.5 py-3 text-sm text-success"
+          role="status"
+        >
           {success}
         </div>
       )}
@@ -65,15 +75,18 @@ export default function ForgotPasswordPage() {
           icon={Mail}
           label="Email"
           type="email"
+          autoComplete="email"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@example.com"
+          placeholder="you@company.com"
         />
 
-        <PrimaryButton disabled={submitting} loading={submitting}>
-          {submitting ? 'Sending...' : 'Send Reset Link'}
-        </PrimaryButton>
+        <div className="pt-1">
+          <PrimaryButton disabled={submitting} loading={submitting}>
+            {submitting ? 'Sending...' : 'Send reset link'}
+          </PrimaryButton>
+        </div>
       </form>
     </AuthShell>
   )

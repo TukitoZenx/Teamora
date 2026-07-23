@@ -46,13 +46,20 @@ export default function CompleteProfilePage() {
 
   return (
     <AuthShell mode="signup">
-      <div className="mb-8">
-        <h2 className="text-4xl font-medium tracking-tight text-text">Complete your profile</h2>
-        <p className="mt-3 text-base text-muted">Finish setting up your Teamora account.</p>
+      <div className="mb-7">
+        <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">
+          Complete your profile
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Finish setting up your Teamora account to continue.
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-card border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div
+          className="mb-4 rounded-input border border-danger/20 bg-danger/10 px-3.5 py-3 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -60,7 +67,8 @@ export default function CompleteProfilePage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <AuthField
           icon={User}
-          label="Full Name"
+          label="Full name"
+          autoComplete="name"
           required
           value={form.fullName}
           onChange={(event) => updateField('fullName', event.target.value)}
@@ -70,15 +78,18 @@ export default function CompleteProfilePage() {
         <AuthField
           icon={Users}
           label="Username"
+          autoComplete="username"
           required
           value={form.username}
           onChange={(event) => updateField('username', event.target.value)}
           placeholder="alex"
         />
 
-        <PrimaryButton disabled={submitting} loading={submitting}>
-          {submitting ? 'Please wait...' : 'Continue'}
-        </PrimaryButton>
+        <div className="pt-1">
+          <PrimaryButton disabled={submitting} loading={submitting}>
+            {submitting ? 'Saving...' : 'Continue'}
+          </PrimaryButton>
+        </div>
       </form>
     </AuthShell>
   )

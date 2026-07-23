@@ -23,8 +23,14 @@ export const GoogleMark = () => (
   </svg>
 )
 
-export const PrimaryButton = ({ children, disabled, loading }) => (
-  <Button type="submit" size="lg" className="h-[52px] w-full" disabled={disabled} loading={loading}>
+export const PrimaryButton = ({ children, disabled, loading, className = '' }) => (
+  <Button
+    type="submit"
+    size="lg"
+    className={`h-12 w-full rounded-button text-sm font-semibold shadow-sm ${className}`}
+    disabled={disabled}
+    loading={loading}
+  >
     {children}
     {!loading && <ArrowRight className="h-4 w-4" aria-hidden />}
   </Button>
@@ -35,12 +41,26 @@ export const GoogleButton = ({ onClick, disabled, loading }) => (
     type="button"
     variant="secondary"
     size="lg"
-    className="h-[52px] w-full"
+    className="h-12 w-full rounded-button border-border/80 bg-card text-sm font-semibold shadow-sm"
     onClick={onClick}
     disabled={disabled || loading}
     loading={loading}
   >
     {!loading && <GoogleMark />}
     {loading ? 'Connecting...' : 'Continue with Google'}
+  </Button>
+)
+
+export const SecondaryButton = ({ children, disabled, loading, onClick, type = 'button' }) => (
+  <Button
+    type={type}
+    variant="secondary"
+    size="lg"
+    className="h-12 w-full rounded-button text-sm font-semibold"
+    disabled={disabled}
+    loading={loading}
+    onClick={onClick}
+  >
+    {children}
   </Button>
 )
