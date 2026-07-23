@@ -26,13 +26,34 @@ const getTlsOptions = () => {
   };
 };
 
+let httpServer = null;
+
+const shutdown = (signal, error) => {
+  if (error) console.error(signal, error);
+  else console.error(signal);
+
+  const forceExit = setTimeout(() => process.exit(1), 10_000);
+  forceExit.unref?.();
+
+  if (httpServer) {
+    httpServer.close(() => process.exit(error ? 1 : 0));
+  } else {
+    process.exit(error ? 1 : 0);
+  }
+};
+
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled promise rejection:', error);
+  shutdown('unhandledRejection', error);
 });
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught exception:', error);
+  shutdown('uncaughtException', error);
 });
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 const startServer = async () => {
   try {
@@ -40,6 +61,7 @@ const startServer = async () => {
 
     const tlsOptions = getTlsOptions();
     const server = tlsOptions ? https.createServer(tlsOptions, app) : http.createServer(app);
+    httpServer = server;
     attachCollabWs(server, { sessionMiddleware, isAllowedOrigin });
 
     server.listen(PORT, HOST, () => {

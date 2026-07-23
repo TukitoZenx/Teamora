@@ -10,6 +10,17 @@ const MAX_KEY_LENGTH = 200;
 // Client compresses images before save; this is a hard ceiling only.
 const MAX_JSON_CHARS = 8_000_000;
 
+/** Serialize concurrent puts per workspace+key so merges see the latest base. */
+const writeQueues = new Map();
+const enqueueWrite = (queueKey, task) => {
+  const prev = writeQueues.get(queueKey) || Promise.resolve();
+  const next = prev.then(task, task).finally(() => {
+    if (writeQueues.get(queueKey) === next) writeQueues.delete(queueKey);
+  });
+  writeQueues.set(queueKey, next);
+  return next;
+};
+
 const createError = (message, statusCode = 400) => {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -74,7 +85,9 @@ const getContent = async (userId, workspaceId, key) => {
 const putContent = async (userId, workspaceId, key, data) => {
   await assertMember(userId, workspaceId);
   const cleanKey = sanitizeKey(key);
+  const queueKey = `${workspaceId}:${cleanKey}`;
 
+  return enqueueWrite(queueKey, async () => {
   let nextData = data === undefined ? null : data;
   const existing = await WorkspaceContent.findOne({ workspace: workspaceId, key: cleanKey }).lean();
 
@@ -200,6 +213,7 @@ const putContent = async (userId, workspaceId, key, data) => {
     updatedAt: doc.updatedAt,
     updatedBy: doc.updatedBy
   };
+  });
 };
 
 const listContentKeys = async (userId, workspaceId, prefix = '') => {

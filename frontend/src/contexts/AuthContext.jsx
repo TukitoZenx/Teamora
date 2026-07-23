@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import * as authService from '../features/auth/services/auth'
+import { onUnauthorized } from '../services/api'
 
 const AuthContext = createContext(null)
 const AUTH_CACHE_KEY = 'teamora-auth-user'
@@ -37,41 +38,68 @@ const getInitialUser = () => {
 export function AuthProvider({ children }) {
   // Seed user from cache only for display after validation. Always start with
   // `loading` true so ProtectedRoute never treats a stale localStorage user as
-  // an authenticated session before `/me` returns.
+  // an authenticated session before `/me` returns. Public routes skip the wait
+  // when there is no authenticated user (see PublicRoute).
   const [user, setUser] = useState(() => readCachedUser())
   const [loading, setLoading] = useState(true)
+  /** True only after the first `/me` completes successfully with a user. */
+  const [sessionValidated, setSessionValidated] = useState(false)
   const cachedUserRef = useRef(null)
   const sessionCheckedRef = useRef(false)
+  const sessionValidatedRef = useRef(false)
 
-  const refreshUser = useCallback(async ({ useInitialCache = false } = {}) => {
-    // Block protected routes only until the first session check finishes.
-    // Later refreshes (e.g. after saving profile) should not remount the app
-    // into the full-page auth loader.
-    if (!sessionCheckedRef.current) {
-      setLoading(true)
-    }
-
-    try {
-      const currentUser = useInitialCache ? await getInitialUser() : await authService.getCurrentUser()
-      setUser(currentUser)
-      cachedUserRef.current = currentUser
-      cacheUser(currentUser)
-      sessionCheckedRef.current = true
-      return currentUser
-    } catch (error) {
-      if (error.status === 401) {
-        setUser(null)
-        cachedUserRef.current = null
-        cacheUser(null)
-      }
-      // Network errors keep the last known user so a brief outage does not
-      // hard-logout; ProtectedRoute still waited for the first attempt.
-      sessionCheckedRef.current = true
-      return null
-    } finally {
-      setLoading(false)
-    }
+  const clearSession = useCallback(() => {
+    initialUserRequest = null
+    setUser(null)
+    cachedUserRef.current = null
+    cacheUser(null)
+    sessionValidatedRef.current = false
+    setSessionValidated(false)
+    sessionCheckedRef.current = true
+    setLoading(false)
   }, [])
+
+  const refreshUser = useCallback(
+    async ({ useInitialCache = false } = {}) => {
+      // Block protected routes only until the first session check finishes.
+      // Later refreshes (e.g. after saving profile) should not remount the app
+      // into the full-page auth loader.
+      if (!sessionCheckedRef.current) {
+        setLoading(true)
+      }
+
+      try {
+        const currentUser = useInitialCache ? await getInitialUser() : await authService.getCurrentUser()
+        setUser(currentUser)
+        cachedUserRef.current = currentUser
+        cacheUser(currentUser)
+        const validated = Boolean(currentUser)
+        sessionValidatedRef.current = validated
+        setSessionValidated(validated)
+        sessionCheckedRef.current = true
+        return currentUser
+      } catch (error) {
+        if (error.status === 401) {
+          clearSession()
+          return null
+        }
+        // First load + network failure: do not treat cached user as authenticated.
+        // After a validated session, keep last known user through brief outages.
+        if (!sessionValidatedRef.current) {
+          setUser(null)
+          cachedUserRef.current = null
+          cacheUser(null)
+          sessionValidatedRef.current = false
+          setSessionValidated(false)
+        }
+        sessionCheckedRef.current = true
+        return null
+      } finally {
+        setLoading(false)
+      }
+    },
+    [clearSession]
+  )
 
   useEffect(() => {
     cachedUserRef.current = user
@@ -81,52 +109,63 @@ export function AuthProvider({ children }) {
     queueMicrotask(() => refreshUser({ useInitialCache: true }))
   }, [refreshUser])
 
-  const login = async (payload) => {
-    const authenticatedUser = await authService.login(payload)
-    initialUserRequest = null
-    setUser(authenticatedUser)
-    cachedUserRef.current = authenticatedUser
-    cacheUser(authenticatedUser)
-    sessionCheckedRef.current = true
-    setLoading(false)
-    return authenticatedUser
-  }
+  useEffect(() => onUnauthorized(() => clearSession()), [clearSession])
 
-  const register = async (payload) => {
+  const login = useCallback(
+    async (payload) => {
+      const authenticatedUser = await authService.login(payload)
+      initialUserRequest = null
+      setUser(authenticatedUser)
+      cachedUserRef.current = authenticatedUser
+      cacheUser(authenticatedUser)
+      sessionValidatedRef.current = true
+      setSessionValidated(true)
+      sessionCheckedRef.current = true
+      setLoading(false)
+      return authenticatedUser
+    },
+    []
+  )
+
+  const register = useCallback(async (payload) => {
     const authenticatedUser = await authService.register(payload)
     initialUserRequest = null
     setUser(authenticatedUser)
     cachedUserRef.current = authenticatedUser
     cacheUser(authenticatedUser)
+    sessionValidatedRef.current = true
+    setSessionValidated(true)
     sessionCheckedRef.current = true
     setLoading(false)
     return authenticatedUser
-  }
+  }, [])
 
-  const logout = async () => {
-    await authService.logout()
-    initialUserRequest = null
-    setUser(null)
-    cachedUserRef.current = null
-    cacheUser(null)
-    sessionCheckedRef.current = true
-    setLoading(false)
-  }
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout()
+    } catch {
+      // Always clear local session even if the network logout fails.
+    }
+    clearSession()
+  }, [clearSession])
 
   const value = useMemo(
     () => ({
       user,
       loading,
-      authenticated: Boolean(user),
-      isAuthenticated: Boolean(user),
-      profileComplete: user?.profileComplete !== false,
+      // Validated cookie session, or cached user only while the first /me is in flight
+      // (ProtectedRoute still waits on `loading` before rendering private UI).
+      authenticated: Boolean(user) && (sessionValidated || loading),
+      isAuthenticated: Boolean(user) && (sessionValidated || loading),
+      profileComplete: user ? user.profileComplete !== false : false,
       login,
       logout,
       register,
       refreshUser,
-      fetchCurrentUser: refreshUser
+      fetchCurrentUser: refreshUser,
+      clearSession
     }),
-    [user, loading, refreshUser]
+    [user, loading, sessionValidated, login, logout, register, refreshUser, clearSession]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

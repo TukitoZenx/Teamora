@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { sanitizeHtml } from '../../utils/sanitizeHtml'
 
 const textStyle = (el) => ({
   fontFamily: el.fontFamily || 'Inter, sans-serif',
@@ -63,7 +64,7 @@ function ElementContent({ el }) {
           <div
             className="w-full whitespace-pre-wrap break-words text-center"
             style={textStyle({ ...el, textAlign: el.textAlign || 'center' })}
-            dangerouslySetInnerHTML={{ __html: el.text }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(el.text) }}
           />
         ) : null}
       </div>
@@ -86,7 +87,7 @@ function ElementContent({ el }) {
     <div
       className="h-full w-full overflow-hidden whitespace-pre-wrap break-words p-2"
       style={textStyle(el)}
-      dangerouslySetInnerHTML={{ __html: el.text || '' }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(el.text || '') }}
     />
   )
 }

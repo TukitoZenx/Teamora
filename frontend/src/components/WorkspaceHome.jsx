@@ -699,9 +699,10 @@ export default function WorkspaceHome({
                   const next = mergeChatMessages(current, [message])
                   chatChannel.emit('chat-messages', next)
                   if (workspaceId) {
+                    // Persist the full merged list so multi-device sync keeps history.
                     putWorkspaceContent(workspaceId, 'chat', {
                       format: 'messages-v1',
-                      messages: [message]
+                      messages: next
                     }).catch(() => {})
                   }
                   return next

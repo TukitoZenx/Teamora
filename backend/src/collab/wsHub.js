@@ -35,7 +35,8 @@ const runSession = (sessionMiddleware, req) =>
  * @param {{ sessionMiddleware: Function, isAllowedOrigin?: (origin: string) => boolean }} opts
  */
 const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => true }) => {
-  const wss = new WebSocketServer({ noServer: true });
+  // Cap frame size to reduce memory DoS from huge yjs/signaling payloads.
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 512 * 1024 });
   /** @type {Map<string, Set<import('ws').WebSocket>>} */
   const rooms = new Map();
   /** @type {Map<string, Object>} */
@@ -142,6 +143,8 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
           const rk = roomKey(workspaceId, key);
           joinRoom(ws, rk);
           ws.userMeta = msg.user && typeof msg.user === 'object' ? msg.user : { name: 'User' };
+          if (msg.clientId) ws.clientId = String(msg.clientId);
+          if (msg.socketId) ws.socketId = String(msg.socketId);
           ws.send(JSON.stringify({ type: 'joined', workspaceId, key, peers: (rooms.get(rk)?.size || 1) - 1 }));
 
           if (key === 'meetings') {
@@ -219,6 +222,8 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
           const rk = roomKey(workspaceId, String(msg.key || 'meetings'));
           if (!ws.rooms?.has(rk)) return;
 
+          if (msg.socketId) ws.socketId = String(msg.socketId);
+
           if (msg.payload && msg.payload.type) {
             const p = msg.payload;
             if (p.type === 'meeting-started') {
@@ -233,8 +238,9 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
               }
             } else if (p.type === 'meeting-join' && p.participant) {
               const meeting = activeMeetings.get(workspaceId);
-              if (meeting) {
+              if (meeting && p.participant.socketId) {
                 meeting.participants[p.participant.socketId] = p.participant;
+                ws.socketId = String(p.participant.socketId);
               }
             } else if (p.type === 'meeting-state-change' && p.state) {
               const meeting = activeMeetings.get(workspaceId);
@@ -268,15 +274,34 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
     ws.on('close', () => {
       if (ws.rooms) {
         for (const rk of ws.rooms) {
-          if (rk.endsWith('::meetings')) {
-            const workspaceId = rk.split('::')[0];
+          const [workspaceId, key] = rk.split('::');
+          if (key === 'meetings') {
             const meeting = activeMeetings.get(workspaceId);
-            if (meeting) {
-              const participantIds = Object.keys(meeting.participants);
-              let wasInMeeting = false;
-              for (const pid of participantIds) {
-                // If we had a way to map WS connection to socketId, we'd do it here.
-                // For now, clients emit meeting-leave on beforeunload.
+            if (meeting && ws.socketId && meeting.participants?.[ws.socketId]) {
+              delete meeting.participants[ws.socketId];
+              if (Object.keys(meeting.participants).length === 0) {
+                activeMeetings.delete(workspaceId);
+                broadcast(
+                  rk,
+                  {
+                    type: 'meeting-event',
+                    workspaceId,
+                    key: 'meetings',
+                    payload: { type: 'meeting-ended', workspaceId, meetingId: meeting.meetingId }
+                  },
+                  ws
+                );
+              } else {
+                broadcast(
+                  rk,
+                  {
+                    type: 'meeting-event',
+                    workspaceId,
+                    key: 'meetings',
+                    payload: { type: 'participant-left', socketId: ws.socketId, workspaceId }
+                  },
+                  ws
+                );
               }
             }
           }
@@ -284,7 +309,9 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
             rk,
             {
               type: 'peer-leave',
-              clientId: ws.userMeta?.clientId
+              workspaceId,
+              key,
+              clientId: ws.userMeta?.clientId || ws.clientId || ws.socketId
             },
             ws
           );

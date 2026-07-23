@@ -40,3 +40,8 @@ lerna-debug.log*
 # Coverage / test artifacts
 coverage/
 *.local
+
+# Local Mongo data dumps / WiredTiger files
+backend/local_db/
+backend/local_db.log
+*.wt

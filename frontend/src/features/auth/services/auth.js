@@ -17,7 +17,8 @@ export const logout = async () => {
 }
 
 export const getCurrentUser = async () => {
-  const { data } = await api.get('/api/auth/me')
+  // Cap wait so a cold/unreachable API cannot leave the app on a spinner forever.
+  const { data } = await api.get('/api/auth/me', { timeout: 8000 })
   return extractUser(data)
 }
 

@@ -130,6 +130,18 @@ app.use((error, req, res, next) => {
     return res.status(409).json({ success: false, message: `${field} is already in use` });
   }
 
+  if (error.name === 'CastError') {
+    return res.status(400).json({ success: false, message: 'Invalid identifier' });
+  }
+
+  if (error.name === 'ValidationError') {
+    const first = error.errors && Object.values(error.errors)[0];
+    return res.status(400).json({
+      success: false,
+      message: first?.message || 'Validation failed'
+    });
+  }
+
   const statusCode = error.statusCode || 500;
   const message = statusCode === 500 ? 'Internal server error' : error.message;
 
