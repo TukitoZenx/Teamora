@@ -50,20 +50,30 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthShell>
-      <div className="mb-10 text-center">
-        <h2 className="text-4xl font-medium tracking-tight text-text">Reset your password</h2>
-        <p className="mt-4 text-base text-muted">Choose a new password for your Teamora account.</p>
+    <AuthShell mode="signin">
+      <div className="mb-7">
+        <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">
+          Reset your password
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Choose a new password for your Teamora account.
+        </p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-card border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div
+          className="mb-4 rounded-input border border-danger/20 bg-danger/10 px-3.5 py-3 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 rounded-card border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
+        <div
+          className="mb-4 rounded-input border border-success/20 bg-success/10 px-3.5 py-3 text-sm text-success"
+          role="status"
+        >
           {success}
         </div>
       )}
@@ -71,27 +81,31 @@ export default function ResetPasswordPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <AuthField
           icon={Lock}
-          label="New Password"
+          label="New password"
           type="password"
+          autoComplete="new-password"
           required
           value={form.password}
           onChange={(event) => updateField('password', event.target.value)}
-          placeholder="New password"
+          placeholder="At least 8 characters"
         />
 
         <AuthField
           icon={Lock}
-          label="Confirm Password"
+          label="Confirm password"
           type="password"
+          autoComplete="new-password"
           required
           value={form.confirmPassword}
           onChange={(event) => updateField('confirmPassword', event.target.value)}
-          placeholder="Confirm password"
+          placeholder="Repeat new password"
         />
 
-        <PrimaryButton disabled={submitting} loading={submitting}>
-          {submitting ? 'Please wait...' : 'Reset Password'}
-        </PrimaryButton>
+        <div className="pt-1">
+          <PrimaryButton disabled={submitting} loading={submitting}>
+            {submitting ? 'Updating...' : 'Reset password'}
+          </PrimaryButton>
+        </div>
       </form>
     </AuthShell>
   )

@@ -110,6 +110,11 @@ export default function useAuthForm(mode) {
     }
   }
 
+  const backToSignupStep1 = () => {
+    setError('')
+    setSignupStep(1)
+  }
+
   const startGoogleAuth = () => {
     setError('')
     setGoogleLoading(true)
@@ -125,6 +130,7 @@ export default function useAuthForm(mode) {
     googleLoading,
     submitting,
     continueSignup,
+    backToSignupStep1,
     handleSubmit,
     startGoogleAuth,
     updateField
