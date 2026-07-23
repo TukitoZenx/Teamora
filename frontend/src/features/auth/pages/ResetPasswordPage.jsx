@@ -52,12 +52,8 @@ export default function ResetPasswordPage() {
   return (
     <AuthShell mode="signin">
       <div className="mb-7">
-        <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">
-          Reset your password
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
-          Choose a new password for your Teamora account.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">Reset your password</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">Choose a new password for your Teamora account.</p>
       </div>
 
       {error && (

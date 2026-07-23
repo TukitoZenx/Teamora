@@ -121,7 +121,11 @@ export function connectCollabSocket(opts, handlers = {}) {
       }
       if (msg.type === 'error') {
         // e.g. not a member after delete — stop reconnect thrash
-        if (String(msg.message || '').toLowerCase().includes('not a workspace member')) {
+        if (
+          String(msg.message || '')
+            .toLowerCase()
+            .includes('not a workspace member')
+        ) {
           destroyed = true
           handlers.onWorkspaceDeleted?.(msg)
           status('error')

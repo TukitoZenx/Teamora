@@ -552,9 +552,7 @@ export default function TopToolbar({
                 className="flex h-16 w-16 flex-col items-center justify-center rounded text-text transition-colors hover:bg-muted/50"
                 title={t.label}
               >
-                <div
-                  className={`mb-1 h-8 w-12 rounded border border-border bg-gradient-to-br ${t.gradient}`}
-                />
+                <div className={`mb-1 h-8 w-12 rounded border border-border bg-gradient-to-br ${t.gradient}`} />
                 <span className="text-[10px]">{t.label}</span>
               </button>
             ))}

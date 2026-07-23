@@ -908,8 +908,7 @@ function PublicRoute({ children, loading, authenticated, profileComplete }) {
   return children
 }
 
-const SAFE_RESTORE_PATH =
-  /^\/(dashboard|settings(?:\/[a-z0-9-]+)?|workspace(?:\/[a-zA-Z0-9_-]+(?:\/[a-z0-9-]+)?)?)$/
+const SAFE_RESTORE_PATH = /^\/(dashboard|settings(?:\/[a-z0-9-]+)?|workspace(?:\/[a-zA-Z0-9_-]+(?:\/[a-z0-9-]+)?)?)$/
 
 function RootRoute({ loading, authenticated, profileComplete }) {
   if (loading) {

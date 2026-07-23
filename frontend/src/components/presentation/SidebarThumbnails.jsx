@@ -85,9 +85,7 @@ function SlideMiniPreview({ slide, theme }) {
               borderStyle: el.borderWidth ? 'solid' : 'none',
               borderColor: el.borderWidth ? el.borderColor || el.color || 'transparent' : 'transparent',
               background:
-                el.type === 'image'
-                  ? undefined
-                  : el.fill || (el.type === 'shape' ? '#e2e8f0' : 'transparent'),
+                el.type === 'image' ? undefined : el.fill || (el.type === 'shape' ? '#e2e8f0' : 'transparent'),
               overflow: 'hidden',
               boxSizing: 'border-box',
               pointerEvents: 'none'

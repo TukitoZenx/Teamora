@@ -47,12 +47,8 @@ export default function CompleteProfilePage() {
   return (
     <AuthShell mode="signup">
       <div className="mb-7">
-        <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">
-          Complete your profile
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
-          Finish setting up your Teamora account to continue.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[1.75rem]">Complete your profile</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted">Finish setting up your Teamora account to continue.</p>
       </div>
 
       {error && (

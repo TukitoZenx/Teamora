@@ -20,10 +20,7 @@ export default function BrandLoadingScreen({ message = 'Loading…' }) {
         {/* Single circle: logo + loading border */}
         <div className="relative flex h-20 w-20 items-center justify-center">
           {/* Soft track */}
-          <div
-            aria-hidden
-            className="absolute inset-0 rounded-full border-[2.5px] border-primary/15"
-          />
+          <div aria-hidden className="absolute inset-0 rounded-full border-[2.5px] border-primary/15" />
           {/* Spinning arc on the same circle */}
           <div
             aria-hidden
