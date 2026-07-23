@@ -32,6 +32,7 @@ import Switch from './ui/Switch'
 import Button from './ui/Button'
 import Input from './ui/Input'
 import Textarea from './ui/Textarea'
+import { WorkspaceIcon as WorkspaceIconMark } from './ui/TeamoraLogo'
 import { addWorkspaceNotification } from './utils/notifications'
 import useMeetingNotifications from '../hooks/useMeetingNotifications'
 import { useMeeting } from '../contexts/MeetingContext'
@@ -1207,9 +1208,7 @@ function WorkspaceOverview({
       <div className="rounded-card border border-border bg-card p-5 shadow-card shrink-0">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-input bg-primary/10 text-xl font-bold text-primary">
-              {workspace?.icon || 'T'}
-            </span>
+            <WorkspaceIconMark icon={workspace?.icon} name={workspace?.name} />
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-semibold tracking-tight text-text">{workspace?.name}</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
-  Building2,
   CalendarDays,
   Clock3,
   Pin,
@@ -21,6 +20,7 @@ import WorkspaceDeleteDialog from './WorkspaceDeleteDialog'
 import WorkspaceModal from './WorkspaceModal'
 import ConfirmDialog from './ConfirmDialog'
 import Button from './ui/Button'
+import TeamoraLogo, { WorkspaceIcon } from './ui/TeamoraLogo'
 
 const tabs = ['Recent', 'Pinned', 'Favorites', 'History']
 const sortOptions = [
@@ -594,9 +594,7 @@ function WorkspaceLauncherCard({
     >
       <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Building2 className="h-5 w-5" />
-          </span>
+          <WorkspaceIcon icon={workspace.icon} name={workspace.name} size="lg" />
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold tracking-tight text-text">{workspace.name}</h3>
             <p className="mt-1 truncate text-sm text-muted">by {workspace.ownerName || 'Teamora user'}</p>
@@ -701,8 +699,8 @@ function IconAction({ active, label, onClick, children }) {
 function DashboardEmptyState({ onCreate, onJoin }) {
   return (
     <section className="mx-auto flex min-h-[380px] max-w-xl flex-col items-center justify-center rounded-card border border-dashed border-border bg-card p-10 text-center shadow-card">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-card bg-primary/10 text-primary">
-        <Building2 className="h-7 w-7" />
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-card bg-primary/10 p-2">
+        <TeamoraLogo size="xl" className="h-12 w-12" rounded="rounded-xl" />
       </div>
       <h2 className="text-2xl font-semibold tracking-tight text-text">No Workspaces Found</h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted">
