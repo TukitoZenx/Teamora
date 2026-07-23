@@ -92,7 +92,7 @@ function ElementContent({ el }) {
   )
 }
 
-export default function PresentSlideView({ slide, theme, presentScale = 1, revision = 0, appDark = false }) {
+export default function PresentSlideView({ slide, theme, presentScale = 1, revision = 0 }) {
   const elements = useMemo(() => {
     const list = Array.isArray(slide?.elements) ? [...slide.elements] : []
     list.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
@@ -100,13 +100,15 @@ export default function PresentSlideView({ slide, theme, presentScale = 1, revis
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slide?.elements, slide?.id, revision])
 
-  const gradient = theme?.gradient || (appDark ? 'from-slate-900 to-slate-950' : 'from-white to-slate-50')
+  // Slide design is fixed by the presentation theme id — not app light/dark.
+  const isDarkSlide = Boolean(theme?.isDark)
+  const gradient = theme?.gradient || 'from-white to-slate-50'
   const accent = theme?.accent || 'from-primary to-indigo-500'
 
   return (
-    <div className={`flex h-full w-full items-center justify-center overflow-hidden ${appDark ? 'dark' : ''}`}>
+    <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div
-        key={`present-slide-${slide?.id || 'x'}-r${revision}-${appDark ? 'd' : 'l'}`}
+        key={`present-slide-${slide?.id || 'x'}-r${revision}`}
         className={`relative overflow-hidden rounded-lg bg-gradient-to-br ${gradient}`}
         style={{
           transform: `scale(${presentScale})`,
@@ -128,7 +130,7 @@ export default function PresentSlideView({ slide, theme, presentScale = 1, revis
         {elements.length === 0 && (
           <div
             className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center opacity-50 ${
-              appDark ? 'text-slate-400' : 'text-muted'
+              isDarkSlide ? 'text-slate-400' : 'text-slate-500'
             }`}
           >
             <h1 className="mb-4 text-4xl font-bold">{slide?.title || 'Blank Slide'}</h1>

@@ -228,6 +228,45 @@ export default function App() {
     })
   }, [])
 
+  // When the owner deletes a workspace, kick every remaining client out of the UI.
+  // Must sit after replaceWorkspaces / replaceRecentWorkspaces are defined.
+  useEffect(() => {
+    const onWorkspaceDeleted = (event) => {
+      const deletedId = event?.detail?.workspaceId
+      if (!deletedId) return
+
+      const activeId = activeWorkspace?._id || activeWorkspace?.workspaceId
+      replaceWorkspaces((current) => current.filter((workspace) => workspace._id !== deletedId))
+      replaceRecentWorkspaces((current) =>
+        current.filter((workspace) => workspace.workspaceId !== deletedId && workspace._id !== deletedId)
+      )
+      removeWorkspaceCache(deletedId)
+      if (localStorage.getItem(LAST_WORKSPACE_KEY) === deletedId) {
+        localStorage.removeItem(LAST_WORKSPACE_KEY)
+      }
+      if (activeMeetingWorkspace?._id === deletedId) {
+        leaveMeeting()
+      }
+      if (activeId === deletedId || location.pathname.includes(`/workspace/${deletedId}`)) {
+        setActiveWorkspace(null)
+        toast.error(event?.detail?.message || 'This workspace was deleted by the owner.')
+        navigate('/dashboard', { replace: true })
+      }
+    }
+
+    window.addEventListener('teamora-workspace-deleted', onWorkspaceDeleted)
+    return () => window.removeEventListener('teamora-workspace-deleted', onWorkspaceDeleted)
+  }, [
+    activeMeetingWorkspace?._id,
+    activeWorkspace?._id,
+    activeWorkspace?.workspaceId,
+    leaveMeeting,
+    location.pathname,
+    navigate,
+    replaceRecentWorkspaces,
+    replaceWorkspaces
+  ])
+
   const cacheWorkspace = useCallback((workspace) => {
     if (!workspace?._id) return
 
