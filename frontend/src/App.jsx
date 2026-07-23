@@ -18,7 +18,7 @@ import WorkspaceLayout from './features/workspace/components/WorkspaceLayout'
 import { addWorkspaceNotification } from './components/utils/notifications'
 import GlobalMeetings from './components/GlobalMeetings'
 import { useMeeting } from './contexts/MeetingContext'
-import TeamoraLogo from './components/ui/TeamoraLogo'
+import BrandLoadingScreen from './components/ui/BrandLoadingScreen'
 
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 const LAST_PAGE_KEY = 'teamora-last-page'
@@ -900,12 +900,7 @@ function PublicRoute({ children, loading, authenticated, profileComplete }) {
   // Only wait when a cached/live session may need redirect away from auth pages.
   if (authenticated) {
     if (loading) {
-      return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background" role="status" aria-live="polite">
-          <TeamoraLogo size="lg" />
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-muted border-t-primary" />
-        </div>
-      )
+      return <BrandLoadingScreen message="Signing you in…" />
     }
     return profileComplete ? <Navigate to="/dashboard" replace /> : <Navigate to="/complete-profile" replace />
   }

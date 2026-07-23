@@ -1,18 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import TeamoraLogo from './ui/TeamoraLogo'
-
-function AuthLoadingShell() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-live="polite">
-      <div className="flex flex-col items-center gap-3">
-        <TeamoraLogo size="lg" className="opacity-90" />
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-muted border-t-primary" />
-        <p className="text-sm font-medium text-muted">Checking your session…</p>
-      </div>
-    </div>
-  )
-}
+import BrandLoadingScreen from './ui/BrandLoadingScreen'
 
 export default function ProtectedRoute({ children }) {
   const { authenticated, loading, profileComplete } = useAuth()
@@ -21,7 +9,7 @@ export default function ProtectedRoute({ children }) {
   // Never render protected UI until the session check finishes — otherwise
   // dashboard/workspace chrome can flash for unauthenticated visitors.
   if (loading) {
-    return <AuthLoadingShell />
+    return <BrandLoadingScreen message="Checking your session…" />
   }
 
   if (!authenticated) {
