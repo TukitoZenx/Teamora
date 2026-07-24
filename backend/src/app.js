@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const passport = require('passport');
 const authRoutes = require('./routes/auth.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
+const aiRoutes = require('./routes/ai.routes');
 const configurePassport = require('./config/passport');
 const { createSessionStore, createSessionMiddleware, isProduction } = require('./config/session');
 const compression = require('compression');
@@ -115,6 +116,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/workspaces', workspaceRoutes);
+app.use('/api/v1/ai', aiRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });

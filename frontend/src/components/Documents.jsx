@@ -27,6 +27,9 @@ import {
 import html2pdf from 'html2pdf.js'
 import toast from 'react-hot-toast'
 import api from '../services/api'
+import AiAutocomplete from './editor/AiAutocomplete'
+import AiFloatingMenu from './editor/AiFloatingMenu'
+import AiGenerateModal from './editor/AiGenerateModal'
 import { SHAPE_LIBRARY, newTextBox, newShape, renderEquationHtml, shapeCss } from './utils/canvasOverlays'
 
 const FONTS = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
@@ -160,6 +163,8 @@ export default function Documents({
   const [pageNumberFormat, setPageNumberFormat] = useState('Page {n} of {total}')
   const [showPageNumbers, setShowPageNumbers] = useState(true)
   const [outerPageBorder, setOuterPageBorder] = useState(true)
+  const [showAiGenerateModal, setShowAiGenerateModal] = useState(false)
+  const [isAiGenerating, setIsAiGenerating] = useState(false)
 
   // Stats
   const [stats, setStats] = useState({ words: 0, characters: 0, readTime: 1, pages: 1 })
@@ -857,6 +862,15 @@ export default function Documents({
               <button
                 type="button"
                 role="menuitem"
+                onClick={() => handleMenuAction('importDoc')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <FolderUp className="w-3.5 h-3.5" />
+                Import...
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 onClick={() => handleMenuAction('saveDoc')}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
               >
@@ -1186,18 +1200,19 @@ export default function Documents({
           )}
         </div>
 
-        {/* IMPORT */}
-        <div className="relative ml-2 border-l border-border pl-2">
+        {/* AI ASSISTANT */}
+        <div className="relative">
           <button
             type="button"
-            onClick={() => handleMenuAction('importDoc')}
-            className="h-7 px-3 text-xs font-semibold rounded-lg bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-on-primary transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Import TXT, MD, HTML, or DOCX"
+            onClick={() => setShowAiGenerateModal(true)}
+            className="px-3 py-1 text-xs font-medium rounded-md transition-colors text-purple-600 hover:bg-purple-50 flex items-center gap-1.5"
+            title="Generate document with AI"
           >
-            <FolderUp className="w-3.5 h-3.5" />
-            <span>Import</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            AI Assistant
           </button>
         </div>
+
       </div>
 
       {/* Editor Formatting Ribbon */}
@@ -1465,7 +1480,7 @@ export default function Documents({
 
             <div
               ref={pageShellRef}
-              className="relative z-10 bg-card shadow-card"
+              className={`relative z-10 bg-card transition-shadow duration-300 ${isAiGenerating ? 'animate-ai-glow' : 'shadow-card'}`}
               style={{
                 width: pageDims.w,
                 minHeight: Math.max(pageDims.h, stats.pages * pageDims.h + Math.max(0, stats.pages - 1) * pageGap),
@@ -1761,6 +1776,15 @@ export default function Documents({
           <span>COLLABORATORS: {activeUsersCount}</span>
         </div>
       </div>
+      {/* AI Modals and Overlays */}
+      {editorReady && <AiAutocomplete quillRef={quillRef} />}
+      {editorReady && <AiFloatingMenu quillRef={quillRef} onGenerating={setIsAiGenerating} />}
+      <AiGenerateModal
+        isOpen={showAiGenerateModal}
+        onClose={() => setShowAiGenerateModal(false)}
+        quillRef={quillRef}
+        onGenerating={setIsAiGenerating}
+      />
     </div>
   )
 }
