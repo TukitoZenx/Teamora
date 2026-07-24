@@ -158,12 +158,17 @@ export default function DocumentsSection({
     })
     providerRef.current = provider
 
+
+
     const quill = new Quill(mountEl, {
       theme: 'snow',
       modules: {
         toolbar: false,
         cursors: {
           transformOnTextChange: true
+        },
+        history: {
+          userOnly: true
         }
       },
       placeholder: 'Start writing…'
@@ -173,6 +178,7 @@ export default function DocumentsSection({
 
     const binding = new QuillBinding(ytext, quill)
     bindingRef.current = binding
+
     setEditorReady(true)
 
     let dirtyTimer = null
