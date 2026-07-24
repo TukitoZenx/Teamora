@@ -29,11 +29,17 @@ const emitUnauthorized = () => {
 
 api.interceptors.request.use((config) => {
   config.headers.Accept = 'application/json'
-  config.headers['Content-Type'] = 'application/json'
-
+  
   const method = config.method ? config.method.toUpperCase() : ''
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && config.data === undefined) {
     config.data = {}
+  }
+
+  // Prevent forcing application/json if sending FormData
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  } else {
+    config.headers['Content-Type'] = 'application/json'
   }
 
   config.withCredentials = true

@@ -21,10 +21,12 @@ import {
   AlignRight,
   List,
   ListOrdered,
-  Sparkles
+  Sparkles,
+  FolderUp
 } from 'lucide-react'
 import html2pdf from 'html2pdf.js'
 import toast from 'react-hot-toast'
+import api from '../services/api'
 import { SHAPE_LIBRARY, newTextBox, newShape, renderEquationHtml, shapeCss } from './utils/canvasOverlays'
 
 const FONTS = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
@@ -353,6 +355,63 @@ export default function Documents({
             toast.success('Document imported!')
           }
           reader.readAsText(file)
+        }
+        input.click()
+        break
+      }
+      case 'importDoc': {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = '.docx,.txt,.html,.htm,.md,text/plain,text/html,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        input.onchange = async (e) => {
+          const file = e.target.files?.[0]
+          if (!file || !quill) return
+          
+          const formData = new FormData()
+          formData.append('file', file)
+          
+          const importToast = toast.loading('Importing document...')
+          try {
+            const { data } = await api.post(`/api/v1/workspaces/${roomId}/files/import`, formData)
+            
+            if (data.success) {
+              const content = data.html || data.text || ''
+              const looksHtml = /<\/?[a-z][\s\S]*>/i.test(content)
+              if (looksHtml) {
+                quill.clipboard.dangerouslyPasteHTML(content)
+              } else {
+                quill.setText(content)
+              }
+              setDocTitle(data.name)
+              onRenameDocument?.(data.name)
+              onDirtyChange?.(true)
+              toast.success('Document imported!', { id: importToast })
+            } else {
+              toast.error(data.message || 'Failed to import document', { id: importToast })
+            }
+          } catch (err) {
+            console.error('Import error:', err)
+            if (file.type !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+              const reader = new FileReader()
+              reader.onload = (evt) => {
+                const raw = String(evt.target?.result || '')
+                const looksHtml = /<\/?[a-z][\s\S]*>/i.test(raw)
+                if (looksHtml) {
+                  quill.clipboard.dangerouslyPasteHTML(raw)
+                } else {
+                  quill.setText(raw)
+                }
+                const baseName = file.name.replace(/\.[^.]+$/, '')
+                setDocTitle(baseName)
+                onRenameDocument?.(baseName)
+                onDirtyChange?.(true)
+                toast.success('Document imported (offline fallback)!', { id: importToast })
+              }
+              reader.readAsText(file)
+            } else {
+              toast.error(err.response?.data?.message || 'Error connecting to import service', { id: importToast })
+            }
+          }
         }
         input.click()
         break
@@ -1125,6 +1184,19 @@ export default function Documents({
               </div>
             </div>
           )}
+        </div>
+
+        {/* IMPORT */}
+        <div className="relative ml-2 border-l border-border pl-2">
+          <button
+            type="button"
+            onClick={() => handleMenuAction('importDoc')}
+            className="h-7 px-3 text-xs font-semibold rounded-lg bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-on-primary transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Import TXT, MD, HTML, or DOCX"
+          >
+            <FolderUp className="w-3.5 h-3.5" />
+            <span>Import</span>
+          </button>
         </div>
       </div>
 

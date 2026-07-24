@@ -68,13 +68,13 @@ if (isProduction && !process.env.SESSION_SECRET) {
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const requireJsonContentType = (req, res, next) => {
-  if (!MUTATING_METHODS.has(req.method) || req.is('application/json')) {
+  if (!MUTATING_METHODS.has(req.method) || req.is('application/json') || req.is('multipart/form-data')) {
     return next();
   }
 
   return res.status(415).json({
     success: false,
-    message: 'Content-Type must be application/json'
+    message: 'Content-Type must be application/json or multipart/form-data'
   });
 };
 

@@ -29,9 +29,11 @@ import {
   Star,
   Heart,
   Circle,
-  Square
+  Square,
+  FolderUp
 } from 'lucide-react'
 import { listThemeCards } from './utils/slideThemes'
+import api from '../../services/api'
 
 const FONT_FAMILIES = [
   'Inter, sans-serif',
@@ -85,9 +87,12 @@ export default function TopToolbar({
   canUndo = false,
   canRedo = false,
   onDeleteSelection,
-  hasSelection = false
+  hasSelection = false,
+  onImportSlides,
+  roomId
 }) {
   const imageInputRef = useRef(null)
+  const fileInputRef = useRef(null)
   const tabs = ['Home', 'Insert', 'Design', 'Transitions']
 
   const flushActiveEditor = () => {
@@ -209,9 +214,61 @@ export default function TopToolbar({
     }
   }
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleImportFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    const ext = file.name.split('.').pop().toLowerCase()
+    if (ext === 'json') {
+      const reader = new FileReader()
+      reader.onload = (evt) => {
+        try {
+          const data = JSON.parse(evt.target.result)
+          if (Array.isArray(data) && data.length > 0) {
+            onImportSlides?.(data)
+          } else {
+            toast.error('Invalid slides JSON structure')
+          }
+        } catch {
+          toast.error('Error parsing presentation JSON')
+        }
+      }
+      reader.readAsText(file)
+    } else if (ext === 'pptx') {
+      if (!roomId) {
+        toast.error('Cannot import PPTX without room information')
+        return
+      }
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const importToast = toast.loading('Importing presentation...')
+      try {
+        const { data } = await api.post(`/api/v1/workspaces/${roomId}/files/import`, formData)
+        if (data.success && Array.isArray(data.slides)) {
+          onImportSlides?.(data.slides)
+          toast.success('Presentation imported!', { id: importToast })
+        } else {
+          toast.error(data.message || 'Failed to parse PPTX', { id: importToast })
+        }
+      } catch (err) {
+        console.error('PPTX import error:', err)
+        toast.error(err.response?.data?.message || 'Error connecting to import service', { id: importToast })
+      }
+    } else {
+      toast.error('Please choose a .pptx or .json presentation file')
+    }
+  }
+
   return (
     <div className="relative z-10 flex shrink-0 flex-col border-b border-border bg-card shadow-sm">
       <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
+      <input ref={fileInputRef} type="file" accept=".pptx,.json" className="hidden" onChange={handleImportFileChange} />
 
       <div className="flex items-center gap-1 bg-card-sunken/30 px-2 pt-1">
         {tabs.map((tab) => (
@@ -230,6 +287,15 @@ export default function TopToolbar({
         ))}
 
         <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={handleImportClick}
+          className="mb-1 mr-2 flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/25 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all sm:px-4 cursor-pointer"
+        >
+          <FolderUp className="h-4 w-4" />
+          <span>Import</span>
+        </button>
 
         <button
           type="button"
