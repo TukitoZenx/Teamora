@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const workspaceController = require('../controllers/workspace.controller');
 const contentController = require('../controllers/content.controller');
+const importController = require('../controllers/import.controller');
 const { requireAuth } = require('../middleware/auth.middleware');
 
 const router = express.Router();
@@ -67,6 +68,9 @@ router.post('/:id/join-requests/:requestId/decline', workspaceController.decline
 router.get('/:id/content', contentController.listContentKeys);
 router.get('/:id/content/:key', contentController.getContent);
 router.put('/:id/content/:key', ...maybe(contentWriteLimiter), contentController.putContent);
+
+// File import routes
+router.post('/:id/files/import', importController.importFile);
 
 router.get('/:id', workspaceController.getWorkspaceById);
 router.put('/:id', workspaceController.updateWorkspace);

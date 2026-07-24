@@ -631,6 +631,15 @@ export default function PresentationModule({
     setEditingElemId(null)
   }, [commit, setActiveSlide])
 
+  const handleImportSlides = useCallback((newSlides) => {
+    if (!Array.isArray(newSlides) || newSlides.length === 0) return
+    commit(() => newSlides)
+    setActiveSlide(0)
+    setSelectedElemIds([])
+    setEditingElemId(null)
+    toast.success('Presentation slides imported!')
+  }, [commit, setActiveSlide])
+
   const handleDuplicateSlide = useCallback(
     (index) => {
       commit((curr) => {
@@ -919,6 +928,8 @@ export default function PresentationModule({
         canRedo={canRedo}
         onDeleteSelection={() => handleDeleteElements(effectiveSelectedIds)}
         hasSelection={effectiveSelectedIds.length > 0}
+        onImportSlides={handleImportSlides}
+        roomId={roomId}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">

@@ -18,6 +18,7 @@
     "node": ">=20.8.0"
   },
   "dependencies": {
+    "adm-zip": "^0.6.0",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "connect-mongo": "^5.1.0",
@@ -28,12 +29,16 @@
     "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
     "helmet": "^8.2.0",
+    "mammoth": "^1.12.0",
     "mongoose": "^9.7.3",
     "morgan": "^1.11.0",
+    "multer": "^2.2.0",
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "uuid": "^14.0.1",
     "ws": "^8.21.0",
+    "xml2js": "^0.6.2",
     "yjs": "^13.6.31"
   },
   "devDependencies": {
