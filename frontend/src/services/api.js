@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { getApiBaseUrl } from './apiBaseUrl'
-
+// whhy this file is imported ? ans : this file is imported to get the base URL for the API endpoints
 const api = axios.create({
   baseURL: getApiBaseUrl(),
   withCredentials: true,

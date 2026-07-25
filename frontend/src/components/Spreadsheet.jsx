@@ -12,10 +12,12 @@ import {
   Trash2,
   Edit3,
   Lock,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Sparkles
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
+import AiSpreadsheetModal from './AiSpreadsheetModal'
 
 // Advanced formula evaluator supporting SUM, AVERAGE, COUNT, MIN, MAX, PRODUCT, and basic arithmetic references (=A1+B2)
 function evaluateFormula(formula, grid, offset = 0) {
@@ -108,6 +110,7 @@ export default function Spreadsheet({
   const [showPivotBuilder, setShowPivotBuilder] = useState(false)
   const [showCharts, setShowCharts] = useState(false)
   const [chartType, setChartType] = useState('bar') // 'bar', 'line'
+  const [showAiModal, setShowAiModal] = useState(false)
 
   // Formatting rules fields
   const [ruleCol, setRuleCol] = useState(0)
@@ -609,6 +612,16 @@ export default function Spreadsheet({
             <Download className="w-3.5 h-3.5" />
             <span>Export</span>
           </button>
+          
+          <div className="w-px h-5 bg-border mx-0.5" />
+
+          <button
+            onClick={() => setShowAiModal(true)}
+            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:from-green-600 hover:to-emerald-600 transition-all hover:scale-105"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            AI Assistant
+          </button>
         </div>
       </div>
       {/* Formula Bar */}
@@ -947,6 +960,34 @@ export default function Spreadsheet({
           </div>
         </div>
       )}
+
+      <AiSpreadsheetModal 
+        isOpen={showAiModal} 
+        onClose={() => setShowAiModal(false)}
+        onApplyAi={(result, mode) => {
+          if (!activeCell) {
+            toast.error('Please select a cell first to place the AI content.');
+            return;
+          }
+          if (mode === 'formula') {
+            handleCellChange(sheetOffset + activeCell.r, activeCell.c, result);
+          } else if (mode === 'data') {
+            // result is a 2D array of strings
+            const numRows = result.length;
+            const numCols = result[0]?.length || 0;
+            
+            // Expand grid if needed (naively handled by scrolling normally, but here we just write to grid state)
+            if (activeCell.r + numRows > rowCount) setRowCount(activeCell.r + numRows + 5);
+            if (activeCell.c + numCols > columnCount) setColumnCount(activeCell.c + numCols + 5);
+            
+            for (let r = 0; r < numRows; r++) {
+              for (let c = 0; c < numCols; c++) {
+                handleCellChange(sheetOffset + activeCell.r + r, activeCell.c + c, result[r][c] || '');
+              }
+            }
+          }
+        }}
+      />
     </div>
   )
 }

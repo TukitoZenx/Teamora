@@ -67,3 +67,25 @@ export const getCommandStream = (command, selectedText, fullText) => {
 export const getGenerateStream = (prompt) => {
   return fetchAiStream('/api/v1/ai/generate', { prompt });
 };
+
+export const generateSlides = async (prompt) => {
+  const url = `${getApiBaseUrl()}/api/v1/ai/generate-slides`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+    credentials: 'include'
+  });
+
+  if (!response.ok) {
+    let msg = 'Failed to generate slides.';
+    try {
+      const data = await response.json();
+      if (data.message) msg = data.message;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  const data = await response.json();
+  return data.slides; // JSON array of slides
+};

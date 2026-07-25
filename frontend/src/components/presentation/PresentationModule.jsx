@@ -6,6 +6,7 @@ import SlideCanvas from './SlideCanvas'
 import PresentSlideView from './PresentSlideView'
 import PropertiesPanel from './PropertiesPanel'
 import useSlideHistory from './hooks/useSlideHistory'
+import AiPresentationModal from './AiPresentationModal'
 import { collectOpenTextEditorHtml, applyTextEditorFlush, deepCloneSlides } from './utils/flushTextEditors'
 import { compressImageToDataUrl } from './utils/compressImage'
 import { resolveSlideTheme, defaultObjectColors } from './utils/slideThemes'
@@ -138,6 +139,7 @@ export default function PresentationModule({
   const [presentEntering, setPresentEntering] = useState(false)
   const [clipboard, setClipboard] = useState([])
   const [dragIndex, setDragIndex] = useState(null)
+  const [showAiModal, setShowAiModal] = useState(false)
 
   const slidesRef = useRef(slides)
   const activeSlideRef = useRef(activeSlide)
@@ -640,6 +642,20 @@ export default function PresentationModule({
     toast.success('Presentation slides imported!')
   }, [commit, setActiveSlide])
 
+  const handleInsertAiSlides = useCallback((newSlides, append = false) => {
+    if (!Array.isArray(newSlides) || newSlides.length === 0) return
+    commit((curr) => {
+      if (append) {
+        return [...ensureArray(curr), ...newSlides]
+      }
+      return newSlides
+    })
+    // If not appending, go to slide 0, otherwise go to first appended slide
+    setActiveSlide(append ? ensureArray(slidesRef.current).length : 0)
+    setSelectedElemIds([])
+    setEditingElemId(null)
+  }, [commit, setActiveSlide])
+
   const handleDuplicateSlide = useCallback(
     (index) => {
       commit((curr) => {
@@ -930,6 +946,7 @@ export default function PresentationModule({
         hasSelection={effectiveSelectedIds.length > 0}
         onImportSlides={handleImportSlides}
         roomId={roomId}
+        onAiAssistant={() => setShowAiModal(true)}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -1015,6 +1032,12 @@ export default function PresentationModule({
           />
         </div>
       </div>
+      
+      <AiPresentationModal 
+        isOpen={showAiModal} 
+        onClose={() => setShowAiModal(false)}
+        onInsertSlides={handleInsertAiSlides}
+      />
     </div>
   )
 }

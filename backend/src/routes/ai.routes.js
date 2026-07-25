@@ -17,5 +17,8 @@ router.use(aiRateLimiter);
 router.post('/autocomplete', aiController.autocomplete);
 router.post('/command', aiController.executeCommand);
 router.post('/generate', aiController.generateDocument);
+router.post('/generate-slides', aiController.generateSlides);
+router.post('/generate-spreadsheet', aiController.generateSpreadsheet);
+router.post('/generate-tasks', aiController.generateTasks);
 
 module.exports = router;
