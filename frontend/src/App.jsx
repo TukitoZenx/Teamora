@@ -13,7 +13,9 @@ import CompleteProfilePage from './features/auth/pages/CompleteProfilePage'
 import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage'
 import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
 import api from './services/api'
+
 import { useAuth } from './hooks/useAuth'
+
 import WorkspaceLayout from './features/workspace/components/WorkspaceLayout'
 import { addWorkspaceNotification } from './components/utils/notifications'
 import GlobalMeetings from './components/GlobalMeetings'
@@ -62,8 +64,9 @@ const removeWorkspaceCache = (workspaceId) => {
   writeJsonCache(WORKSPACE_CACHE_KEY, cache)
 }
 
+//starting point of the app, handles routing and global state management
 export default function App() {
-  const { user, loading, authenticated, profileComplete } = useAuth()
+  const { user, loading, authenticated, profileComplete } = useAuth()//check the user is authenticated or not
   const { activeMeetingWorkspace, leaveMeeting } = useMeeting()
   const navigate = useNavigate()
   const location = useLocation()

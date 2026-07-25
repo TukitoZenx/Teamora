@@ -30,7 +30,8 @@ import {
   Heart,
   Circle,
   Square,
-  FolderUp
+  FolderUp,
+  Sparkles
 } from 'lucide-react'
 import { listThemeCards } from './utils/slideThemes'
 import api from '../../services/api'
@@ -89,7 +90,8 @@ export default function TopToolbar({
   onDeleteSelection,
   hasSelection = false,
   onImportSlides,
-  roomId
+  roomId,
+  onAiAssistant
 }) {
   const imageInputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -287,6 +289,14 @@ export default function TopToolbar({
         ))}
 
         <div className="flex-1" />
+
+        <button
+          onClick={() => onAiAssistant?.()}
+          className="mr-2 mb-1 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:from-purple-600 hover:to-indigo-600 transition-all hover:scale-105"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          AI Assistant
+        </button>
 
         <button
           type="button"

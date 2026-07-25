@@ -8,7 +8,8 @@ import {
   Plus,
   Search,
   Trash2,
-  X
+  X,
+  Sparkles
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -16,6 +17,7 @@ import { ensureArray } from './utils/arrayUtils'
 import useLocalCollabChannel from '../hooks/useLocalCollabChannel'
 import { canShowBrowserNotification } from './utils/notificationPreferences'
 import { addWorkspaceNotification } from './utils/notifications'
+import AiTaskModal from './AiTaskModal'
 
 const priorities = ['Low', 'Medium', 'High', 'Urgent']
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -138,6 +140,8 @@ export default function Calendar({
   const [priority, setPriority] = useState('')
   const [reminder, setReminder] = useState('')
   const [workspaceName, setWorkspaceName] = useState('')
+  const [syncStatus, setSyncStatus] = useState('syncing')
+  const [showAiModal, setShowAiModal] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
   const [monthPulse, setMonthPulse] = useState(0)
@@ -317,7 +321,47 @@ export default function Calendar({
     })
   }, [taskFilter, taskPriorityFilter, taskSearch, taskSort, tasks])
 
-  const openCreateModal = (dateKey) => {
+  const handleInsertAiTasks = useCallback(
+    async (newTasks) => {
+      if (!canEdit || !newTasks || newTasks.length === 0) return;
+      
+      let savedCount = 0;
+      const results = await Promise.allSettled(
+        newTasks.map(async (task) => {
+          const payload = {
+            title: task.title || 'AI Task',
+            description: task.description || '',
+            date: task.dueDate || new Date().toISOString().slice(0, 10),
+            priority: task.priority || 'Medium',
+            startTime: '',
+            endTime: '',
+            reminder: '',
+            workspaceName: ''
+          };
+          const { data } = await api.post(`/api/v1/workspaces/${workspaceId}/tasks`, payload);
+          return data.task;
+        })
+      );
+
+      const saved = results
+        .filter((r) => r.status === 'fulfilled')
+        .map((r) => r.value);
+      
+      savedCount = saved.length;
+      if (savedCount > 0) {
+        setTasks((prev) => [...prev, ...saved]);
+        tasksChannel.emit('tasks-updated', {});
+      }
+
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (failed > 0) {
+        toast.error(`${failed} task(s) failed to save.`);
+      }
+    },
+    [canEdit, workspaceId, tasksChannel]
+  );
+
+  const openCreateModal = useCallback((dateKey) => {
     if (!canEdit) return
     setActiveDate(dateKey)
     setEditingTask(null)
@@ -331,7 +375,7 @@ export default function Calendar({
     setWorkspaceName('')
     setSubmitted(false)
     setModalMode('create')
-  }
+  }, [canEdit])
 
   const openEditModal = (task) => {
     if (!canEdit) return
@@ -665,6 +709,14 @@ export default function Calendar({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowAiModal(true)}
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 px-4 text-sm font-semibold text-white shadow-sm transition duration-normal hover:from-blue-600 hover:to-indigo-600 hover:scale-105"
+          >
+            <Sparkles className="h-4 w-4" />
+            AI Extract Tasks
+          </button>
+          
           <button
             type="button"
             onClick={() => (onOpenTasksPage ? onOpenTasksPage() : setTaskViewerOpen(true))}
@@ -1102,6 +1154,13 @@ export default function Calendar({
           </div>
         </div>
       )}
+
+      <AiTaskModal
+        isOpen={showAiModal}
+        onClose={() => setShowAiModal(false)}
+        onInsertTasks={handleInsertAiTasks}
+        workspaceId={workspaceId}
+      />
     </section>
   )
 }

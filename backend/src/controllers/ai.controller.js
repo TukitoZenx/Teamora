@@ -47,8 +47,58 @@ const generateDocument = async (req, res) => {
   await handleStream(res, AiService.generateDocument(prompt));
 };
 
+const generateSlides = async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ success: false, message: 'Prompt is required' });
+  }
+  
+  try {
+    const jsonStr = await AiService.generateSlides(prompt);
+    // Parse it to ensure it's valid JSON before sending
+    const slides = JSON.parse(jsonStr);
+    res.json({ success: true, slides });
+  } catch (error) {
+    console.error('AI Generate Slides Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate slides', error: error.message });
+  }
+};
+
+const generateSpreadsheet = async (req, res) => {
+  const { prompt, mode } = req.body;
+  if (!prompt || !mode) {
+    return res.status(400).json({ success: false, message: 'Prompt and mode are required' });
+  }
+  
+  try {
+    const result = await AiService.generateSpreadsheet(prompt, mode);
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error('AI Generate Spreadsheet Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate spreadsheet content', error: error.message });
+  }
+};
+
+const generateTasks = async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ success: false, message: 'Prompt is required' });
+  }
+  
+  try {
+    const result = await AiService.generateTasks(prompt);
+    res.json({ success: true, tasks: result });
+  } catch (error) {
+    console.error('AI Generate Tasks Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate tasks', error: error.message });
+  }
+};
+
 module.exports = {
   autocomplete,
   executeCommand,
-  generateDocument
+  generateDocument,
+  generateSlides,
+  generateSpreadsheet,
+  generateTasks
 };

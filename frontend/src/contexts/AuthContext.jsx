@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import * as authService from '../features/auth/services/auth'
 import { onUnauthorized } from '../services/api'
 
-const AuthContext = createContext(null)
+const AuthContext = createContext(null) // create a global context for authentication state and actions
 const AUTH_CACHE_KEY = 'teamora-auth-user'
 let initialUserRequest = null
 
@@ -41,12 +41,12 @@ export function AuthProvider({ children }) {
   // an authenticated session before `/me` returns. Public routes skip the wait
   // when there is no authenticated user (see PublicRoute).
   const [user, setUser] = useState(() => readCachedUser())
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true)// if loading is true, it means the authentication state is being checked and the app is waiting for the response from the server
   /** True only after the first `/me` completes successfully with a user. */
-  const [sessionValidated, setSessionValidated] = useState(false)
-  const cachedUserRef = useRef(null)
-  const sessionCheckedRef = useRef(false)
-  const sessionValidatedRef = useRef(false)
+  const [sessionValidated, setSessionValidated] = useState(false)// 
+  const cachedUserRef = useRef(null)// what is does ? ans : it stores the cached user data
+  const sessionCheckedRef = useRef(false)// what is does ? ans : it tracks whether the session has been checked
+  const sessionValidatedRef = useRef(false)// what is does ? ans : it tracks whether the session is validated 
 
   const clearSession = useCallback(() => {
     initialUserRequest = null
@@ -57,14 +57,14 @@ export function AuthProvider({ children }) {
     setSessionValidated(false)
     sessionCheckedRef.current = true
     setLoading(false)
-  }, [])
+  }, [])// at where this function is used ? ans : it is used to clear the session data when the user logs out or the session expires
 
   const refreshUser = useCallback(
     async ({ useInitialCache = false } = {}) => {
       // Block protected routes only until the first session check finishes.
       // Later refreshes (e.g. after saving profile) should not remount the app
       // into the full-page auth loader.
-      if (!sessionCheckedRef.current) {
+      if (!sessionCheckedRef.current) {// what is does ? ans : it checks if the session has been checked or not, it mean s the first time the user is loading the app, so it will set the loading state to true
         setLoading(true)
       }
 
@@ -99,7 +99,7 @@ export function AuthProvider({ children }) {
       }
     },
     [clearSession]
-  )
+  )// what is does ? ans : it refreshes the user data from the server and updates the state accordingly
 
   useEffect(() => {
     cachedUserRef.current = user

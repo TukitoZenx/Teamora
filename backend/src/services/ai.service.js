@@ -179,6 +179,117 @@ Do not include conversational filler like "Here is your document". Just output t
     const prompt = `Create a document based on this request:\n\n${promptText}`;
     
     yield* callAiStream(prompt, system);
+  },
+
+  generateSlides: async function (promptText) {
+    const system = `You are an expert presentation generator. 
+The user will provide a topic. Generate a structured presentation.
+Return ONLY valid JSON.
+The JSON must be an array of objects.
+Each object represents a slide and MUST have these exact keys:
+- "title": A concise title for the slide (string)
+- "content": A markdown string representing the slide body (use bullet points, short paragraphs) (string)
+- "notes": Speaker notes for the slide (string)
+
+Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSON array. Start with [ and end with ].`;
+
+    const prompt = `Topic for presentation: ${promptText}\n\nPlease generate 5-8 slides.`;
+    
+    let fullJson = '';
+    for await (const chunk of callAiStream(prompt, system)) {
+      fullJson += chunk;
+    }
+    
+    // Clean up potential markdown formatting that Ollama sometimes adds even when told not to
+    fullJson = fullJson.trim();
+    if (fullJson.startsWith('```json')) {
+      fullJson = fullJson.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    } else if (fullJson.startsWith('```')) {
+      fullJson = fullJson.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    }
+    
+    return fullJson.trim();
+  },
+
+  generateSpreadsheet: async function (promptText, mode) {
+    let system = '';
+    let prompt = '';
+    
+    if (mode === 'formula') {
+      system = `You are an expert spreadsheet formula generator.
+The user will describe a calculation.
+Return ONLY the raw formula starting with = (e.g. =SUM(A1:B2)).
+Do NOT wrap the formula in markdown blocks or quotes. Just output the formula text.`;
+      prompt = `Description: ${promptText}\n\nPlease provide the formula.`;
+    } else {
+      system = `You are an expert spreadsheet data generator.
+The user will describe the data they want.
+Generate realistic sample data based on the prompt.
+Return ONLY valid JSON.
+The JSON must be an array of arrays of strings. Each inner array represents a row of data.
+Example: [["Name", "Age"], ["Alice", "30"], ["Bob", "25"]]
+Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSON array. Start with [ and end with ].`;
+      prompt = `Data description: ${promptText}\n\nPlease provide the data as a JSON array of arrays.`;
+    }
+
+    let fullOutput = '';
+    for await (const chunk of callAiStream(prompt, system)) {
+      fullOutput += chunk;
+    }
+    
+    fullOutput = fullOutput.trim();
+    if (mode === 'data') {
+      if (fullOutput.startsWith('```json')) {
+        fullOutput = fullOutput.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+      } else if (fullOutput.startsWith('```')) {
+        fullOutput = fullOutput.replace(/^```\n?/, '').replace(/\n?```$/, '');
+      }
+      return JSON.parse(fullOutput.trim());
+    }
+    
+    // For formula, just return the text
+    // Ensure it starts with '='
+    if (!fullOutput.startsWith('=')) {
+      if (fullOutput.startsWith('"') && fullOutput.endsWith('"')) {
+        fullOutput = fullOutput.slice(1, -1);
+      }
+      if (!fullOutput.startsWith('=')) {
+        fullOutput = '=' + fullOutput;
+      }
+    }
+    return fullOutput.trim();
+  },
+
+  generateTasks: async function (promptText) {
+    const system = `You are an expert project manager AI. 
+The user will provide unstructured text (meeting notes, chat logs).
+Extract all action items and tasks from the text.
+Return ONLY valid JSON.
+The JSON must be an array of objects.
+Each object must have these exact keys:
+- "title": A concise title for the task (string)
+- "description": A slightly longer description or context (string)
+- "assignee": The person assigned to it, or "" if unassigned (string)
+- "deadline": The due date in YYYY-MM-DD format if mentioned, or "" if not (string)
+- "priority": One of "Low", "Medium", "High", or "Urgent" (string)
+
+Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSON array. Start with [ and end with ].`;
+
+    const prompt = `Unstructured Text:\n${promptText}\n\nPlease extract the tasks into the JSON array.`;
+    
+    let fullJson = '';
+    for await (const chunk of callAiStream(prompt, system)) {
+      fullJson += chunk;
+    }
+    
+    fullJson = fullJson.trim();
+    if (fullJson.startsWith('```json')) {
+      fullJson = fullJson.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    } else if (fullJson.startsWith('```')) {
+      fullJson = fullJson.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    }
+    
+    return JSON.parse(fullJson.trim());
   }
 };
 
