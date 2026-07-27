@@ -9,6 +9,7 @@ const app = require('./app'); // used as handler for the http server
 const { sessionMiddleware, isAllowedOrigin } = require('./app'); // used for the websocket server
 const connectDatabase = require('./config/database'); // used to connect to the database
 const { attachCollabWs } = require('./collab/wsHub'); // used to attach the websocket server
+const { startReminderService } = require('./services/reminder.service');
 
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -58,6 +59,9 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 const startServer = async () => {
   try {
     await connectDatabase();
+    
+    // Start background services
+    startReminderService();
 
     const tlsOptions = getTlsOptions();
     const server = tlsOptions ? https.createServer(tlsOptions, app) : http.createServer(app);

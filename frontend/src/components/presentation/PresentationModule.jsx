@@ -1,3 +1,4 @@
+import pptxgen from 'pptxgenjs'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import TopToolbar from './TopToolbar'
@@ -705,6 +706,76 @@ export default function PresentationModule({
     setTheme(resolveSlideTheme(nextId || 'default'))
   }, [])
 
+  const handleExportPptx = useCallback(async () => {
+    const toastId = toast.loading('Exporting PPTX...')
+    try {
+      const pres = new pptxgen()
+      pres.layout = 'LAYOUT_16x9'
+      for (const slide of slides) {
+        const slideObj = pres.addSlide()
+        if (slide.backgroundColor) {
+          slideObj.background = { color: slide.backgroundColor.replace('#', '') }
+        } else {
+          slideObj.background = { color: 'FFFFFF' }
+        }
+        for (const el of slide.elements || []) {
+          const pxToIn = (px) => px / 96
+          const opts = {
+            x: pxToIn(el.x),
+            y: pxToIn(el.y),
+            w: pxToIn(el.width),
+            h: pxToIn(el.height),
+            rotate: el.rotation || 0,
+          }
+          if (el.type === 'textbox' || el.type === 'text') {
+            opts.fontSize = (parseInt(el.fontSize) || 24) * 0.75
+            opts.color = (el.color || '#000000').replace('#', '')
+            if (el.fontFamily) opts.fontFace = el.fontFamily.split(',')[0].replace(/['"]/g, '')
+            if (el.bold) opts.bold = true
+            if (el.italic) opts.italic = true
+            if (el.textAlign) opts.align = el.textAlign
+            const textLines = (el.text || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
+            slideObj.addText(textLines, opts)
+          } else if (el.type === 'image') {
+            if (el.src) {
+              if (el.src.startsWith('data:image')) {
+                slideObj.addImage({ ...opts, data: el.src })
+              } else {
+                slideObj.addImage({ ...opts, path: el.src })
+              }
+            }
+          } else if (el.type === 'shape') {
+            const shapeMap = {
+              rect: pres.ShapeType.rect,
+              rounded: pres.ShapeType.roundRect,
+              circle: pres.ShapeType.ellipse
+            }
+            opts.fill = { color: (el.fill || '#000000').replace('#', '') }
+            if (el.borderColor) {
+              opts.line = { color: el.borderColor.replace('#', ''), width: el.borderWidth || 1 }
+            }
+            slideObj.addShape(shapeMap[el.shape] || pres.ShapeType.rect, opts)
+            if (el.text) {
+              const textLines = (el.text || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
+              slideObj.addText(textLines, { ...opts, color: 'FFFFFF', align: 'center', valign: 'middle' })
+            }
+          } else if (el.type === 'icon') {
+            opts.fontSize = (parseInt(el.width) || 48) * 0.75
+            opts.color = (el.fill || el.color || '#000000').replace('#', '')
+            opts.align = 'center'
+            opts.valign = 'middle'
+            slideObj.addText(el.icon || '★', opts)
+          }
+        }
+      }
+      await pres.writeFile({ fileName: `Presentation.pptx` })
+      toast.success('Exported to PPTX', { id: toastId })
+    } catch (err) {
+      console.error(err)
+      toast.error('Export failed', { id: toastId })
+    }
+  }, [slides])
+
   const enterPresentMode = useCallback(async () => {
     if (presentEntering) return
     setPresentEntering(true)
@@ -752,12 +823,12 @@ export default function PresentationModule({
 
       const mod = e.ctrlKey || e.metaKey
 
-      if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey && !inField) {
         e.preventDefault()
         undo()
         return
       }
-      if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+      if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey)) && !inField) {
         e.preventDefault()
         redo()
         return
@@ -947,6 +1018,7 @@ export default function PresentationModule({
         onImportSlides={handleImportSlides}
         roomId={roomId}
         onAiAssistant={() => setShowAiModal(true)}
+        onExportPptx={handleExportPptx}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">

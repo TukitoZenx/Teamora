@@ -854,6 +854,20 @@ const createTask = async (userId, workspaceId, payload) => {
     startTime: validateOptionalText(payload.startTime, 'Start time', 10),
     endTime: validateOptionalText(payload.endTime, 'End time', 10),
     reminder: validateOptionalText(payload.reminder, 'Reminder', 40),
+    reminderEnabled: Boolean(payload.reminderEnabled),
+    reminderEmail: validateOptionalText(payload.reminderEmail, 'Reminder Email', 120),
+    reminderGapMinutes: Number(payload.reminderGapMinutes) || 0,
+    reminderLimit: Number(payload.reminderLimit) || 1,
+    remindersSent: 0,
+    nextReminderTime: payload.reminderEnabled ? (() => {
+      try {
+        const dateStr = validateDateKey(payload.date);
+        const timeStr = validateOptionalText(payload.startTime, 'Start time', 10) || '09:00';
+        return new Date(`${dateStr}T${timeStr}:00`);
+      } catch (e) {
+        return null;
+      }
+    })() : null,
     workspaceName: validateOptionalText(payload.workspaceName, 'Workspace', 120),
     creator: userId
   });
@@ -887,6 +901,21 @@ const updateTask = async (userId, workspaceId, taskId, payload) => {
   if (payload.startTime !== undefined) task.startTime = validateOptionalText(payload.startTime, 'Start time', 10);
   if (payload.endTime !== undefined) task.endTime = validateOptionalText(payload.endTime, 'End time', 10);
   if (payload.reminder !== undefined) task.reminder = validateOptionalText(payload.reminder, 'Reminder', 40);
+  if (payload.reminderEnabled !== undefined) task.reminderEnabled = Boolean(payload.reminderEnabled);
+  if (payload.reminderEmail !== undefined) task.reminderEmail = validateOptionalText(payload.reminderEmail, 'Reminder Email', 120);
+  if (payload.reminderGapMinutes !== undefined) task.reminderGapMinutes = Number(payload.reminderGapMinutes) || 0;
+  if (payload.reminderLimit !== undefined) task.reminderLimit = Number(payload.reminderLimit) || 1;
+  
+  if (payload.reminderEnabled && !task.nextReminderTime && (payload.date || payload.startTime)) {
+    try {
+      const dateStr = task.date;
+      const timeStr = task.startTime || '09:00';
+      task.nextReminderTime = new Date(`${dateStr}T${timeStr}:00`);
+    } catch (e) {}
+  } else if (payload.reminderEnabled === false) {
+    task.nextReminderTime = null;
+  }
+  
   if (payload.workspaceName !== undefined)
     task.workspaceName = validateOptionalText(payload.workspaceName, 'Workspace', 120);
 

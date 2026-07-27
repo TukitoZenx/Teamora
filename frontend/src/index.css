@@ -649,3 +649,54 @@ textarea {
 .eq-block {
   user-select: all;
 }
+
+/* =============================================================================
+   PRINT STYLES
+   ============================================================================= */
+@media print {
+  @page {
+    margin: 1in;
+  }
+
+  body, html, #root, .teamora-page {
+    background: white !important;
+    color: black !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Prevent content flowing into the gap and ensure proper page breaks */
+  .quill-editor-wrapper, .quill-editor-wrapper .ql-editor {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .ql-editor > * {
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+  }
+
+  img, table, pre, blockquote {
+    page-break-inside: avoid;
+  }
+
+  /* Hide UI elements that shouldn't be printed */
+  nav, header, aside, .no-print, [data-app-navbar], [data-workspace-sidebar], button, .teamora-control {
+    display: none !important;
+  }
+}
+

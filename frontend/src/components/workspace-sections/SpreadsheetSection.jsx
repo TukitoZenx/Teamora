@@ -94,6 +94,7 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
     const ydoc = new Y.Doc()
     const cells = ydoc.getMap('cells')
     const meta = ydoc.getMap('meta')
+    const undoManager = new Y.UndoManager(cells)
     ydocRef.current = ydoc
     cellsMapRef.current = cells
     metaMapRef.current = meta
@@ -126,6 +127,27 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
         }))
       }
     }
+
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        // If typing, let native undo handle the text field unless we want to intercept
+        if (e.key.toLowerCase() !== 'z' && e.key.toLowerCase() !== 'y') return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        // Prevent default native undo so we can use Yjs collaborative undo
+        if (e.shiftKey) {
+          e.preventDefault();
+          undoManager.redo();
+        } else {
+          e.preventDefault();
+          undoManager.undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        undoManager.redo();
+      }
+    }
+    window.addEventListener('keydown', onKey)
 
     cells.observe(scheduleRebuild)
     meta.observe(applyMeta)
@@ -197,6 +219,7 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
 
     return () => {
       cancelled = true
+      window.removeEventListener('keydown', onKey)
       channel.off('receive-room-settings', onRemoteSettings)
       if (dirtyTimer) window.clearTimeout(dirtyTimer)
       if (rebuildRafRef.current != null) {
@@ -206,6 +229,7 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
       cells.unobserve(scheduleRebuild)
       meta.unobserve(applyMeta)
       ydoc.off('update', onDocUpdate)
+      undoManager.destroy()
       try {
         provider.flush?.()
       } catch {

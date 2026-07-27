@@ -1224,7 +1224,12 @@ function WorkspaceOverview({
               </div>
             </div>
           </div>
-          <Button type="button" onClick={onCopyInviteLink} className="h-10 shrink-0">
+          <Button 
+            type="button" 
+            onClick={onCopyInviteLink} 
+            disabled={workspace?.visibility === 'private'}
+            className="h-10 shrink-0"
+          >
             <UserPlus className="h-4 w-4" />
             Invite
           </Button>
@@ -1319,6 +1324,7 @@ function WorkspaceSection({ workspace, title }) {
 function WorkspaceChat({ messages, userName, onSend }) {
   const [draft, setDraft] = useState('')
   const [pendingAttachments, setPendingAttachments] = useState([])
+  const [previewImage, setPreviewImage] = useState(null)
   const fileInputRef = useRef(null)
   const listRef = useRef(null)
 
@@ -1399,13 +1405,13 @@ function WorkspaceChat({ messages, userName, onSend }) {
                         return (
                           <div key={att.id || att.name} className="rounded-lg border border-white/20 bg-black/10 p-2">
                             {isImage && att.dataUrl ? (
-                              <a href={att.dataUrl} target="_blank" rel="noreferrer">
+                              <button type="button" onClick={() => setPreviewImage(att.dataUrl)} className="cursor-zoom-in text-left">
                                 <img
                                   src={att.dataUrl}
                                   alt={att.name}
                                   className="max-h-48 max-w-full rounded-md object-contain"
                                 />
-                              </a>
+                              </button>
                             ) : (
                               <a
                                 href={att.dataUrl}
@@ -1492,6 +1498,26 @@ function WorkspaceChat({ messages, userName, onSend }) {
           Send
         </Button>
       </div>
+
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <img 
+            src={previewImage} 
+            alt="Preview full screen" 
+            className="max-h-full max-w-full rounded-md object-contain" 
+          />
+          <button 
+            type="button"
+            className="absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/40 transition"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+      )}
     </section>
   )
 }
@@ -1615,7 +1641,13 @@ function WorkspaceSettings({
               <div>
                 <p className="text-sm font-medium text-muted">Review members, roles, and invite access.</p>
               </div>
-              <Button type="button" variant="secondary" onClick={onCopyInviteLink} className="h-10">
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={onCopyInviteLink} 
+                disabled={workspace?.visibility === 'private'}
+                className="h-10"
+              >
                 <UserPlus className="h-4 w-4" />
                 Invite Member
               </Button>
@@ -1667,15 +1699,17 @@ function WorkspaceSettings({
                   <Input
                     readOnly
                     value={workspace?.inviteLink || `${window.location.origin}/invite/${workspace?.inviteCode}`}
-                    className="h-10 text-xs bg-card-sunken text-muted"
+                    className="h-10 text-xs bg-card-sunken text-muted flex-1"
                   />
                   <Button
                     type="button"
                     onClick={onCopyInviteLink}
-                    className="h-10 w-10 p-0"
+                    disabled={workspace?.visibility === 'private'}
+                    size="icon"
+                    className="relative z-10 bg-primary text-on-primary hover:bg-primary-hover shadow-sm flex shrink-0"
                     aria-label="Copy invite link"
                   >
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-4.5 w-4.5 text-on-primary stroke-[2.5]" />
                   </Button>
                 </div>
               </div>
@@ -1841,7 +1875,13 @@ function MembersAndRequests({ workspace, isOwner, pendingRequests, onCopyInviteL
             <h2 className="text-base font-semibold text-text">Pending Requests</h2>
             <p className="mt-1 text-sm text-muted">Owners can accept or decline invite-link requests.</p>
           </div>
-          <Button type="button" variant="secondary" onClick={onCopyInviteLink} className="h-10">
+          <Button 
+            type="button" 
+            variant="secondary" 
+            onClick={onCopyInviteLink} 
+            disabled={workspace?.visibility === 'private'}
+            className="h-10"
+          >
             <UserPlus className="h-4 w-4" />
             Invite
           </Button>

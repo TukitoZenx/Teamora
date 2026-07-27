@@ -1,7 +1,10 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Sparkles, Replace, Type, AlignLeft, Scissors, Check, Wand2, Lightbulb, X } from 'lucide-react';
 import { getCommandStream } from '../../services/aiClient';
 import toast from 'react-hot-toast';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 const COMMANDS = [
   { id: 'rewrite', icon: <Replace className="w-4 h-4" />, label: 'Rewrite' },
@@ -29,10 +32,26 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
       if (range && range.length > 0) {
         const bounds = quill.getBounds(range.index, range.length);
         setSelectedRange(range);
-        setPosition({
-          top: bounds.bottom + 10,
-          left: bounds.left + (bounds.width / 2)
-        });
+        
+        const rect = quill.container.getBoundingClientRect();
+        let top = bounds.bottom + 10;
+        let left = bounds.left + (bounds.width / 2);
+        
+        // Positioning clamp to keep within editor bounds
+        const menuWidth = 350; 
+        const menuHeight = 50;
+        
+        if (left - (menuWidth / 2) < 10) {
+          left = (menuWidth / 2) + 10;
+        } else if (left + (menuWidth / 2) > rect.width - 10) {
+          left = rect.width - (menuWidth / 2) - 10;
+        }
+        
+        if (top + menuHeight > rect.height - 10) {
+          top = Math.max(10, bounds.top - menuHeight - 10);
+        }
+
+        setPosition({ top, left });
       } else if (!isGenerating && !draftState) {
         setIsOpen(false);
         setPosition(null);
@@ -42,7 +61,8 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
 
     quill.on('selection-change', handleSelection);
     return () => quill.off('selection-change', handleSelection);
-  }, [quillRef]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quillRef, isGenerating, draftState]);
 
   const executeCommand = async (commandId) => {
     if (!quillRef?.current || !selectedRange) return;
@@ -62,21 +82,44 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
     
     try {
       const stream = getCommandStream(commandId, selectedText, fullText);
+      let fullGeneratedText = '';
+      
       for await (const chunk of stream) {
         quill.insertText(currentIndex, chunk, 'user');
         quill.formatText(currentIndex, chunk.length, 'background', 'rgba(168, 85, 247, 0.2)');
         currentIndex += chunk.length;
+        fullGeneratedText += chunk;
         // Keep scrolling to cursor if needed
         quill.setSelection(currentIndex);
       }
       
+      // Clean up markdown if present
+      const hasMarkdown = /#{1,6}\s|\*\*|__|\*|_|- \w|1\. |```|!\[/g.test(fullGeneratedText);
+      let finalEndIndex = currentIndex;
+      
+      if (hasMarkdown) {
+        const html = DOMPurify.sanitize(marked.parse(fullGeneratedText));
+        quill.deleteText(selectedRange.index, fullGeneratedText.length, 'user');
+        
+        const lenBefore = quill.getLength();
+        quill.clipboard.dangerouslyPasteHTML(selectedRange.index, html, 'user');
+        const lenAfter = quill.getLength();
+        
+        const insertedLength = lenAfter - lenBefore;
+        finalEndIndex = selectedRange.index + insertedLength;
+        
+        // Re-apply highlight to the newly pasted HTML content
+        quill.formatText(selectedRange.index, insertedLength, 'background', 'rgba(168, 85, 247, 0.2)');
+        quill.setSelection(finalEndIndex);
+      }
+
       setDraftState({
         startIndex: selectedRange.index,
-        endIndex: currentIndex,
+        endIndex: finalEndIndex,
         originalText: selectedText
       });
-      
-      const bounds = quill.getBounds(currentIndex, 0);
+
+      const bounds = quill.getBounds(finalEndIndex, 0);
       setPosition({
         top: bounds.bottom + 10,
         left: bounds.left
@@ -93,10 +136,10 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
 
   if (!position) return null;
 
-  return (
+  return createPortal(
     <div 
       className="absolute z-50 flex items-center -translate-x-1/2 shadow-lg rounded-full bg-card border border-border p-1 animate-in fade-in zoom-in-95 duration-200"
-      style={{ top: position.top, left: position.left }}
+      style={{ top: `${position.top}px`, left: `${position.left}px` }}
     >
       {!isOpen && !isGenerating && !draftState && (
         <button
@@ -167,6 +210,7 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    quillRef.current.container
   );
 }

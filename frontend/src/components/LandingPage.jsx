@@ -111,7 +111,7 @@ export default function LandingPage() {
               className="h-8 w-8 rounded-lg object-contain transition-transform duration-200 group-hover:scale-105"
             />
             <span className="text-base font-bold tracking-tight text-text transition-colors group-hover:text-primary">
-              Teamora
+              TEAMORA
             </span>
           </a>
 
@@ -270,11 +270,10 @@ export default function LandingPage() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-2 rounded-t-lg border-x border-t px-4 py-2 text-[10px] font-bold transition-colors ${
-                        isActive
-                          ? 'border-border bg-card text-primary'
-                          : 'border-transparent bg-transparent text-muted hover:text-text'
-                      }`}
+                      className={`flex items-center gap-2 rounded-t-lg border-x border-t px-4 py-2 text-[10px] font-bold transition-colors ${isActive
+                        ? 'border-border bg-card text-primary'
+                        : 'border-transparent bg-transparent text-muted hover:text-text'
+                        }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {tab.label}

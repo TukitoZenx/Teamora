@@ -22,6 +22,8 @@ import GlobalMeetings from './components/GlobalMeetings'
 import { useMeeting } from './contexts/MeetingContext'
 import BrandLoadingScreen from './components/ui/BrandLoadingScreen'
 
+
+//to store the date in localstorage...
 const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
 const LAST_PAGE_KEY = 'teamora-last-page'
 const WORKSPACES_CACHE_KEY = 'teamora-workspaces-cache'
@@ -42,6 +44,8 @@ const WORKSPACE_SECTIONS = new Set([
   'chat'
 ])
 
+
+// what 48-54 lines done ? ans : it reads the cache from the local storage and returns it  , yeah if thier what it return and if not what it returns 
 const readJsonCache = (key, fallback) => {
   try {
     return JSON.parse(localStorage.getItem(key) || 'null') || fallback
@@ -50,6 +54,7 @@ const readJsonCache = (key, fallback) => {
   }
 }
 
+// what 56-58 lines does ? ans :
 const writeJsonCache = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value))
@@ -66,7 +71,7 @@ const removeWorkspaceCache = (workspaceId) => {
 
 //starting point of the app, handles routing and global state management
 export default function App() {
-  const { user, loading, authenticated, profileComplete } = useAuth()//check the user is authenticated or not
+  const { user, loading, authenticated, profileComplete } = useAuth()//how this line works and what is useAuth it is a custom hook, created in AuthContext.jsx file where can i find the custom hooks in my project it is in the contexts folder as well as hooks folder 
   const { activeMeetingWorkspace, leaveMeeting } = useMeeting()
   const navigate = useNavigate()
   const location = useLocation()
@@ -421,21 +426,21 @@ export default function App() {
             )
             const nextEntry = existing
               ? {
-                  ...existing,
-                  status: 'previously_joined',
-                  statusLabel: 'Previously Joined',
-                  canOpen: false,
-                  canRequestAccess: true
-                }
+                ...existing,
+                status: 'previously_joined',
+                statusLabel: 'Previously Joined',
+                canOpen: false,
+                canRequestAccess: true
+              }
               : {
-                  _id: workspaceId,
-                  workspaceId,
-                  status: 'previously_joined',
-                  statusLabel: 'Previously Joined',
-                  canOpen: false,
-                  canRequestAccess: true,
-                  lastSeenAt: new Date().toISOString()
-                }
+                _id: workspaceId,
+                workspaceId,
+                status: 'previously_joined',
+                statusLabel: 'Previously Joined',
+                canOpen: false,
+                canRequestAccess: true,
+                lastSeenAt: new Date().toISOString()
+              }
 
             return [
               nextEntry,
@@ -945,10 +950,10 @@ function WorkspaceLoadingShell({ activeItem = 'home', onBack }) {
     <WorkspaceLayout
       workspace={{ name: 'Workspace', members: [], owner: null }}
       activeItem={activeItem}
-      onActiveItemChange={() => {}}
+      onActiveItemChange={() => { }}
       onBackToDashboard={onBack}
-      onLeaveWorkspace={() => {}}
-      onDeleteWorkspace={() => {}}
+      onLeaveWorkspace={() => { }}
+      onDeleteWorkspace={() => { }}
     >
       <div className="teamora-content-fade">
         <WorkspaceContentSkeleton activeItem={activeItem} />

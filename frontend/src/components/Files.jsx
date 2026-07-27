@@ -242,6 +242,83 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
     toast.success(`Downloading "${file.name}"...`)
   }
 
+    const handleDownloadFolder = async (folder) => {
+    toast.loading(`Zipping folder "${folder.name}"...`, { id: 'zip-folder' })
+    try {
+      const { downloadZip } = await import('client-zip')
+
+      async function* getFiles() {
+        const fetchFolderContents = async function* (folderId, path = '') {
+          const children = filesList.filter((f) => f && f.folderId === folderId)
+          for (const child of children) {
+            if (child.type === 'folder') {
+              yield* fetchFolderContents(child.id, `${path}${child.name}/`)
+            } else if (child.content) {
+              if (child.content.startsWith('data:')) {
+                // client-zip can accept a Response, Blob, TypedArray, string, ReadableStream, or AsyncIterable.
+                // Convert base64 to Blob:
+                const arr = child.content.split(',')
+                const bstr = atob(arr[1])
+                let n = bstr.length
+                const u8arr = new Uint8Array(n)
+                while (n--) {
+                  u8arr[n] = bstr.charCodeAt(n)
+                }
+                yield {
+                  name: `${path}${child.name}`,
+                  lastModified: new Date(),
+                  input: u8arr
+                }
+              } else {
+                yield {
+                  name: `${path}${child.name}`,
+                  lastModified: new Date(),
+                  input: child.content
+                }
+              }
+            }
+          }
+        }
+        yield* fetchFolderContents(folder.id, `${folder.name || 'Shared_Files'}/`)
+      }
+
+      const response = downloadZip(getFiles())
+      
+      if (window.showSaveFilePicker) {
+        try {
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName: `${folder.name || 'Shared_Files'}.zip`
+          })
+          const writable = await fileHandle.createWritable()
+          await response.body.pipeTo(writable)
+          toast.success(`Downloaded "${folder.name}.zip"`, { id: 'zip-folder' })
+          return
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            console.error(e)
+            toast.error('Failed to save file', { id: 'zip-folder' })
+          } else {
+            toast.dismiss('zip-folder')
+          }
+          return
+        }
+      }
+      
+      const blob = await response.blob()
+      const element = document.createElement('a')
+      element.href = URL.createObjectURL(blob)
+      element.download = `${folder.name || 'Shared_Files'}.zip`
+      document.body.appendChild(element)
+      element.click()
+      document.body.removeChild(element)
+      URL.revokeObjectURL(element.href)
+      toast.success(`Downloaded "${folder.name}.zip"`, { id: 'zip-folder' })
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to zip folder', { id: 'zip-folder' })
+    }
+  }
+
   return (
     <div
       onDragOver={handleDragOver}
@@ -291,6 +368,20 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
               </label>
             </>
           )}
+          <button
+            onClick={() => {
+              if (currentFolderId) {
+                const currentFolder = ensureArray(filesList).find((f) => f && f.id === currentFolderId)
+                if (currentFolder) handleDownloadFolder(currentFolder)
+              } else {
+                handleDownloadFolder({ id: null, name: 'Shared_Files' })
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border text-text rounded-xl font-semibold text-xs hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download {currentFolderId ? 'Folder' : 'All'}</span>
+          </button>
         </div>
       </div>
 
@@ -360,19 +451,22 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
 
                   {/* Item Menu Overlay */}
                   <div className="opacity-0 group-hover:opacity-100 flex gap-1 z-10 transition-opacity">
-                    {item.type !== 'folder' && (
-                      <button
-                        onClick={() => handleDownload(item)}
-                        className="p-1 hover:bg-primary/10 text-muted hover:text-primary rounded-md transition-colors cursor-pointer"
-                        title="Download"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (item.type === 'folder') handleDownloadFolder(item)
+                        else handleDownload(item)
+                      }}
+                      className="p-1 hover:bg-primary/10 text-muted hover:text-primary rounded-md transition-colors cursor-pointer"
+                      title="Download"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
                     {canEdit && (
                       <>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation()
                             setEditingFile(item)
                             setNewFileName(item.name)
                           }}
@@ -382,7 +476,10 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDeleteItem(item.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteItem(item.id)
+                          }}
                           className="p-1 hover:bg-danger/10 text-muted hover:text-danger rounded-md transition-colors cursor-pointer"
                           title="Delete"
                         >
