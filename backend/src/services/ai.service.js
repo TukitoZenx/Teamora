@@ -1,134 +1,45 @@
+const { GoogleGenAI } = require('@google/genai');
+
 const getEnv = (key, fallback = '') => process.env[key] || fallback;
 
-const AI_PROVIDER = getEnv('AI_PROVIDER', 'ollama').toLowerCase();
-const OLLAMA_MODEL = getEnv('OLLAMA_MODEL', 'llama3.2');
-const OLLAMA_URL = getEnv('OLLAMA_URL', 'http://localhost:11434');
+let aiClientInstance = null;
 
-const getGeminiUrl = (model = 'gemini-2.5-flash', action = 'streamGenerateContent') => {
-  const apiKey = getEnv('GEMINI_API_KEY');
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured on the server.');
-  }
-  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}?alt=sse&key=${apiKey}`;
-};
-
-/**
- * Handles communication with Gemini API.
- */
-async function* callGeminiStream(prompt, systemInstruction = null) {
-  const url = getGeminiUrl();
-  const payload = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }]
-  };
-
-  if (systemInstruction) {
-    payload.system_instruction = { parts: [{ text: systemInstruction }] };
-  }
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    let errMsg = `Gemini API failed: ${response.statusText}`;
-    try {
-      const p = await response.json();
-      if (p.error?.message) errMsg = p.error.message;
-    } catch {}
-    throw new Error(errMsg);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value, { stream: true });
-    const lines = chunk.split('\n');
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const dataStr = line.replace('data: ', '').trim();
-        if (dataStr === '[DONE]') break;
-        try {
-          const parsed = JSON.parse(dataStr);
-          const textPart = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (textPart) yield textPart;
-        } catch (e) {
-          // ignore incomplete JSON chunks
-        }
-      }
+function getAiClient() {
+  if (!aiClientInstance) {
+    const apiKey = getEnv('GEMINI_API_KEY');
+    if (!apiKey || apiKey === 'your_gemini_api_key_here' || apiKey === '<gemini-api-key>') {
+      throw new Error('GEMINI_API_KEY is not validly configured on the server. Please check your .env file.');
     }
+    aiClientInstance = new GoogleGenAI({ apiKey });
   }
+  return aiClientInstance;
 }
 
 /**
- * Handles communication with local Ollama API.
- */
-async function* callOllamaStream(prompt, systemInstruction = null) {
-  const url = `${OLLAMA_URL}/api/generate`;
-  
-  const payload = {
-    model: OLLAMA_MODEL,
-    prompt: prompt,
-    system: systemInstruction || '',
-    stream: true
-  };
-
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch (err) {
-    throw new Error(`Failed to connect to Ollama at ${OLLAMA_URL}. Is it running?`);
-  }
-
-  if (!response.ok) {
-    let errMsg = `Ollama API failed: ${response.statusText}`;
-    try {
-      const p = await response.json();
-      if (p.error) errMsg = p.error;
-    } catch {}
-    throw new Error(errMsg);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value, { stream: true });
-    const lines = chunk.split('\n').filter(Boolean);
-    
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed.response) {
-          yield parsed.response;
-        }
-      } catch (e) {
-        // ignore incomplete JSON chunks
-      }
-    }
-  }
-}
-
-/**
- * Routes to the configured provider
+ * Handles communication with Gemini API using the official SDK.
  */
 async function* callAiStream(prompt, systemInstruction = null) {
-  if (AI_PROVIDER === 'gemini') {
-    yield* callGeminiStream(prompt, systemInstruction);
-  } else {
-    yield* callOllamaStream(prompt, systemInstruction);
+  const client = getAiClient();
+  const config = {};
+  
+  if (systemInstruction) {
+    config.systemInstruction = systemInstruction;
+  }
+
+  try {
+    const responseStream = await client.models.generateContentStream({
+      model: 'gemini-flash-latest',
+      contents: prompt,
+      config: config
+    });
+
+    for await (const chunk of responseStream) {
+      if (chunk.text) {
+        yield chunk.text;
+      }
+    }
+  } catch (error) {
+    throw new Error(`Gemini API failed: ${error.message}`);
   }
 }
 
@@ -174,6 +85,8 @@ Reply ONLY with the updated text. Do not wrap in quotes or add conversational fi
   generateDocument: async function* (promptText) {
     const system = `You are an AI document creator. The user will ask for a document. 
 Generate a well-structured document using markdown (headers, bullet points). 
+If the user asks to generate or include an image, output a markdown image using the Pollinations AI API format:
+![Alt Text](https://image.pollinations.ai/prompt/{URL_ENCODED_IMAGE_PROMPT}?width=800&height=400&nologo=true)
 Do not include conversational filler like "Here is your document". Just output the document itself.`;
 
     const prompt = `Create a document based on this request:\n\n${promptText}`;
@@ -200,7 +113,7 @@ Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSO
       fullJson += chunk;
     }
     
-    // Clean up potential markdown formatting that Ollama sometimes adds even when told not to
+    // Clean up potential markdown formatting
     fullJson = fullJson.trim();
     if (fullJson.startsWith('```json')) {
       fullJson = fullJson.replace(/^```json\n?/, '').replace(/\n?```$/, '');

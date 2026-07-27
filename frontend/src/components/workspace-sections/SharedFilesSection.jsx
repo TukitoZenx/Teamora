@@ -9,11 +9,117 @@ import {
   Search,
   Trash2,
   FolderPlus,
-  Folder
+  Folder,
+  Download
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import * as Y from 'yjs'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
+
+const fromBase64 = (b64) => {
+  const s = atob(b64)
+  const u8 = new Uint8Array(s.length)
+  for (let i = 0; i < s.length; i += 1) u8[i] = s.charCodeAt(i)
+  return u8
+}
+
+const extractYjsContent = (res, kind) => {
+  const data = res?.data
+  if (!data) {
+    if (kind === 'document') return ''
+    return '[]'
+  }
+
+  if (data.format !== 'yjs-v1' || typeof data.state !== 'string') {
+    if (kind === 'document') {
+      return data.html || ''
+    }
+    return JSON.stringify(data, null, 2)
+  }
+
+  try {
+    const ydoc = new Y.Doc()
+    Y.applyUpdate(ydoc, fromBase64(data.state))
+
+    if (kind === 'document') {
+      const ytext = ydoc.getText('quill').toString()
+      const meta = ydoc.getMap('meta')
+      const legacyHtml = meta.get('legacyHtml')
+      return ytext || legacyHtml || ''
+    }
+
+    if (kind === 'whiteboard') {
+      const elementsMap = ydoc.getMap('elements')
+      const list = []
+      elementsMap.forEach((value, key) => {
+        if (!value || typeof value !== 'object') return
+        const id = typeof value.id === 'string' ? value.id : key
+        const el = { ...value, id }
+        if (Array.isArray(value.points)) {
+          el.points = value.points.map((p) => (p && typeof p === 'object' ? { ...p } : p))
+        }
+        list.push(el)
+      })
+      list.sort((a, b) => {
+        const ao = Number.isFinite(a.order) ? a.order : 0
+        const bo = Number.isFinite(b.order) ? b.order : 0
+        if (ao !== bo) return ao - bo
+        return String(a.id).localeCompare(String(b.id))
+      })
+      return JSON.stringify(list, null, 2)
+    }
+
+    if (kind === 'spreadsheet') {
+      const cellsMap = ydoc.getMap('cells')
+      let maxRow = -1
+      const entries = []
+      cellsMap.forEach((value, key) => {
+        if (typeof key !== 'string' || !key.includes(':')) return
+        const [rs, cs] = key.split(':')
+        const r = Number(rs)
+        const c = Number(cs)
+        if (!Number.isFinite(r) || !Number.isFinite(c) || r < 0 || c < 0) return
+        maxRow = Math.max(maxRow, r)
+        entries.push([r, c, value == null ? '' : String(value)])
+      })
+      if (maxRow < 0) return '[]'
+      const grid = Array.from({ length: maxRow + 1 }, () => [])
+      for (const [r, c, value] of entries) {
+        if (!grid[r]) grid[r] = []
+        grid[r][c] = value
+      }
+      return JSON.stringify(grid, null, 2)
+    }
+
+    if (kind === 'presentation') {
+      const slidesMap = ydoc.getMap('slides')
+      const list = []
+      slidesMap.forEach((value, key) => {
+        if (!value || typeof value !== 'object') return
+        const plain = { ...value }
+        const id = typeof plain.id === 'string' && plain.id ? plain.id : key
+        list.push({
+          ...plain,
+          id,
+          elements: Array.isArray(plain.elements) ? plain.elements : []
+        })
+      })
+      list.sort((a, b) => {
+        const ao = Number.isFinite(a.order) ? a.order : 0
+        const bo = Number.isFinite(b.order) ? b.order : 0
+        if (ao !== bo) return ao - bo
+        return String(a.id).localeCompare(String(b.id))
+      })
+      return JSON.stringify(list, null, 2)
+    }
+  } catch (err) {
+    console.error('Yjs decode failed', err)
+  }
+
+  if (kind === 'document') return ''
+  return '[]'
+}
 
 const EXT_KIND = {
   doc: 'document',
@@ -141,6 +247,122 @@ export default function SharedFilesSection({
     onCreateFolder?.(name.trim())
   }
 
+  const handleDownloadFile = async (file) => {
+    if (!workspaceId) return
+    try {
+      toast.loading(`Downloading ${file.name}...`, { id: 'download' })
+      const { getWorkspaceContent } = await import('../../services/workspaceContent')
+      
+      let res = null
+      if (file.kind === 'document') {
+         res = await getWorkspaceContent(workspaceId, `documents:${file.id}`)
+      } else if (file.kind === 'whiteboard') {
+         res = await getWorkspaceContent(workspaceId, `whiteboards:${file.id}`)
+      } else if (file.kind === 'spreadsheet') {
+         res = await getWorkspaceContent(workspaceId, `spreadsheets:${file.id}`)
+      } else if (file.kind === 'presentation') {
+         res = await getWorkspaceContent(workspaceId, `presentations:${file.id}`)
+      } else {
+         toast.error('Unsupported file kind for download', { id: 'download' })
+         return
+      }
+
+      const contentData = extractYjsContent(res, file.kind)
+
+      const blob = new Blob([contentData || ''], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('Downloaded', { id: 'download' })
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to download', { id: 'download' })
+    }
+  }
+
+    const handleDownloadFolder = async (folder) => {
+    if (!workspaceId) return
+    try {
+      toast.loading(`Zipping folder...`, { id: 'zip' })
+      const { downloadZip } = await import('client-zip')
+      const { getWorkspaceContent } = await import('../../services/workspaceContent')
+
+      async function* getFiles() {
+        const fetchFolderContents = async function* (folderId, path = '') {
+          const children = (workspaceFiles || []).filter(f => f.parentId === folderId)
+          for (const child of children) {
+            if (child.type === 'folder') {
+              yield* fetchFolderContents(child.id, `${path}${child.name}/`)
+            } else {
+              let contentData = ''
+              try {
+                let res = null
+                if (child.kind === 'document') {
+                  res = await getWorkspaceContent(workspaceId, `documents:${child.id}`)
+                } else if (child.kind === 'whiteboard') {
+                  res = await getWorkspaceContent(workspaceId, `whiteboards:${child.id}`)
+                } else if (child.kind === 'spreadsheet') {
+                  res = await getWorkspaceContent(workspaceId, `spreadsheets:${child.id}`)
+                } else if (child.kind === 'presentation') {
+                  res = await getWorkspaceContent(workspaceId, `presentations:${child.id}`)
+                }
+                contentData = extractYjsContent(res, child.kind)
+              } catch (e) {
+                console.error(e)
+              }
+              yield {
+                name: `${path}${child.name}`,
+                lastModified: new Date(),
+                input: contentData || ''
+              }
+            }
+          }
+        }
+        yield* fetchFolderContents(folder.id, `${folder.name || 'Shared_Files'}/`)
+      }
+
+      const response = downloadZip(getFiles())
+      
+      if (window.showSaveFilePicker) {
+        try {
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName: `${folder.name || 'Shared_Files'}.zip`
+          })
+          const writable = await fileHandle.createWritable()
+          await response.body.pipeTo(writable)
+          toast.success('Downloaded folder', { id: 'zip' })
+          return
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            console.error(e)
+            toast.error('Failed to save file', { id: 'zip' })
+          } else {
+            toast.dismiss('zip')
+          }
+          return
+        }
+      }
+      
+      const blob = await response.blob()
+      const element = document.createElement('a')
+      element.href = URL.createObjectURL(blob)
+      element.download = `${folder.name || 'Shared_Files'}.zip`
+      document.body.appendChild(element)
+      element.click()
+      document.body.removeChild(element)
+      URL.revokeObjectURL(element.href)
+      toast.success('Downloaded folder', { id: 'zip' })
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to download folder', { id: 'zip' })
+    }
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card shadow-card">
       <div className="flex shrink-0 flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -216,9 +438,23 @@ export default function SharedFilesSection({
                 </button>
                 <button
                   type="button"
+                  title="Download folder"
+                  className="shrink-0 rounded p-1 text-muted opacity-0 hover:bg-primary/10 hover:text-primary group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDownloadFolder(folder)
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
                   title="Delete folder and contents"
                   className="shrink-0 rounded p-1 text-muted opacity-0 hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-                  onClick={() => handleDeleteFolder(folder)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteFolder(folder)
+                  }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -278,8 +514,22 @@ export default function SharedFilesSection({
                       </Button>
                       <button
                         type="button"
+                        className="rounded-lg p-2 text-muted hover:bg-primary/10 hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDownloadFile(file)
+                        }}
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
                         className="rounded-lg p-2 text-muted hover:bg-danger/10 hover:text-danger"
-                        onClick={() => handleDelete(file)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDelete(file)
+                        }}
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />

@@ -488,19 +488,47 @@ export default function Documents({
         break
       }
       case 'exportDocx': {
-        // Honest HTML export (real OOXML DOCX is out of scope without a new dependency).
-        const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${String(docTitle)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')}</title></head><body>${quill.root.innerHTML}</body></html>`
-        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
-        const link = document.createElement('a')
-        link.href = URL.createObjectURL(blob)
-        link.download = `${docTitle || 'document'}.html`
-        link.click()
-        URL.revokeObjectURL(link.href)
-        toast.success('Exported as HTML.')
+        const html = quill.root.innerHTML
+        const margins = {
+          top: marginToInches(pageMargin) * 1440,
+          bottom: marginToInches(pageMargin) * 1440,
+          left: marginToInches(pageMargin) * 1440,
+          right: marginToInches(pageMargin) * 1440
+        }
+
+        toast.promise(
+          (async () => {
+            const res = await api.post(
+              '/api/v1/workspaces/export-docx',
+              {
+                html,
+                title: docTitle || 'Document',
+                orientation,
+                margins
+              },
+              {
+                responseType: 'blob',
+                headers: {
+                  Accept: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                }
+              }
+            )
+            const blob = res.data
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `${docTitle || 'document'}.docx`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+          })(),
+          {
+            loading: 'Generating DOCX...',
+            success: 'DOCX file exported successfully!',
+            error: 'Failed to export DOCX'
+          }
+        )
         break
       }
       case 'printDoc': {
@@ -938,9 +966,7 @@ export default function Documents({
                 onClick={() => handleMenuAction('exportDocx')}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
               >
-                <Download className="w-3.5 h-3.5" />
-                Export HTML
-              </button>
+                <Download className="w-3.5 h-3.5" />Export DOCX</button>
               <button
                 type="button"
                 role="menuitem"

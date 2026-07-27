@@ -139,8 +139,11 @@ export default function Calendar({
   const [endTime, setEndTime] = useState('')
   const [priority, setPriority] = useState('')
   const [reminder, setReminder] = useState('')
+  const [reminderEnabled, setReminderEnabled] = useState(false)
+  const [reminderEmail, setReminderEmail] = useState('')
+  const [reminderGapMinutes, setReminderGapMinutes] = useState(0)
+  const [reminderLimit, setReminderLimit] = useState(1)
   const [workspaceName, setWorkspaceName] = useState('')
-  const [syncStatus, setSyncStatus] = useState('syncing')
   const [showAiModal, setShowAiModal] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -325,7 +328,6 @@ export default function Calendar({
     async (newTasks) => {
       if (!canEdit || !newTasks || newTasks.length === 0) return;
       
-      let savedCount = 0;
       const results = await Promise.allSettled(
         newTasks.map(async (task) => {
           const payload = {
@@ -347,8 +349,7 @@ export default function Calendar({
         .filter((r) => r.status === 'fulfilled')
         .map((r) => r.value);
       
-      savedCount = saved.length;
-      if (savedCount > 0) {
+      if (saved.length > 0) {
         setTasks((prev) => [...prev, ...saved]);
         tasksChannel.emit('tasks-updated', {});
       }
@@ -372,6 +373,10 @@ export default function Calendar({
     setEndTime('')
     setPriority('')
     setReminder('')
+    setReminderEnabled(false)
+    setReminderEmail('')
+    setReminderGapMinutes(0)
+    setReminderLimit(1)
     setWorkspaceName('')
     setSubmitted(false)
     setModalMode('create')
@@ -388,6 +393,10 @@ export default function Calendar({
     setEndTime(task.endTime || '')
     setPriority(task.priority || '')
     setReminder(task.reminder || '')
+    setReminderEnabled(task.reminderEnabled || false)
+    setReminderEmail(task.reminderEmail || '')
+    setReminderGapMinutes(task.reminderGapMinutes || 0)
+    setReminderLimit(task.reminderLimit || 1)
     setWorkspaceName(task.workspaceName || '')
     setSubmitted(false)
     setModalMode('edit')
@@ -439,6 +448,10 @@ export default function Calendar({
       startTime: startTime.trim(),
       endTime: endTime.trim(),
       reminder: reminder.trim(),
+      reminderEnabled,
+      reminderEmail: reminderEmail.trim(),
+      reminderGapMinutes: Number(reminderGapMinutes) || 0,
+      reminderLimit: Number(reminderLimit) || 1,
       workspaceName: workspaceName.trim()
     }
 
@@ -1064,21 +1077,53 @@ export default function Calendar({
                   )}
                 </label>
 
-                <label className="block">
-                  <span className="text-sm font-semibold text-text-secondary">Reminder</span>
-                  <select
-                    value={reminder}
-                    onChange={(event) => setReminder(event.target.value)}
-                    className="mt-2 h-12 w-full rounded-input border border-border bg-card px-4 text-sm text-text outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                  >
-                    <option value="">None</option>
-                    <option value="At time of event">At time of event</option>
-                    <option value="15 min">15 min before</option>
-                    <option value="30 min">30 min before</option>
-                    <option value="1 hour">1 hour before</option>
-                    <option value="1 day">1 day before</option>
-                  </select>
-                </label>
+                <div className="rounded-input border border-border p-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={reminderEnabled}
+                      onChange={(event) => setReminderEnabled(event.target.checked)}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm font-semibold text-text-secondary">Enable Email Reminders</span>
+                  </label>
+                  
+                  {reminderEnabled && (
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <label className="block col-span-2">
+                        <span className="text-xs font-semibold text-text-secondary">Email Address</span>
+                        <input
+                          type="email"
+                          value={reminderEmail}
+                          onChange={(event) => setReminderEmail(event.target.value)}
+                          className="mt-1 h-10 w-full rounded-input border border-border bg-card px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                          placeholder="Email to receive reminders"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-text-secondary">Interval (minutes)</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={reminderGapMinutes}
+                          onChange={(event) => setReminderGapMinutes(event.target.value)}
+                          className="mt-1 h-10 w-full rounded-input border border-border bg-card px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-text-secondary">Max Reminders</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={reminderLimit}
+                          onChange={(event) => setReminderLimit(event.target.value)}
+                          className="mt-1 h-10 w-full rounded-input border border-border bg-card px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">

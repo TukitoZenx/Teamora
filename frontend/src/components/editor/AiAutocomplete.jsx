@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getAutocompleteStream } from '../../services/aiClient';
 
 export default function AiAutocomplete({ quillRef }) {
@@ -67,7 +68,7 @@ export default function AiAutocomplete({ quillRef }) {
       }, 500);
     };
 
-    const handleSelectionChange = (range, oldRange, source) => {
+    const handleSelectionChange = (range) => {
       if (!range || range.length > 0) {
         setSuggestion('');
         setPosition(null);
@@ -123,12 +124,12 @@ export default function AiAutocomplete({ quillRef }) {
   if (!suggestion && !isLoading) return null;
   if (!position) return null;
 
-  return (
+  return createPortal(
     <div
-      className="pointer-events-none absolute z-50 transition-opacity flex items-center"
+      className="pointer-events-none absolute z-50 transition-opacity flex items-center font-mono opacity-60 text-purple-500"
       style={{
-        top: position.top,
-        left: position.left,
+        top: `${position.top}px`,
+        left: `${position.left}px`,
         fontSize: '1em',
         fontFamily: 'inherit',
         lineHeight: 1.5,
@@ -146,6 +147,7 @@ export default function AiAutocomplete({ quillRef }) {
       {!isLoading && suggestion && (
         <span className="text-muted-foreground opacity-50">{suggestion}</span>
       )}
-    </div>
+    </div>,
+    quillRef.current.container
   );
 }

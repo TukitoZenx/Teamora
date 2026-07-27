@@ -111,6 +111,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => onUnauthorized(() => clearSession()), [clearSession])
 
+  // --- AUTHENTICATION ACTIONS ---
+  // These functions are exposed to the rest of the app. When a user logs in, 
+  // we call the backend (authService), then save the user data in our React State and LocalStorage.
+  // If we didn't save it in state, the UI wouldn't update to show the "Dashboard" after login.
   const login = useCallback(async (payload) => {
     const authenticatedUser = await authService.login(payload)
     initialUserRequest = null
@@ -137,6 +141,9 @@ export function AuthProvider({ children }) {
     return authenticatedUser
   }, [])
 
+  // Logs the user out. It tells the backend to destroy the session cookie, 
+  // and then calls clearSession() to wipe all user data from the React memory.
+  // If we didn't do this, the user's private data might stay visible on the screen after logging out!
   const logout = useCallback(async () => {
     try {
       await authService.logout()
@@ -146,6 +153,9 @@ export function AuthProvider({ children }) {
     clearSession()
   }, [clearSession])
 
+  // --- THE CONTEXT PROVIDER VALUE ---
+  // useMemo remembers this object so we don't recreate it on every single keystroke.
+  // This object is the "Menu" of data and functions that any component in the app can order from.
   const value = useMemo(
     () => ({
       user,
@@ -165,9 +175,13 @@ export function AuthProvider({ children }) {
     [user, loading, sessionValidated, login, logout, register, refreshUser, clearSession]
   )
 
+  // This wraps our entire application, handing out the "value" object to anyone who asks for it.
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// --- CUSTOM HOOK ---
+// Instead of writing `useContext(AuthContext)` everywhere, developers just call `useSession()`.
+// It includes a safety check: if you try to use it outside of the Provider, it crashes with a helpful error.
 export function useSession() {
   const context = useContext(AuthContext)
 

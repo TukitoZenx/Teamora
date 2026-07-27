@@ -119,6 +119,35 @@ const taskSchema = new mongoose.Schema(
       maxlength: 40,
       default: ''
     },
+    reminderEnabled: {
+      type: Boolean,
+      default: false
+    },
+    reminderEmail: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    reminderStartDateTime: {
+      type: Date,
+      default: null
+    },
+    reminderGapMinutes: {
+      type: Number,
+      default: 0
+    },
+    reminderLimit: {
+      type: Number,
+      default: 1
+    },
+    remindersSent: {
+      type: Number,
+      default: 0
+    },
+    nextReminderTime: {
+      type: Date,
+      default: null
+    },
     workspaceName: {
       type: String,
       trim: true,

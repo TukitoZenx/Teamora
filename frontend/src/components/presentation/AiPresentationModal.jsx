@@ -16,11 +16,11 @@ export default function AiPresentationModal({ isOpen, onClose, onInsertSlides })
     
     setIsGenerating(true);
     try {
-      // Fetch slides JSON from backend Ollama model
+      // Fetch slides JSON from backend AI model
       const rawSlides = await generateSlides(prompt);
       
       // Parse into Teamora slide format
-      const formattedSlides = rawSlides.map((slide, index) => ({
+      const formattedSlides = rawSlides.map((slide) => ({
         id: uuidv4(),
         title: slide.title || 'Untitled Slide',
         content: '', // Not using string content directly, we parse into elements
@@ -50,7 +50,7 @@ export default function AiPresentationModal({ isOpen, onClose, onInsertSlides })
           {
             id: uuidv4(),
             type: 'text',
-            text: slide.content || '',
+            text: slide.content ? slide.content.replace(/\n/g, '<br/>').replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%; max-height: 250px; display:block; margin: 10px auto; border-radius: 8px;" />') : '',
             x: 80,
             y: 160,
             width: 800,

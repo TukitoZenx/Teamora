@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Video,
+import {  Video,
   VideoOff,
   Mic,
   MicOff,
@@ -9,9 +8,6 @@ import {
   Users,
   MessageSquare,
   Hand,
-  Sparkles,
-  Shield,
-  VolumeX,
   Ban,
   Disc,
   X,
@@ -20,10 +16,10 @@ import {
   Pin,
   Wifi,
   WifiOff,
-  Activity,
   Smile,
   Settings,
-  PhoneOff
+  PhoneOff,
+  VolumeX
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { describeIceSetup } from '../services/webrtcIce'
@@ -32,7 +28,6 @@ import { dismissMeetingNotifications } from './utils/notifications'
 import { useMeeting } from '../contexts/MeetingContext'
 
 const REACTIONS = ['👍', '👏', '❤️', '😂', '🎉', '👋']
-const MAX_DIAG = 80
 
 function RemoteAudio({ stream, audioOutputDeviceId }) {
   const audioRef = useRef(null)
@@ -133,6 +128,240 @@ function MiniVideo({ stream, isMe }) {
   )
 }
 
+function ParticipantTile({
+  participantId,
+  part,
+  isMe,
+  localVideoRef,
+  localStream,
+  remoteStream,
+  selectedSpeaker,
+  speaking,
+  networkQualityValue,
+  pinnedId,
+  setPinnedId,
+  toggleFullscreen,
+  camActive,
+  peerState,
+  userName
+}) {
+  return (
+    <div
+      id={`participant-tile-${participantId}`}
+      className="bg-card rounded-2xl border border-border overflow-hidden relative w-full h-full group flex items-center justify-center shadow-card transition-all duration-300"
+    >
+      {isMe ? (
+        <>
+          <video
+            ref={(el) => {
+              if (localVideoRef) localVideoRef.current = el
+              if (el && localStream) {
+                if (el.srcObject !== localStream) el.srcObject = localStream
+                el.muted = true
+                el.play?.().catch(() => {})
+              }
+            }}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              filter: 'none',
+              display: camActive ? 'block' : 'none'
+            }}
+            className="w-full h-full object-cover transition-all scale-x-[-1]"
+          />
+          {!camActive && (
+            <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
+              <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-lg font-bold text-primary shadow-md">
+                {(userName || 'U').substring(0, 2).toUpperCase()}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <RemoteVideo
+            stream={remoteStream}
+            hidden={!remoteStream || part.camActive === false}
+          />
+          {remoteStream && (
+            <RemoteAudio stream={remoteStream} audioOutputDeviceId={selectedSpeaker} />
+          )}
+          {(!remoteStream || part.camActive === false) && (
+            <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-lg font-bold text-primary shadow-md">
+                {(part.user || 'U').substring(0, 2).toUpperCase()}
+              </div>
+              {!remoteStream && (
+                <span className="absolute bottom-12 text-[10px] font-semibold text-muted">
+                  {peerState === 'connecting' ? 'Connecting…' : 'Waiting for media…'}
+                </span>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      <div
+        className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-[3px] transition-all duration-300 ${
+          speaking
+            ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)] scale-[0.98]'
+            : 'ring-transparent'
+        }`}
+      />
+      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text pointer-events-none flex items-center gap-1.5 shadow-sm">
+            {part.user} {isMe && '(You)'}
+            {pinnedId === participantId && <span className="text-primary">• Pinned</span>}
+          </span>
+          {!isMe && networkQualityValue && (
+            <div
+              className={`p-1 rounded-full bg-card/85 border border-border backdrop-blur-sm ${
+                networkQualityValue === 'good'
+                  ? 'text-success'
+                  : networkQualityValue === 'fair'
+                    ? 'text-warning'
+                    : 'text-danger'
+              }`}
+              title={`Network: ${networkQualityValue}`}
+            >
+              {networkQualityValue === 'poor' ? (
+                <WifiOff className="w-3 h-3" />
+              ) : (
+                <Wifi className="w-3 h-3" />
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-1.5 items-center">
+          {!isMe && (
+            <button
+              type="button"
+              onClick={() => setPinnedId((cur) => (cur === participantId ? null : participantId))}
+              className={`p-1.5 rounded-full border pointer-events-auto cursor-pointer ${
+                pinnedId === participantId
+                  ? 'bg-primary text-on-primary border-primary'
+                  : 'bg-card/85 border-border text-muted hover:text-primary'
+              }`}
+              title={pinnedId === participantId ? 'Unpin' : 'Pin / spotlight'}
+            >
+              <Pin className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!isMe && remoteStream && (
+            <button
+              type="button"
+              onClick={() => toggleFullscreen(participantId)}
+              className="p-1.5 rounded-full border bg-card/85 border-border text-muted hover:text-primary pointer-events-auto cursor-pointer"
+              title="Fullscreen"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!part.micActive && (
+            <div className="p-1.5 bg-danger/90 text-on-primary rounded-full border border-danger">
+              <MicOff className="w-3.5 h-3.5" />
+            </div>
+          )}
+          {part.handRaised && (
+            <div className="p-1.5 bg-warning/90 text-on-primary rounded-full border border-warning animate-bounce">
+              <Hand className="w-3.5 h-3.5" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ActiveSpeakerVideo({
+  participant,
+  isMe,
+  localVideoRef,
+  localStream,
+  remoteStream,
+  selectedSpeaker,
+  speaking,
+  networkQualityValue,
+  pinnedId,
+  setPinnedId,
+  toggleFullscreen,
+  camActive,
+  peerState,
+  userName
+}) {
+  if (!participant) {
+    return (
+      <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center rounded-2xl border border-border">
+        <span className="text-muted text-sm">No active speaker</span>
+      </div>
+    )
+  }
+  return (
+    <ParticipantTile
+      participantId={participant.id}
+      part={participant}
+      isMe={isMe}
+      localVideoRef={localVideoRef}
+      localStream={localStream}
+      remoteStream={remoteStream}
+      selectedSpeaker={selectedSpeaker}
+      speaking={speaking}
+      networkQualityValue={networkQualityValue}
+      pinnedId={pinnedId}
+      setPinnedId={setPinnedId}
+      toggleFullscreen={toggleFullscreen}
+      camActive={camActive}
+      peerState={peerState}
+      userName={userName}
+    />
+  )
+}
+
+function ParticipantThumbnailList({
+  participants,
+  socketId,
+  localVideoRef,
+  localStream,
+  remoteStreams,
+  selectedSpeaker,
+  speakingMap,
+  networkQuality,
+  pinnedId,
+  setPinnedId,
+  toggleFullscreen,
+  camActive,
+  peerStates,
+  userName
+}) {
+  return (
+    <div className="flex flex-row overflow-x-auto overflow-y-hidden pb-2 shrink-0 w-full h-36 md:flex-col md:overflow-y-auto md:overflow-x-hidden md:w-64 md:h-full md:pb-0 md:pr-2 gap-3 no-scrollbar">
+      {participants.map((part) => (
+        <div key={part.id} className="w-48 h-28 md:w-full md:h-36 shrink-0 relative">
+          <ParticipantTile
+            participantId={part.id}
+            part={part}
+            isMe={part.id === socketId}
+            localVideoRef={localVideoRef}
+            localStream={localStream}
+            remoteStream={remoteStreams[part.id]?.stream}
+            selectedSpeaker={selectedSpeaker}
+            speaking={speakingMap[part.id]}
+            networkQualityValue={networkQuality[part.id]}
+            pinnedId={pinnedId}
+            setPinnedId={setPinnedId}
+            toggleFullscreen={toggleFullscreen}
+            camActive={camActive}
+            peerState={peerStates[part.id]}
+            userName={userName}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /**
  * Production Teamora meeting room: mesh WebRTC via MeetingPeerManager,
  * hybrid signaling, host controls, chat, views, diagnostics.
@@ -140,7 +369,9 @@ function MiniVideo({ stream, isMe }) {
 export default function Meetings({ socket, roomId, userName, isMaximized = true }) {
   const navigate = useNavigate()
   const { isMinimized, toggleMinimize, leaveMeeting: globalLeaveMeeting, joinMeeting: globalJoinMeeting } = useMeeting()
-  const [inMeeting, setInMeeting] = useState(false)
+    const [activeSpeakerId, setActiveSpeakerId] = useState(null)
+  const lastSpeakerUpdateRef = useRef(0)
+const [inMeeting, setInMeeting] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [position, setPosition] = useState(() => {
     const x = Math.max(16, window.innerWidth - 340)
@@ -150,13 +381,9 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const dragRef = useRef(null)
   const [micActive, setMicActive] = useState(true)
   const [camActive, setCamActive] = useState(true)
-  const [blurActive, setBlurActive] = useState(false)
-  const [noiseSuppression, setNoiseSuppression] = useState(false)
   const [handRaised, setHandRaised] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
-  const [waitingRoomActive, setWaitingRoomActive] = useState(false)
-  const [waitingUsers, setWaitingUsers] = useState([])
   const [admitted, setAdmitted] = useState(false)
   const [screenSharingActive, setScreenSharingActive] = useState(false)
   const [remoteStreams, setRemoteStreams] = useState({})
@@ -168,13 +395,10 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const [hostInfo, setHostInfo] = useState({ hostSocketId: '', hostName: '' })
   const [layoutMode, setLayoutMode] = useState('grid') // grid | speaker
   const [pinnedId, setPinnedId] = useState(null)
-  const [showDiag, setShowDiag] = useState(false)
-  const [diagLines, setDiagLines] = useState([])
   const [peerStates, setPeerStates] = useState({})
   const [reactions, setReactions] = useState([])
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [networkQuality, setNetworkQuality] = useState({}) // peerId -> 'good' | 'fair' | 'poor'
-  const [diagnostics, setDiagnostics] = useState(null)
   const [devices, setDevices] = useState([])
   const [selectedMic, setSelectedMic] = useState('')
   const [selectedCam, setSelectedCam] = useState('')
@@ -196,12 +420,10 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const admittedRef = useRef(false)
   const participantsRef = useRef({})
   const hostInfoRef = useRef(hostInfo)
-  const waitingRoomActiveRef = useRef(false)
   const isHostRef = useRef(false)
   const micCamHandRef = useRef({ micActive: true, camActive: true, handRaised: false })
   const screenSharingRef = useRef(false)
   const handleLeaveRef = useRef(() => {})
-  const waitingRoomResolverRef = useRef(null)
 
   const socketId = socket?.id
   const isHost = hostInfo.hostSocketId === socketId
@@ -218,9 +440,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   useEffect(() => {
     hostInfoRef.current = hostInfo
   }, [hostInfo])
-  useEffect(() => {
-    waitingRoomActiveRef.current = waitingRoomActive
-  }, [waitingRoomActive])
   useEffect(() => {
     isHostRef.current = isHost
   }, [isHost])
@@ -260,10 +479,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     return () => clearInterval(interval)
   }, [inMeeting])
 
-  const pushDiag = useCallback((line) => {
-    const stamped = `${new Date().toLocaleTimeString()} ${line}`
-    setDiagLines((prev) => [...prev.slice(-(MAX_DIAG - 1)), stamped])
-  }, [])
+  const pushDiag = useCallback(() => {}, [])
 
   const loadDevices = useCallback(async () => {
     try {
@@ -421,21 +637,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     [socket, roomId]
   )
 
-  const requestWaitingRoomStatus = useCallback(() => {
-    if (!socketId) return Promise.resolve({ active: false })
 
-    return new Promise((resolve) => {
-      const finish = (status) => {
-        if (!waitingRoomResolverRef.current) return
-        waitingRoomResolverRef.current = null
-        window.clearTimeout(timer)
-        resolve(status)
-      }
-      const timer = window.setTimeout(() => finish({ active: false }), 350)
-      waitingRoomResolverRef.current = finish
-      emitSignal(undefined, { type: 'waiting-room-status-request', from: socketId })
-    })
-  }, [socketId, emitSignal])
 
   const attachRemoteStream = useCallback(
     (peerId, stream) => {
@@ -452,9 +654,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     }
   }, [])
 
-  const refreshDiagnostics = useCallback(() => {
-    setDiagnostics(peerManagerRef.current?.getDiagnostics?.() || null)
-  }, [])
+  const refreshDiagnostics = useCallback(() => {}, [])
 
   const ensurePeerManager = useCallback(() => {
     if (!socketId) return null
@@ -552,10 +752,13 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       setSpeakingMap((prev) => {
         const next = { ...prev }
         let changed = false
+        let currentLoudest = null
+        let maxAvg = 0
 
         const allIds = new Set([...Object.keys(audioAnalysersRef.current), socketId])
         allIds.forEach((id) => {
           let isLoud = false
+          let avg = 0
           if (id === socketId && localStreamRef.current && micActive) {
             try {
               if (!audioAnalysersRef.current[socketId]) {
@@ -564,21 +767,22 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               const pack = audioAnalysersRef.current[socketId]
               if (pack) {
                 pack.analyser.getByteFrequencyData(pack.data)
-                const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
+                avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
                 isLoud = avg > 25
               }
-            } catch {
-              // ignore
-            }
+            } catch { /* ignore */ }
           } else if (audioAnalysersRef.current[id]) {
             try {
               const pack = audioAnalysersRef.current[id]
               pack.analyser.getByteFrequencyData(pack.data)
-              const avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
+              avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
               isLoud = avg > 25
-            } catch {
-              // ignore
-            }
+            } catch { /* ignore */ }
+          }
+
+          if (isLoud && avg > maxAvg) {
+            maxAvg = avg
+            currentLoudest = id
           }
 
           const score = speakingScoresRef.current[id] || 0
@@ -595,6 +799,22 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
             changed = true
           }
         })
+        
+        // Active Speaker debounce/smoothing logic
+        const now = Date.now()
+        if (currentLoudest) {
+          if (currentLoudest !== activeSpeakerId) {
+            const candidateScore = speakingScoresRef.current[currentLoudest] || 0
+            // Require consistent speaking (score >= 4) and debounce switches to at most once per 1.5 seconds
+            if (candidateScore >= 4 && now - lastSpeakerUpdateRef.current > 1500) {
+              setActiveSpeakerId(currentLoudest)
+              lastSpeakerUpdateRef.current = now
+            }
+          } else {
+            // Keep updating speaker timestamp while they speak
+            lastSpeakerUpdateRef.current = now
+          }
+        }
 
         return changed ? next : prev
       })
@@ -726,10 +946,12 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
   const handleJoinMeeting = async () => {
     if (inMeeting || isJoining) return
+    if (!socketId || !socket?.connected) {
+      toast.error('Connecting to server... please wait.')
+      return
+    }
     setIsJoining(true)
-    console.log(`[RTC-AUDIO-AUDIT] [Join Meeting] Requesting WAITING room status.`)
     try {
-      const waitingRoomStatus = await requestWaitingRoomStatus()
       let stream = null
       try {
         console.log(`[RTC-AUDIO-AUDIT] [GetUserMedia] Requesting getUserMedia with video=true and full audio settings.`)
@@ -753,31 +975,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
         console.error('[RTC-AUDIO-AUDIT] [GetUserMedia Failure] Real media devices fail, using fallback:', err)
         stream = startMockVideoStream()
         localStreamRef.current = stream
-      }
-
-      const host = waitingRoomStatus.hostSocketId
-        ? {
-            hostSocketId: waitingRoomStatus.hostSocketId,
-            hostName: waitingRoomStatus.hostName || ''
-          }
-        : hostInfoRef.current
-      const hostUserObj = host.hostSocketId ? { socketId: host.hostSocketId, user: host.hostName } : null
-      const hostIsMe = hostUserObj && hostUserObj.socketId === socketId
-
-      if (waitingRoomStatus.active && !hostIsMe && !admittedRef.current) {
-        if (!hostUserObj?.socketId) {
-          socket.emit('meeting-claim-host', { hostSocketId: socketId, hostName: userName })
-          setHostInfo({ hostSocketId: socketId, hostName: userName })
-        } else {
-          emitSignal(hostUserObj.socketId, {
-            type: 'waiting-room-request',
-            user: userName,
-            socketId
-          })
-          toast('Waiting for host to admit you...', { icon: '⏳' })
-          setInMeeting(true)
-          return
-        }
       }
 
       setInMeeting(true)
@@ -859,12 +1056,12 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   }
 
   useEffect(() => {
-    if (sessionStorage.getItem('teamora-in-call') === roomId && !inMeeting && !isJoining) {
+    if (sessionStorage.getItem('teamora-in-call') === roomId && !inMeeting && !isJoining && socketId && socket?.connected) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       handleJoinMeeting()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, inMeeting, isJoining])
+  }, [roomId, inMeeting, isJoining, socketId])
 
   const toggleMic = () => {
     const nextState = !micActive
@@ -1012,29 +1209,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     emitSignal(targetSocketId, { type: 'host-action', action: 'kick' })
     toast.error('Kicked user.')
   }
-  const hostAdmitParticipant = (targetSocketId, name) => {
-    if (!isHost) return
-    emitSignal(targetSocketId, { type: 'host-action', action: 'admit' })
-    setWaitingUsers((prev) => prev.filter((u) => u.socketId !== targetSocketId))
-    toast.success(`Admitted ${name}!`)
-  }
-  const hostDenyParticipant = (targetSocketId, name) => {
-    if (!isHost) return
-    emitSignal(targetSocketId, { type: 'host-action', action: 'kick' })
-    setWaitingUsers((prev) => prev.filter((u) => u.socketId !== targetSocketId))
-    toast.error(`Denied ${name}.`)
-  }
-  const toggleWaitingRoom = () => {
-    const active = !waitingRoomActiveRef.current
-    waitingRoomActiveRef.current = active
-    setWaitingRoomActive(active)
-    emitSignal(undefined, {
-      type: 'waiting-room-status',
-      active,
-      hostSocketId: socketId,
-      hostName: userName
-    })
-  }
 
   // Single socket listener lifecycle — deps only socket identity, refs for live state
   useEffect(() => {
@@ -1042,14 +1216,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
     const onJoin = (p) => {
       if (!p?.socketId) return
-      if (waitingRoomActiveRef.current && isHostRef.current && p.socketId !== socketId) {
-        setWaitingUsers((prev) => {
-          if (prev.some((u) => u.socketId === p.socketId)) return prev
-          return [...prev, { socketId: p.socketId, user: p.user }]
-        })
-        toast(`${p.user} is waiting in the lobby.`, { icon: '⏳' })
-        return
-      }
+      
 
       setMeetingParticipants((prev) => {
         if (!prev[p.socketId] && p.socketId !== socketId) {
@@ -1064,24 +1231,24 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       }
     }
 
-    const onLeave = (socketId) => {
-      if (!socketId) return
-      pushDiag(`peer leave ${socketId}`)
+    const onLeave = (peerId) => {
+      if (!peerId) return
+      pushDiag(`peer leave ${peerId}`)
       setMeetingParticipants((prev) => {
         const next = { ...prev }
-        delete next[socketId]
+        delete next[peerId]
         return next
       })
-      setWaitingUsers((prev) => prev.filter((u) => u.socketId !== socketId))
-      peerManagerRef.current?.removePeer(socketId)
-      setPinnedId((cur) => (cur === socketId ? null : cur))
+      
+      peerManagerRef.current?.removePeer(peerId)
+      setPinnedId((cur) => (cur === peerId ? null : cur))
     }
 
-    const onStateChange = ({ socketId, state }) => {
-      if (!socketId) return
+    const onStateChange = ({ socketId: peerSocketId, state }) => {
+      if (!peerSocketId) return
       setMeetingParticipants((prev) => ({
         ...prev,
-        [socketId]: { ...(prev[socketId] || {}), ...state }
+        [peerSocketId]: { ...(prev[peerSocketId] || {}), ...state }
       }))
     }
 
@@ -1102,38 +1269,11 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
         return
       }
 
-      if (signal.type === 'waiting-room-request' && isHostRef.current) {
-        setWaitingUsers((prev) => {
-          if (prev.some((u) => u.socketId === senderSocketId)) return prev
-          return [...prev, { socketId: senderSocketId, user: signal.user }]
-        })
-        toast(`${signal.user} is waiting to join the call.`, { icon: '⏳' })
-        return
-      }
+      
 
-      if (signal.type === 'waiting-room-status-request' && isHostRef.current) {
-        emitSignal(senderSocketId, {
-          type: 'waiting-room-status',
-          active: waitingRoomActiveRef.current,
-          hostSocketId: socketId,
-          hostName: userName
-        })
-        return
-      }
+      
 
-      if (signal.type === 'waiting-room-status') {
-        const status = {
-          active: Boolean(signal.active),
-          hostSocketId: signal.hostSocketId,
-          hostName: signal.hostName
-        }
-        setWaitingRoomActive(status.active)
-        if (status.hostSocketId) {
-          setHostInfo({ hostSocketId: status.hostSocketId, hostName: status.hostName || '' })
-        }
-        waitingRoomResolverRef.current?.(status)
-        return
-      }
+      
 
       if (signal.type === 'screen-share-started') {
         toast(`${signal.from || 'A participant'} is sharing their screen`, { icon: '🖥️' })
@@ -1282,12 +1422,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     spawnReaction
   ])
 
-  useEffect(() => {
-    if (!inMeeting || !showDiag) return undefined
-    refreshDiagnostics()
-    const timer = window.setInterval(refreshDiagnostics, 1000)
-    return () => window.clearInterval(timer)
-  }, [inMeeting, showDiag, refreshDiagnostics])
+  
 
   // Host election
   useEffect(() => {
@@ -1346,142 +1481,31 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     const s = (sec % 60).toString().padStart(2, '0')
     return `${m}:${s}`
   }
-
+  
   const speakerId = useMemo(() => {
     if (pinnedId && meetingParticipants[pinnedId]) return pinnedId
-    const speaking = Object.entries(speakingMap).find(([, v]) => v)
-    if (speaking?.[0] && meetingParticipants[speaking[0]]) return speaking[0]
+    if (activeSpeakerId && meetingParticipants[activeSpeakerId]) return activeSpeakerId
     return Object.keys(meetingParticipants)[0] || socketId
-  }, [pinnedId, speakingMap, meetingParticipants, socketId])
+  }, [pinnedId, activeSpeakerId, meetingParticipants, socketId])
+
+  const participantsList = useMemo(() => {
+    return Object.entries(meetingParticipants).map(([id, part]) => ({
+      id,
+      ...part
+    }))
+  }, [meetingParticipants])
+
+  const activeParticipant = useMemo(() => {
+    return participantsList.find(p => p.id === speakerId)
+  }, [participantsList, speakerId])
+
+  const otherParticipants = useMemo(() => {
+    return participantsList.filter(p => p.id !== speakerId)
+  }, [participantsList, speakerId])
 
   const iceInfo = useMemo(() => describeIceSetup(), [])
 
-  const renderParticipantTile = (participantId, part, { large = false, small = false } = {}) => {
-    const isMe = participantId === socketId
-    const heightClass = large ? 'h-full min-h-[280px]' : small ? 'h-32 md:h-40' : 'h-48 md:h-56'
-    return (
-      <div
-        key={participantId}
-        id={`participant-tile-${participantId}`}
-        className={`bg-card rounded-2xl border border-border overflow-hidden relative ${heightClass} group flex items-center justify-center shadow-card transition-transform`}
-      >
-        {isMe ? (
-          <>
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{
-                filter: blurActive ? 'blur(10px)' : 'none',
-                display: camActive ? 'block' : 'none'
-              }}
-              className="w-full h-full object-cover transition-all scale-x-[-1]"
-            />
-            {!camActive && (
-              <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
-                <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-lg font-bold text-primary shadow-md">
-                  {(userName || 'U').substring(0, 2).toUpperCase()}
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <RemoteVideo
-              stream={remoteStreams[participantId]?.stream}
-              hidden={!remoteStreams[participantId]?.stream || part.camActive === false}
-            />
-            {remoteStreams[participantId]?.stream && (
-              <RemoteAudio stream={remoteStreams[participantId].stream} audioOutputDeviceId={selectedSpeaker} />
-            )}
-            {(!remoteStreams[participantId]?.stream || part.camActive === false) && (
-              <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-lg font-bold text-primary shadow-md">
-                  {(part.user || 'U').substring(0, 2).toUpperCase()}
-                </div>
-                {!remoteStreams[participantId]?.stream && (
-                  <span className="absolute bottom-12 text-[10px] font-semibold text-muted">
-                    {peerStates[participantId] === 'connecting' ? 'Connecting…' : 'Waiting for media…'}
-                  </span>
-                )}
-              </div>
-            )}
-          </>
-        )}
 
-        <div
-          className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-[3px] transition-all duration-300 ${
-            speakingMap[participantId]
-              ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)] scale-[0.98]'
-              : 'ring-transparent'
-          }`}
-        />
-        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text pointer-events-none flex items-center gap-1.5 shadow-sm">
-              {part.user} {isMe && '(You)'}
-              {pinnedId === participantId && <span className="text-primary">• Pinned</span>}
-            </span>
-            {!isMe && networkQuality[participantId] && (
-              <div
-                className={`p-1 rounded-full bg-card/85 border border-border backdrop-blur-sm ${
-                  networkQuality[participantId] === 'good'
-                    ? 'text-success'
-                    : networkQuality[participantId] === 'fair'
-                      ? 'text-warning'
-                      : 'text-danger'
-                }`}
-                title={`Network: ${networkQuality[participantId]}`}
-              >
-                {networkQuality[participantId] === 'poor' ? (
-                  <WifiOff className="w-3 h-3" />
-                ) : (
-                  <Wifi className="w-3 h-3" />
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-1.5 items-center">
-            {!isMe && (
-              <button
-                type="button"
-                onClick={() => setPinnedId((cur) => (cur === participantId ? null : participantId))}
-                className={`p-1.5 rounded-full border pointer-events-auto cursor-pointer ${
-                  pinnedId === participantId
-                    ? 'bg-primary text-on-primary border-primary'
-                    : 'bg-card/85 border-border text-muted hover:text-primary'
-                }`}
-                title={pinnedId === participantId ? 'Unpin' : 'Pin / spotlight'}
-              >
-                <Pin className="w-3.5 h-3.5" />
-              </button>
-            )}
-            {!isMe && remoteStreams[participantId]?.stream && (
-              <button
-                type="button"
-                onClick={() => toggleFullscreen(participantId)}
-                className="p-1.5 rounded-full border bg-card/85 border-border text-muted hover:text-primary pointer-events-auto cursor-pointer"
-                title="Fullscreen"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-            {!part.micActive && (
-              <div className="p-1.5 bg-danger/90 text-on-primary rounded-full border border-danger">
-                <MicOff className="w-3.5 h-3.5" />
-              </div>
-            )}
-            {part.handRaised && (
-              <div className="p-1.5 bg-warning/90 text-on-primary rounded-full border border-warning animate-bounce">
-                <Hand className="w-3.5 h-3.5" />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   const meetingContent = (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken text-text select-none lg:flex-row">
@@ -1508,12 +1532,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               </div>
             )}
             <div className="ml-auto flex items-center gap-2 pointer-events-auto">
-              {waitingRoomActive && (
-                <div className="flex items-center gap-1.5 bg-primary/90 text-on-primary text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg border border-primary">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>Waiting Room</span>
-                </div>
-              )}
+              
               <div className="flex items-center gap-1.5 bg-card/90 text-muted text-[10px] font-bold px-3 py-1.5 rounded-full shadow border border-border">
                 <Users className="w-3.5 h-3.5" />
                 <span>{Object.keys(meetingParticipants).length || 0}</span>
@@ -1523,24 +1542,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
           </div>
         )}
 
-        {inMeeting && !admitted ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
-            <div className="w-16 h-16 bg-warning/10 rounded-2xl flex items-center justify-center text-warning mb-6 border border-warning/20 animate-pulse">
-              <Shield className="w-8 h-8" />
-            </div>
-            <h2 className="text-xl font-bold text-text mb-2">Teamora Call Lobby</h2>
-            <p className="text-sm text-muted mb-8 font-medium">
-              Please wait. The host has enabled the waiting room for this call.
-            </p>
-            <button
-              type="button"
-              onClick={handleLeaveMeeting}
-              className="px-5 py-3 bg-card hover:bg-primary/10 text-text font-bold rounded-2xl cursor-pointer border border-border"
-            >
-              Leave Lobby
-            </button>
-          </div>
-        ) : !inMeeting ? (
+        { !inMeeting ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
             <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 border border-primary/20">
               <Video className="w-8 h-8" />
@@ -1553,33 +1555,83 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
             <button
               type="button"
               onClick={handleJoinMeeting}
-              disabled={isJoining}
+              disabled={isJoining || !socketId || !socket?.connected}
               className="w-full py-4 bg-primary hover:bg-primary-hover disabled:cursor-wait disabled:opacity-70 text-on-primary font-semibold rounded-2xl shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2"
             >
               <Video className="w-5 h-5" />
-              <span>{isJoining ? 'Joining…' : 'Join Meeting'}</span>
+              <span>
+                {!socketId || !socket?.connected
+                  ? 'Connecting to Server…'
+                  : isJoining
+                    ? 'Joining…'
+                    : 'Join Meeting'}
+              </span>
             </button>
           </div>
         ) : layoutMode === 'speaker' ? (
-          <div className="flex-1 flex flex-col gap-3 overflow-hidden min-h-0">
-            <div className="flex-1 min-h-0">
-              {speakerId && meetingParticipants[speakerId]
-                ? renderParticipantTile(speakerId, meetingParticipants[speakerId], { large: true })
-                : null}
+          <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden min-h-0 w-full h-full">
+            {/* Active Speaker Container */}
+            <div className="flex-grow flex-1 min-h-0 relative flex items-center justify-center bg-black/20 rounded-2xl overflow-hidden h-[65vh] md:h-full">
+              <ActiveSpeakerVideo
+                participant={activeParticipant}
+                isMe={activeParticipant?.id === socketId}
+                localVideoRef={localVideoRef}
+                localStream={localStreamRef.current}
+                remoteStream={activeParticipant ? remoteStreams[activeParticipant.id]?.stream : null}
+                selectedSpeaker={selectedSpeaker}
+                speaking={activeParticipant ? speakingMap[activeParticipant.id] : false}
+                networkQualityValue={activeParticipant ? networkQuality[activeParticipant.id] : null}
+                pinnedId={pinnedId}
+                setPinnedId={setPinnedId}
+                toggleFullscreen={toggleFullscreen}
+                camActive={camActive}
+                peerState={activeParticipant ? peerStates[activeParticipant.id] : null}
+                userName={userName}
+              />
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 shrink-0">
-              {Object.entries(meetingParticipants)
-                .filter(([id]) => id !== speakerId)
-                .map(([id, part]) => (
-                  <div key={id} className="w-48 md:w-56 shrink-0">
-                    {renderParticipantTile(id, part, { small: true })}
-                  </div>
-                ))}
-            </div>
+            {/* Participant Sidebar */}
+            {otherParticipants.length > 0 && (
+              <ParticipantThumbnailList
+                participants={otherParticipants}
+                socketId={socketId}
+                localVideoRef={localVideoRef}
+                localStream={localStreamRef.current}
+                remoteStreams={remoteStreams}
+                selectedSpeaker={selectedSpeaker}
+                speakingMap={speakingMap}
+                networkQuality={networkQuality}
+                pinnedId={pinnedId}
+                setPinnedId={setPinnedId}
+                toggleFullscreen={toggleFullscreen}
+                camActive={camActive}
+                peerStates={peerStates}
+                userName={userName}
+              />
+            )}
           </div>
         ) : (
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto max-h-[75vh] p-2 no-scrollbar">
-            {Object.entries(meetingParticipants).map(([socketId, part]) => renderParticipantTile(socketId, part))}
+            {Object.entries(meetingParticipants).map(([id, part]) => (
+              <div key={id} className="h-48 md:h-56 relative rounded-2xl overflow-hidden border border-border">
+                <ParticipantTile
+                  participantId={id}
+                  part={part}
+                  isMe={id === socketId}
+                  localVideoRef={localVideoRef}
+                  localStream={localStreamRef.current}
+                  remoteStream={remoteStreams[id]?.stream}
+                  selectedSpeaker={selectedSpeaker}
+                  speaking={speakingMap[id]}
+                  networkQualityValue={networkQuality[id]}
+                  pinnedId={pinnedId}
+                  setPinnedId={setPinnedId}
+                  toggleFullscreen={toggleFullscreen}
+                  camActive={camActive}
+                  peerState={peerStates[id]}
+                  userName={userName}
+                />
+              </div>
+            ))}
           </div>
         )}
 
@@ -1645,30 +1697,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                   </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setBlurActive(!blurActive)}
-                className={`p-2.5 rounded-xl cursor-pointer border ${blurActive ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
-                title="Background blur"
-              >
-                <Sparkles className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !noiseSuppression
-                  setNoiseSuppression(next)
-                  toast(
-                    next ? 'Noise suppression preference on (browser-dependent).' : 'Noise suppression preference off.',
-                    { icon: '🎙️' }
-                  )
-                }}
-                className={`p-2.5 rounded-xl cursor-pointer border ${noiseSuppression ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
-                title="Noise suppression"
-                aria-pressed={noiseSuppression}
-              >
-                <VolumeX className="w-4 h-4" />
-              </button>
+
               <button
                 type="button"
                 onClick={toggleRecording}
@@ -1685,24 +1714,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
-              {isHost && (
-                <button
-                  type="button"
-                  onClick={toggleWaitingRoom}
-                  className={`p-2.5 rounded-xl cursor-pointer border ${waitingRoomActive ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
-                  title="Waiting room"
-                >
-                  <Shield className="w-4 h-4" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowDiag((v) => !v)}
-                className={`p-2.5 rounded-xl cursor-pointer border ${showDiag ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
-                title="WebRTC diagnostics"
-              >
-                <Activity className="w-4 h-4" />
-              </button>
+              
+
               <div className="relative">
                 <button
                   type="button"
@@ -1810,33 +1823,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
           </div>
         )}
 
-        {/* Diagnostics overlay */}
-        {showDiag && inMeeting && (
-          <div className="absolute bottom-24 left-6 right-6 max-h-48 overflow-auto rounded-xl border border-border bg-card/95 p-3 text-[10px] font-mono text-muted shadow-lg z-30">
-            <div className="flex justify-between items-center mb-2">
-              <span className="font-bold text-text uppercase tracking-wider">WebRTC diagnostics</span>
-              <button type="button" onClick={() => setShowDiag(false)} className="cursor-pointer">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="mb-2 text-text">
-              self={socketId} · peers={diagnostics?.peerCount ?? 0} · TURN=
-              {iceInfo.hasTurn ? 'yes' : 'no'} · WS=
-              {socket?.readyState === 1 ? 'open' : String(socket?.readyState ?? 'n/a')}
-            </div>
-            {(diagnostics?.peers || []).map((p) => (
-              <div key={p.id}>
-                {p.id.slice(0, 12)}… conn={p.connection} ice={p.ice} sig={p.signaling} media=
-                {p.hasRemote ? 'yes' : 'no'}
-              </div>
-            ))}
-            <div className="mt-2 border-t border-border pt-2 space-y-0.5 max-h-24 overflow-y-auto">
-              {diagLines.slice(-20).map((line, i) => (
-                <div key={i}>{line}</div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {inMeeting && activeSidePanel && (
@@ -1899,42 +1885,12 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
             </>
           ) : (
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar text-xs">
-              {isHost && waitingUsers.length > 0 && (
-                <div className="space-y-2 border-b border-border pb-4 mb-4">
-                  <span className="font-bold text-[10px] uppercase text-warning tracking-wider block">
-                    Waiting List ({waitingUsers.length})
-                  </span>
-                  {waitingUsers.map((user) => (
-                    <div
-                      key={user.socketId}
-                      className="flex items-center justify-between bg-card-sunken border border-warning/20 rounded-xl p-2.5"
-                    >
-                      <span className="font-semibold text-text truncate flex-1">{user.user}</span>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => hostAdmitParticipant(user.socketId, user.user)}
-                          className="px-2.5 py-1 bg-success hover:bg-success-hover text-on-primary rounded-lg text-[10px] font-bold cursor-pointer"
-                        >
-                          Admit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => hostDenyParticipant(user.socketId, user.user)}
-                          className="px-2.5 py-1 bg-card border border-border text-muted hover:bg-danger/10 hover:text-danger rounded-lg text-[10px] font-bold cursor-pointer"
-                        >
-                          Deny
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {Object.entries(meetingParticipants).map(([socketId, part]) => {
-                const isUserHost = socketId === hostInfo.hostSocketId
+              
+              {Object.entries(meetingParticipants).map(([participantSocketId, part]) => {
+                const isUserHost = participantSocketId === hostInfo.hostSocketId
                 return (
                   <div
-                    key={socketId}
+                    key={participantSocketId}
                     className="flex items-center justify-between border-b border-border/50 pb-2.5 text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -1945,7 +1901,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                         <span className="font-semibold text-text truncate">{part.user}</span>
                         <span className="text-[8px] text-muted">
                           {isUserHost ? 'Host' : 'Participant'}
-                          {peerStates[socketId] ? ` · ${peerStates[socketId]}` : ''}
+                          {peerStates[participantSocketId] ? ` · ${peerStates[participantSocketId]}` : ''}
                         </span>
                       </div>
                     </div>
@@ -1953,18 +1909,18 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                       {part.handRaised && isHost && (
                         <button
                           type="button"
-                          onClick={() => hostLowerHand(socketId)}
+                          onClick={() => hostLowerHand(participantSocketId)}
                           className="p-1 hover:bg-primary/10 rounded text-warning cursor-pointer"
                           title="Lower hand"
                         >
                           <Hand className="w-3.5 h-3.5 fill-current" />
                         </button>
                       )}
-                      {isHost && socketId !== socket.id && (
+                      {isHost && participantSocketId !== socketId && (
                         <>
                           <button
                             type="button"
-                            onClick={() => hostMuteParticipant(socketId)}
+                            onClick={() => hostMuteParticipant(participantSocketId)}
                             className="p-1 hover:bg-primary/10 rounded text-muted hover:text-danger cursor-pointer"
                             title="Mute"
                           >
@@ -1972,7 +1928,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                           </button>
                           <button
                             type="button"
-                            onClick={() => hostKickParticipant(socketId)}
+                            onClick={() => hostKickParticipant(participantSocketId)}
                             className="p-1 hover:bg-primary/10 rounded text-muted hover:text-danger cursor-pointer"
                             title="Kick"
                           >
@@ -1994,6 +1950,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const miniViewRef = useRef(null)
 
   const handlePointerDown = (e) => {
+    // If clicking on a control button, do not capture/drag
+    if (e.target.closest('button')) return
     dragRef.current = { isDragging: true, startX: e.clientX, startY: e.clientY, posX: position.x, posY: position.y }
     e.currentTarget.setPointerCapture(e.pointerId)
   }

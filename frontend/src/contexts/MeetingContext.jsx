@@ -8,12 +8,17 @@ export function useMeeting() {
 }
 
 export function MeetingProvider({ children }) {
+  // --- STATE VARIABLES (THE COMPONENT'S MEMORY) ---
+  // If we didn't store these in state, the video meeting would crash or disappear when you click to another page.
   const [inMeeting, setInMeeting] = useState(false)
   const [activeMeetingWorkspace, setActiveMeetingWorkspace] = useState(null)
   const [isMinimized, setIsMinimized] = useState(false)
   const [portalTarget, setPortalTarget] = useState(null)
 
-  // Try to restore from sessionStorage on mount
+  // --- RESTORING THE MEETING AFTER A PAGE REFRESH ---
+  // Try to restore from sessionStorage on mount.
+  // Why? If a user accidentally hits F5 (refresh) during a call, React deletes all State. 
+  // By saving it to sessionStorage, we can instantly rebuild the meeting without dropping the call.
   useEffect(() => {
     try {
       const stored = sessionStorage.getItem('teamora-global-active-meeting')
@@ -30,6 +35,9 @@ export function MeetingProvider({ children }) {
     }
   }, [])
 
+  // --- JOINING A MEETING ---
+  // Called when you click the "Join Call" button. It turns the meeting ON and saves it to sessionStorage
+  // so the browser remembers you are in a call even if you refresh.
   const joinMeeting = (workspace) => {
     setInMeeting(true)
     setActiveMeetingWorkspace(workspace)
@@ -41,6 +49,9 @@ export function MeetingProvider({ children }) {
     }
   }
 
+  // --- LEAVING A MEETING ---
+  // Cleans up all the state and removes the meeting from browser memory.
+  // If we forgot to remove it from sessionStorage, the next time you log in, it would auto-join an empty ghost call!
   const leaveMeeting = () => {
     setInMeeting(false)
     setActiveMeetingWorkspace(null)

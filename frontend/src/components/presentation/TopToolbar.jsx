@@ -31,8 +31,7 @@ import {
   Circle,
   Square,
   FolderUp,
-  Sparkles
-} from 'lucide-react'
+  Sparkles, Download } from 'lucide-react'
 import { listThemeCards } from './utils/slideThemes'
 import api from '../../services/api'
 
@@ -91,7 +90,8 @@ export default function TopToolbar({
   hasSelection = false,
   onImportSlides,
   roomId,
-  onAiAssistant
+  onAiAssistant,
+  onExportPptx
 }) {
   const imageInputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -298,7 +298,25 @@ export default function TopToolbar({
           AI Assistant
         </button>
 
+                <button
+          type="button"
+          onClick={onExportPptx}
+          className="mb-1 mr-2 flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/25 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all sm:px-4 cursor-pointer"
+        >
+          <Download className="h-4 w-4" />
+          <span>Export PPTX</span>
+        </button>
+
         <button
+          type="button"
+          onClick={onExportPptx}
+          className="mb-1 mr-2 flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/25 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all sm:px-4 cursor-pointer"
+        >
+          <Download className="h-4 w-4" />
+          <span>Export PPTX</span>
+        </button>
+
+<button
           type="button"
           onClick={handleImportClick}
           className="mb-1 mr-2 flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/25 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all sm:px-4 cursor-pointer"

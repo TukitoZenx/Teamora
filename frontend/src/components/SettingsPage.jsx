@@ -100,8 +100,7 @@ function SettingsNav({ onNavigate }) {
               to={`/settings/${item.id}`}
               onClick={onNavigate}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-semibold transition duration-normal ${
-                  isActive ? 'bg-primary text-on-primary' : 'text-muted hover:bg-primary-subtle hover:text-primary'
+                `flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-semibold transition duration-normal ${isActive ? 'bg-primary text-on-primary' : 'text-muted hover:bg-primary-subtle hover:text-primary'
                 }`
               }
             >
@@ -259,7 +258,7 @@ function SecuritySection() {
             title="Password"
             description="Your account signs in with Google, so there is no Teamora password to change."
             action="Google sign-in"
-            onClick={() => {}}
+            onClick={() => { }}
           />
         ) : (
           <SettingsAction
@@ -284,7 +283,7 @@ function SecuritySection() {
           title="Active Sessions"
           description={`You are signed in on this browser as ${user?.email || 'this account'}. Multi-device session management is not available yet.`}
           action="This browser"
-          onClick={() => {}}
+          onClick={() => { }}
         />
       </div>
     </>
@@ -298,12 +297,12 @@ function NotificationsSection() {
       return saved
         ? JSON.parse(saved)
         : {
-            emailNotifications: true,
-            workspaceInvitations: true,
-            meetingReminders: true,
-            documentActivity: true,
-            mentionNotifications: true
-          }
+          emailNotifications: true,
+          workspaceInvitations: true,
+          meetingReminders: true,
+          documentActivity: true,
+          mentionNotifications: true
+        }
     } catch {
       return {
         emailNotifications: true,

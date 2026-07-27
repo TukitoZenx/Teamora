@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Sparkles, Loader2, Check } from 'lucide-react';
 import { getGenerateStream } from '../../services/aiClient';
 import toast from 'react-hot-toast';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export default function AiGenerateModal({ isOpen, onClose, quillRef, onGenerating }) {
   const [prompt, setPrompt] = useState('');
@@ -33,17 +35,38 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
         quill.insertText(insertIndex, '\n\n', 'user');
         insertIndex += 2;
       }
+      const textStartIndex = insertIndex;
       
+      let fullText = '';
       for await (const chunk of stream) {
         quill.insertText(insertIndex, chunk, 'user');
         quill.formatText(insertIndex, chunk.length, 'background', 'rgba(168, 85, 247, 0.2)');
         insertIndex += chunk.length;
         quill.setSelection(insertIndex);
+        fullText += chunk;
       }
       
+      let finalEndIndex = insertIndex;
+      const hasMarkdown = /#{1,6}\s|\*\*|__|\*|_|- \w|1\. |```|!\[/g.test(fullText);
+      
+      if (hasMarkdown) {
+        const html = DOMPurify.sanitize(marked.parse(fullText));
+        quill.deleteText(textStartIndex, fullText.length, 'user');
+        
+        const lenBefore = quill.getLength();
+        quill.clipboard.dangerouslyPasteHTML(textStartIndex, html, 'user');
+        const lenAfter = quill.getLength();
+        
+        const insertedLength = lenAfter - lenBefore;
+        finalEndIndex = textStartIndex + insertedLength;
+        
+        quill.formatText(textStartIndex, insertedLength, 'background', 'rgba(168, 85, 247, 0.2)');
+        quill.setSelection(finalEndIndex);
+      }
+
       setDraftState({
         startIndex: originalStartIndex,
-        endIndex: insertIndex
+        endIndex: finalEndIndex
       });
     } catch (err) {
       console.error('Generate Error:', err);

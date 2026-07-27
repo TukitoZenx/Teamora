@@ -244,6 +244,10 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
 
   return {
     id: clientId,
+    get connected() {
+      // Connected if WS room is joined OR local channel is available (same-browser tab signaling)
+      return joined || Boolean(localChannel?.emit)
+    },
     get readyState() {
       return meetingWs?.readyState
     },

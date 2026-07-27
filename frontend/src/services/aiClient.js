@@ -22,7 +22,9 @@ async function* fetchAiStream(endpoint, payload) {
     try {
       const data = await response.json();
       if (data.message) msg = data.message;
-    } catch {}
+    } catch (e) {
+      // ignore
+    }
     throw new Error(msg);
   }
 
@@ -40,16 +42,19 @@ async function* fetchAiStream(endpoint, payload) {
         const data = line.replace('data: ', '').trim();
         if (data === '[DONE]') break;
         if (!data) continue;
+        let parsed;
         try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) {
-            throw new Error(parsed.error);
-          }
-          if (parsed.chunk) {
-            yield parsed.chunk;
-          }
-        } catch (err) {
+          parsed = JSON.parse(data);
+        } catch {
           // Ignore incomplete JSON chunks from split network packets
+          continue;
+        }
+        
+        if (parsed.error) {
+          throw new Error(parsed.error);
+        }
+        if (parsed.chunk) {
+          yield parsed.chunk;
         }
       }
     }
@@ -82,7 +87,9 @@ export const generateSlides = async (prompt) => {
     try {
       const data = await response.json();
       if (data.message) msg = data.message;
-    } catch {}
+    } catch (e) {
+      // ignore
+    }
     throw new Error(msg);
   }
 

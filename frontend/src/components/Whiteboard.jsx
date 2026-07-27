@@ -441,6 +441,27 @@ export default function Whiteboard({
     socket.emit('update-whiteboard-elements', { roomId, elements: verifiedNext })
   }
 
+  const undoRef = useRef(handleUndo)
+  const redoRef = useRef(handleRedo)
+  undoRef.current = handleUndo
+  redoRef.current = handleRedo
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redoRef.current();
+        else undoRef.current();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redoRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const handleElementTextChange = (elemId, newText) => {
     const safeElements = Array.isArray(elements) ? elements : []
     const updated = safeElements.map((el) => (el.id === elemId ? { ...el, text: newText } : el))

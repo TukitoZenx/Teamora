@@ -28,7 +28,9 @@ export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceI
         try {
           const data = await response.json();
           if (data.message) msg = data.message;
-        } catch {}
+        } catch (e) {
+          // ignore
+        }
         throw new Error(msg);
       }
 

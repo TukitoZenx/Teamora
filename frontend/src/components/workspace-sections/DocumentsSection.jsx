@@ -169,6 +169,17 @@ export default function DocumentsSection({
         },
         history: {
           userOnly: true
+        },
+        keyboard: {
+          bindings: {
+            redo: {
+              key: 'y',
+              shortKey: true,
+              handler: function() {
+                this.quill.history.redo();
+              }
+            }
+          }
         }
       },
       placeholder: 'Start writing…'
