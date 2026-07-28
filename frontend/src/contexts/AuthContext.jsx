@@ -1,12 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import * as authService from '../features/auth/services/auth'
+import * as authService from '../features/auth/services/auth' 
 import { onUnauthorized } from '../services/api'
 
 const AuthContext = createContext(null) // create a global context for authentication state and actions
 const AUTH_CACHE_KEY = 'teamora-auth-user'
 let initialUserRequest = null
 
+// it reads the data from localstorage... 
 const readCachedUser = () => {
   try {
     return JSON.parse(window.localStorage.getItem(AUTH_CACHE_KEY) || 'null')
@@ -40,7 +41,7 @@ export function AuthProvider({ children }) {
   // `loading` true so ProtectedRoute never treats a stale localStorage user as
   // an authenticated session before `/me` returns. Public routes skip the wait
   // when there is no authenticated user (see PublicRoute).
-  const [user, setUser] = useState(() => readCachedUser())
+  const [user, setUser] = useState(() => readCachedUser())// readcacheduser() gets the current user from localstorage using the auth key called teamora-auth-user and then sets it as the initial state of the user so the usestate is used ? ans : it is used to store the user data in the localstorage and also in the react state , the main purpose to use the usestate at here ? ans : 
   const [loading, setLoading] = useState(true)// if loading is true, it means the authentication state is being checked and the app is waiting for the response from the server
   /** True only after the first `/me` completes successfully with a user. */
   const [sessionValidated, setSessionValidated] = useState(false)// 
@@ -182,12 +183,12 @@ export function AuthProvider({ children }) {
 // --- CUSTOM HOOK ---
 // Instead of writing `useContext(AuthContext)` everywhere, developers just call `useSession()`.
 // It includes a safety check: if you try to use it outside of the Provider, it crashes with a helpful error.
-export function useSession() {
-  const context = useContext(AuthContext)
+export function useSession() {// useSession custom hook 
+  const context = useContext(AuthContext)// useContext what it does ? ans : it returns the value of the context for example AuthContext contains state user and loading and functions login, logout, register, refreshUser, fetchCurrentUser, clearSession
 
-  if (!context) {
+  if (!context) {// when it use ? ans : it is used to check if the context is not null or undefined
     throw new Error('useSession must be used within AuthProvider')
   }
 
-  return context
+  return context// when it use ? ans : it is used to return the context
 }

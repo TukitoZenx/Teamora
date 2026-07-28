@@ -54,7 +54,7 @@ const readJsonCache = (key, fallback) => {
   }
 }
 
-// what 56-58 lines does ? ans :
+// what 56-58 lines does ? ans : it writes the data to the local storage
 const writeJsonCache = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value))
@@ -65,15 +65,15 @@ const writeJsonCache = (key, value) => {
 
 const removeWorkspaceCache = (workspaceId) => {
   const cache = readJsonCache(WORKSPACE_CACHE_KEY, {})
-  delete cache[workspaceId]
-  writeJsonCache(WORKSPACE_CACHE_KEY, cache)
+  delete cache[workspaceId]// it deletes the workspace from the cache
+  writeJsonCache(WORKSPACE_CACHE_KEY, cache)// what it writes is the cache with the deleted workspace
 }
 
 //starting point of the app, handles routing and global state management
 export default function App() {
   const { user, loading, authenticated, profileComplete } = useAuth()//how this line works and what is useAuth it is a custom hook, created in AuthContext.jsx file where can i find the custom hooks in my project it is in the contexts folder as well as hooks folder 
   const { activeMeetingWorkspace, leaveMeeting } = useMeeting()
-  const navigate = useNavigate()
+  const navigate = useNavigate()// it stores current page and future page , am i right  ? ans : 
   const location = useLocation()
   const workspacesRequestRef = useRef(null)
   const workspaceRequestRef = useRef(new Map())
@@ -84,7 +84,7 @@ export default function App() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [authNotice, setAuthNotice] = useState('')
 
-  const displayName = useMemo(() => {
+  const displayName = useMemo(() => {// at where it is used either in the dahsboard or workspace or mention that place ? ans : 
     if (user?.fullName) return user.fullName
     if (user?.username) return user.username
     return user?.email?.split('@')[0] || 'User'
@@ -269,6 +269,11 @@ export default function App() {
     replaceWorkspaces
   ])
 
+  // cacheworkspace function below 272-282 explain more about it
+  // here we are storing the workspace in the cache for quick access
+  // and retreive the workspace from the cache for quick access 
+  // suppose you close the tab and reopen it then it will retreive the workspace from the cache for quick access
+  // suppose you open another tab and open the workspace then it will retreive the workspace from the cache for quick access
   const cacheWorkspace = useCallback((workspace) => {
     if (!workspace?._id) return
 

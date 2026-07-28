@@ -71,7 +71,7 @@ export function SettingsIndex() {
 }
 
 export function SettingsSection() {
-  const { section = 'profile' } = useParams()
+  const { section = 'profile' } = useParams()// use parameters from different urls
   const { user } = useOutletContext()
   const activeSection = sections.some((item) => item.id === section) ? section : 'profile'
 
