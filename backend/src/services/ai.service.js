@@ -21,7 +21,7 @@ function getAiClient() {
 async function* callAiStream(prompt, systemInstruction = null) {
   const client = getAiClient();
   const config = {};
-  
+
   if (systemInstruction) {
     config.systemInstruction = systemInstruction;
   }
@@ -46,16 +46,20 @@ async function* callAiStream(prompt, systemInstruction = null) {
 /**
  * Service to orchestrate AI tasks
  */
+const clampText = (value, max) => String(value ?? '').slice(0, max);
+
+const ALLOWED_COMMANDS = new Set(['rewrite', 'professional', 'shorter', 'expand', 'grammar', 'ideas', 'summarize']);
+
 const AiService = {
   autocomplete: async function* (contextText) {
     const system = `You are an intelligent writing assistant embedded in a document editor.
 The user is currently typing a document. Complete their sentence logically, matching their tone and style.
 Do not provide multiple options. Do not include quotes. ONLY reply with the exact text that should follow what they typed, nothing else. Do not rewrite their input.`;
 
-    // Limit context size for performance
-    const maxContext = contextText.slice(-1000);
+    // Limit context size for performance + prompt injection surface
+    const maxContext = clampText(contextText, 1000).slice(-1000);
     const prompt = `Here is the current text (cursor is at the very end):\n\n${maxContext}`;
-    
+
     yield* callAiStream(prompt, system);
   },
 
@@ -63,21 +67,37 @@ Do not provide multiple options. Do not include quotes. ONLY reply with the exac
     const system = `You are an AI editor assistant. You perform actions on text selected by the user.
 Reply ONLY with the updated text. Do not wrap in quotes or add conversational filler.`;
 
+    const safeCommand = ALLOWED_COMMANDS.has(command) ? command : 'rewrite';
     let instruction = '';
-    switch (command) {
-      case 'rewrite': instruction = 'Rewrite this text to flow better.'; break;
-      case 'professional': instruction = 'Rewrite this text to be highly professional and formal.'; break;
-      case 'shorter': instruction = 'Make this text more concise.'; break;
-      case 'expand': instruction = 'Expand on this text with more detail.'; break;
-      case 'grammar': instruction = 'Fix all grammar and spelling errors without changing the meaning.'; break;
-      case 'ideas': instruction = 'Generate 3 bulleted ideas expanding on this thought.'; break;
-      case 'summarize': instruction = 'Provide a brief summary of this text.'; break;
-      default: instruction = 'Process this text: ' + command;
+    switch (safeCommand) {
+      case 'rewrite':
+        instruction = 'Rewrite this text to flow better.';
+        break;
+      case 'professional':
+        instruction = 'Rewrite this text to be highly professional and formal.';
+        break;
+      case 'shorter':
+        instruction = 'Make this text more concise.';
+        break;
+      case 'expand':
+        instruction = 'Expand on this text with more detail.';
+        break;
+      case 'grammar':
+        instruction = 'Fix all grammar and spelling errors without changing the meaning.';
+        break;
+      case 'ideas':
+        instruction = 'Generate 3 bulleted ideas expanding on this thought.';
+        break;
+      case 'summarize':
+        instruction = 'Provide a brief summary of this text.';
+        break;
+      default:
+        instruction = 'Rewrite this text to flow better.';
     }
 
-    // Limit full document size to save memory/processing for local models
-    const maxFullText = fullDocumentText.slice(0, 2000);
-    const prompt = `Command: ${instruction}\n\nSelected Text:\n${selectedText}\n\n(For context only, here is the document snippet:\n${maxFullText})`;
+    const maxFullText = clampText(fullDocumentText, 2000);
+    const maxSelected = clampText(selectedText, 4000);
+    const prompt = `Command: ${instruction}\n\nSelected Text:\n${maxSelected}\n\n(For context only, here is the document snippet:\n${maxFullText})`;
 
     yield* callAiStream(prompt, system);
   },
@@ -89,8 +109,8 @@ If the user asks to generate or include an image, output a markdown image using 
 ![Alt Text](https://image.pollinations.ai/prompt/{URL_ENCODED_IMAGE_PROMPT}?width=800&height=400&nologo=true)
 Do not include conversational filler like "Here is your document". Just output the document itself.`;
 
-    const prompt = `Create a document based on this request:\n\n${promptText}`;
-    
+    const prompt = `Create a document based on this request:\n\n${clampText(promptText, 4000)}`;
+
     yield* callAiStream(prompt, system);
   },
 
@@ -106,13 +126,13 @@ Each object represents a slide and MUST have these exact keys:
 
 Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSON array. Start with [ and end with ].`;
 
-    const prompt = `Topic for presentation: ${promptText}\n\nPlease generate 5-8 slides.`;
-    
+    const prompt = `Topic for presentation: ${clampText(promptText, 2000)}\n\nPlease generate 5-8 slides.`;
+
     let fullJson = '';
     for await (const chunk of callAiStream(prompt, system)) {
       fullJson += chunk;
     }
-    
+
     // Clean up potential markdown formatting
     fullJson = fullJson.trim();
     if (fullJson.startsWith('```json')) {
@@ -120,20 +140,20 @@ Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSO
     } else if (fullJson.startsWith('```')) {
       fullJson = fullJson.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
-    
+
     return fullJson.trim();
   },
 
   generateSpreadsheet: async function (promptText, mode) {
     let system = '';
     let prompt = '';
-    
+
     if (mode === 'formula') {
       system = `You are an expert spreadsheet formula generator.
 The user will describe a calculation.
 Return ONLY the raw formula starting with = (e.g. =SUM(A1:B2)).
 Do NOT wrap the formula in markdown blocks or quotes. Just output the formula text.`;
-      prompt = `Description: ${promptText}\n\nPlease provide the formula.`;
+      prompt = `Description: ${clampText(promptText, 1000)}\n\nPlease provide the formula.`;
     } else {
       system = `You are an expert spreadsheet data generator.
 The user will describe the data they want.
@@ -142,14 +162,14 @@ Return ONLY valid JSON.
 The JSON must be an array of arrays of strings. Each inner array represents a row of data.
 Example: [["Name", "Age"], ["Alice", "30"], ["Bob", "25"]]
 Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSON array. Start with [ and end with ].`;
-      prompt = `Data description: ${promptText}\n\nPlease provide the data as a JSON array of arrays.`;
+      prompt = `Data description: ${clampText(promptText, 2000)}\n\nPlease provide the data as a JSON array of arrays.`;
     }
 
     let fullOutput = '';
     for await (const chunk of callAiStream(prompt, system)) {
       fullOutput += chunk;
     }
-    
+
     fullOutput = fullOutput.trim();
     if (mode === 'data') {
       if (fullOutput.startsWith('```json')) {
@@ -159,7 +179,7 @@ Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSO
       }
       return JSON.parse(fullOutput.trim());
     }
-    
+
     // For formula, just return the text
     // Ensure it starts with '='
     if (!fullOutput.startsWith('=')) {
@@ -188,20 +208,20 @@ Each object must have these exact keys:
 
 Do NOT wrap the JSON in markdown blocks like \`\`\`json. Just output the raw JSON array. Start with [ and end with ].`;
 
-    const prompt = `Unstructured Text:\n${promptText}\n\nPlease extract the tasks into the JSON array.`;
-    
+    const prompt = `Unstructured Text:\n${clampText(promptText, 4000)}\n\nPlease extract the tasks into the JSON array.`;
+
     let fullJson = '';
     for await (const chunk of callAiStream(prompt, system)) {
       fullJson += chunk;
     }
-    
+
     fullJson = fullJson.trim();
     if (fullJson.startsWith('```json')) {
       fullJson = fullJson.replace(/^```json\n?/, '').replace(/\n?```$/, '');
     } else if (fullJson.startsWith('```')) {
       fullJson = fullJson.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
-    
+
     return JSON.parse(fullJson.trim());
   }
 };

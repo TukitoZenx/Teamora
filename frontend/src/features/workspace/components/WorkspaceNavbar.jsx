@@ -17,8 +17,6 @@ export default function WorkspaceNavbar({
   const searchRef = useRef(null)
   const inputRef = useRef(null)
 
-
-
   const [theme, setTheme] = useState(() => {
     try {
       const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')

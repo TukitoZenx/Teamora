@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Sparkles, Replace, Type, AlignLeft, Scissors, Check, Wand2, Lightbulb, X } from 'lucide-react';
-import { getCommandStream } from '../../services/aiClient';
-import toast from 'react-hot-toast';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Sparkles, Replace, Type, AlignLeft, Scissors, Check, Wand2, Lightbulb, X } from 'lucide-react'
+import { getCommandStream } from '../../services/aiClient'
+import toast from 'react-hot-toast'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const COMMANDS = [
   { id: 'rewrite', icon: <Replace className="w-4 h-4" />, label: 'Rewrite' },
@@ -14,130 +14,134 @@ const COMMANDS = [
   { id: 'grammar', icon: <Check className="w-4 h-4" />, label: 'Fix Grammar' },
   { id: 'ideas', icon: <Lightbulb className="w-4 h-4" />, label: 'Generate Ideas' },
   { id: 'summarize', icon: <Wand2 className="w-4 h-4" />, label: 'Summarize' }
-];
+]
 
 export default function AiFloatingMenu({ quillRef, onGenerating }) {
-  const [position, setPosition] = useState(null);
-  const [selectedRange, setSelectedRange] = useState(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [draftState, setDraftState] = useState(null);
-  
+  const [position, setPosition] = useState(null)
+  const [selectedRange, setSelectedRange] = useState(null)
+  const [isOpen, setIsOpen] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [draftState, setDraftState] = useState(null)
+  const [portalRoot, setPortalRoot] = useState(null)
+
   useEffect(() => {
-    if (!quillRef?.current) return;
-    const quill = quillRef.current;
+    setPortalRoot(quillRef?.current?.container || null)
+  }, [quillRef, position, isOpen, draftState])
+
+  useEffect(() => {
+    if (!quillRef?.current) return
+    const quill = quillRef.current
 
     const handleSelection = () => {
-      const range = quill.getSelection();
+      const range = quill.getSelection()
       if (range && range.length > 0) {
-        const bounds = quill.getBounds(range.index, range.length);
-        setSelectedRange(range);
-        
-        const rect = quill.container.getBoundingClientRect();
-        let top = bounds.bottom + 10;
-        let left = bounds.left + (bounds.width / 2);
-        
+        const bounds = quill.getBounds(range.index, range.length)
+        setSelectedRange(range)
+
+        const rect = quill.container.getBoundingClientRect()
+        let top = bounds.bottom + 10
+        let left = bounds.left + bounds.width / 2
+
         // Positioning clamp to keep within editor bounds
-        const menuWidth = 350; 
-        const menuHeight = 50;
-        
-        if (left - (menuWidth / 2) < 10) {
-          left = (menuWidth / 2) + 10;
-        } else if (left + (menuWidth / 2) > rect.width - 10) {
-          left = rect.width - (menuWidth / 2) - 10;
+        const menuWidth = 350
+        const menuHeight = 50
+
+        if (left - menuWidth / 2 < 10) {
+          left = menuWidth / 2 + 10
+        } else if (left + menuWidth / 2 > rect.width - 10) {
+          left = rect.width - menuWidth / 2 - 10
         }
-        
+
         if (top + menuHeight > rect.height - 10) {
-          top = Math.max(10, bounds.top - menuHeight - 10);
+          top = Math.max(10, bounds.top - menuHeight - 10)
         }
 
-        setPosition({ top, left });
+        setPosition({ top, left })
       } else if (!isGenerating && !draftState) {
-        setIsOpen(false);
-        setPosition(null);
-        setSelectedRange(null);
+        setIsOpen(false)
+        setPosition(null)
+        setSelectedRange(null)
       }
-    };
+    }
 
-    quill.on('selection-change', handleSelection);
-    return () => quill.off('selection-change', handleSelection);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quillRef, isGenerating, draftState]);
+    quill.on('selection-change', handleSelection)
+    return () => quill.off('selection-change', handleSelection)
+  }, [quillRef, isGenerating, draftState])
 
   const executeCommand = async (commandId) => {
-    if (!quillRef?.current || !selectedRange) return;
-    const quill = quillRef.current;
-    const selectedText = quill.getText(selectedRange.index, selectedRange.length);
-    const fullText = quill.getText();
-    
-    setIsOpen(false);
-    setIsGenerating(true);
-    onGenerating?.(true);
-    
+    if (!quillRef?.current || !selectedRange) return
+    const quill = quillRef.current
+    const selectedText = quill.getText(selectedRange.index, selectedRange.length)
+    const fullText = quill.getText()
+
+    setIsOpen(false)
+    setIsGenerating(true)
+    onGenerating?.(true)
+
     // We replace the selection with the streaming response.
     // To do this smoothly, we clear the selection and start inserting.
-    quill.deleteText(selectedRange.index, selectedRange.length, 'user');
-    
-    let currentIndex = selectedRange.index;
-    
+    quill.deleteText(selectedRange.index, selectedRange.length, 'user')
+
+    let currentIndex = selectedRange.index
+
     try {
-      const stream = getCommandStream(commandId, selectedText, fullText);
-      let fullGeneratedText = '';
-      
+      const stream = getCommandStream(commandId, selectedText, fullText)
+      let fullGeneratedText = ''
+
       for await (const chunk of stream) {
-        quill.insertText(currentIndex, chunk, 'user');
-        quill.formatText(currentIndex, chunk.length, 'background', 'rgba(168, 85, 247, 0.2)');
-        currentIndex += chunk.length;
-        fullGeneratedText += chunk;
+        quill.insertText(currentIndex, chunk, 'user')
+        quill.formatText(currentIndex, chunk.length, 'background', 'rgba(168, 85, 247, 0.2)')
+        currentIndex += chunk.length
+        fullGeneratedText += chunk
         // Keep scrolling to cursor if needed
-        quill.setSelection(currentIndex);
+        quill.setSelection(currentIndex)
       }
-      
+
       // Clean up markdown if present
-      const hasMarkdown = /#{1,6}\s|\*\*|__|\*|_|- \w|1\. |```|!\[/g.test(fullGeneratedText);
-      let finalEndIndex = currentIndex;
-      
+      const hasMarkdown = /#{1,6}\s|\*\*|__|\*|_|- \w|1\. |```|!\[/g.test(fullGeneratedText)
+      let finalEndIndex = currentIndex
+
       if (hasMarkdown) {
-        const html = DOMPurify.sanitize(marked.parse(fullGeneratedText));
-        quill.deleteText(selectedRange.index, fullGeneratedText.length, 'user');
-        
-        const lenBefore = quill.getLength();
-        quill.clipboard.dangerouslyPasteHTML(selectedRange.index, html, 'user');
-        const lenAfter = quill.getLength();
-        
-        const insertedLength = lenAfter - lenBefore;
-        finalEndIndex = selectedRange.index + insertedLength;
-        
+        const html = DOMPurify.sanitize(marked.parse(fullGeneratedText))
+        quill.deleteText(selectedRange.index, fullGeneratedText.length, 'user')
+
+        const lenBefore = quill.getLength()
+        quill.clipboard.dangerouslyPasteHTML(selectedRange.index, html, 'user')
+        const lenAfter = quill.getLength()
+
+        const insertedLength = lenAfter - lenBefore
+        finalEndIndex = selectedRange.index + insertedLength
+
         // Re-apply highlight to the newly pasted HTML content
-        quill.formatText(selectedRange.index, insertedLength, 'background', 'rgba(168, 85, 247, 0.2)');
-        quill.setSelection(finalEndIndex);
+        quill.formatText(selectedRange.index, insertedLength, 'background', 'rgba(168, 85, 247, 0.2)')
+        quill.setSelection(finalEndIndex)
       }
 
       setDraftState({
         startIndex: selectedRange.index,
         endIndex: finalEndIndex,
         originalText: selectedText
-      });
+      })
 
-      const bounds = quill.getBounds(finalEndIndex, 0);
+      const bounds = quill.getBounds(finalEndIndex, 0)
       setPosition({
         top: bounds.bottom + 10,
         left: bounds.left
-      });
+      })
     } catch (err) {
-      console.error('Command Error:', err);
-      toast.error('AI command failed');
+      console.error('Command Error:', err)
+      toast.error('AI command failed')
     } finally {
-      setIsGenerating(false);
-      onGenerating?.(false);
-      quill.setSelection(currentIndex);
+      setIsGenerating(false)
+      onGenerating?.(false)
+      quill.setSelection(currentIndex)
     }
-  };
+  }
 
-  if (!position) return null;
+  if (!position || !portalRoot) return null
 
   return createPortal(
-    <div 
+    <div
       className="absolute z-50 flex items-center -translate-x-1/2 shadow-lg rounded-full bg-card border border-border p-1 animate-in fade-in zoom-in-95 duration-200"
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
     >
@@ -152,7 +156,7 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
 
       {isOpen && !isGenerating && !draftState && (
         <div className="flex items-center gap-1">
-          {COMMANDS.map(cmd => (
+          {COMMANDS.map((cmd) => (
             <button
               key={cmd.id}
               onClick={() => executeCommand(cmd.id)}
@@ -163,10 +167,7 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
             </button>
           ))}
           <div className="w-px h-4 bg-border mx-1" />
-          <button
-            onClick={() => setIsOpen(false)}
-            className="px-2 py-1 text-xs text-muted hover:text-text"
-          >
+          <button onClick={() => setIsOpen(false)} className="px-2 py-1 text-xs text-muted hover:text-text">
             Close
           </button>
         </div>
@@ -184,9 +185,14 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
           <button
             onClick={() => {
               if (quillRef?.current) {
-                quillRef.current.formatText(draftState.startIndex, draftState.endIndex - draftState.startIndex, 'background', false);
+                quillRef.current.formatText(
+                  draftState.startIndex,
+                  draftState.endIndex - draftState.startIndex,
+                  'background',
+                  false
+                )
               }
-              setDraftState(null);
+              setDraftState(null)
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-full transition-colors"
           >
@@ -195,14 +201,14 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
           <div className="w-px h-4 bg-border mx-1" />
           <button
             onClick={() => {
-              const quill = quillRef.current;
+              const quill = quillRef.current
               if (quill) {
-                quill.deleteText(draftState.startIndex, draftState.endIndex - draftState.startIndex, 'user');
+                quill.deleteText(draftState.startIndex, draftState.endIndex - draftState.startIndex, 'user')
                 if (draftState.originalText) {
-                  quill.insertText(draftState.startIndex, draftState.originalText, 'user');
+                  quill.insertText(draftState.startIndex, draftState.originalText, 'user')
                 }
               }
-              setDraftState(null);
+              setDraftState(null)
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-full transition-colors"
           >
@@ -211,6 +217,6 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
         </div>
       )}
     </div>,
-    quillRef.current.container
-  );
+    portalRoot
+  )
 }

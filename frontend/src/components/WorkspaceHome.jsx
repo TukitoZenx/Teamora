@@ -9,6 +9,7 @@ import {
   Link2,
   MessageSquare,
   Paintbrush,
+  Pencil,
   Presentation,
   Save,
   Shield,
@@ -28,6 +29,7 @@ import useLocalCollabChannel from '../hooks/useLocalCollabChannel'
 import { useAuth } from '../hooks/useAuth'
 import Calendar from './Calendar'
 import ConfirmDialog from './ConfirmDialog'
+import SectionErrorBoundary from './SectionErrorBoundary'
 import Switch from './ui/Switch'
 import Button from './ui/Button'
 import Input from './ui/Input'
@@ -302,11 +304,28 @@ export default function WorkspaceHome({
     const byId = new Map()
     ;[...a, ...b].forEach((msg) => {
       if (!msg?.id) return
-      byId.set(msg.id, msg)
+      const prev = byId.get(msg.id)
+      if (!prev) {
+        byId.set(msg.id, msg)
+        return
+      }
+      const pt = new Date(prev.updatedAt || prev.createdAt || 0).getTime()
+      const ct = new Date(msg.updatedAt || msg.createdAt || 0).getTime()
+      if (ct >= pt) byId.set(msg.id, { ...prev, ...msg })
     })
     return Array.from(byId.values()).sort(
       (x, y) => new Date(x.createdAt || 0).getTime() - new Date(y.createdAt || 0).getTime()
     )
+  }
+
+  const persistChatMessages = (next) => {
+    chatChannel.emit('chat-messages', next)
+    if (workspaceId) {
+      putWorkspaceContent(workspaceId, 'chat', {
+        format: 'messages-v1',
+        messages: next
+      }).catch(() => {})
+    }
   }
 
   useEffect(() => {
@@ -739,14 +758,29 @@ export default function WorkspaceHome({
                 }
                 setChatMessages((current) => {
                   const next = mergeChatMessages(current, [message])
-                  chatChannel.emit('chat-messages', next)
-                  if (workspaceId) {
-                    // Persist the full merged list so multi-device sync keeps history.
-                    putWorkspaceContent(workspaceId, 'chat', {
-                      format: 'messages-v1',
-                      messages: next
-                    }).catch(() => {})
-                  }
+                  persistChatMessages(next)
+                  return next
+                })
+              }}
+              onEdit={(messageId, text) => {
+                setChatMessages((current) => {
+                  const next = current.map((msg) =>
+                    msg.id === messageId
+                      ? { ...msg, text, updatedAt: new Date().toISOString(), edited: true }
+                      : msg
+                  )
+                  persistChatMessages(next)
+                  return next
+                })
+              }}
+              onDelete={(messageId) => {
+                setChatMessages((current) => {
+                  const next = current.map((msg) =>
+                    msg.id === messageId
+                      ? { ...msg, deleted: true, text: '', attachments: [], updatedAt: new Date().toISOString() }
+                      : msg
+                  )
+                  persistChatMessages(next)
                   return next
                 })
               }}
@@ -776,127 +810,143 @@ export default function WorkspaceHome({
               }
             >
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                {activeItem === 'documents' &&
-                  (activeFile?.kind === 'document' ? (
-                    <DocumentsSection
-                      key={activeFile.id}
-                      workspaceId={workspace?._id}
-                      userName={getDisplayName(user)}
-                      activeFile={activeFile}
-                      onCreateFile={(options) => createWorkspaceFile('document', activeFolderId, options || {})}
-                      onRenameFile={renameWorkspaceFile}
-                      onDirtyChange={markActiveFileUnsaved}
-                      onSaveToActiveFolder={() => moveFileToActiveFolder(activeFile.id, { silent: true })}
-                      onSaveAs={(options) => saveAsInActiveFolder('document', options || {})}
-                    />
-                  ) : (
-                    <WorkspaceSectionFileList
-                      files={workspaceFiles.filter((f) => f.kind === 'document')}
-                      icon={FileText}
-                      kindLabel="Document"
-                      onCreate={() => createWorkspaceFile('document', activeFolderId)}
-                      onOpen={openWorkspaceFile}
-                      onDelete={deleteWorkspaceFile}
-                    />
-                  ))}
-                {activeItem === 'whiteboard' &&
-                  (activeFile?.kind === 'whiteboard' ? (
-                    <WhiteboardSection
-                      key={activeFile.id}
-                      workspaceId={workspace?._id}
-                      userName={getDisplayName(user)}
-                      activeFile={activeFile}
-                      onDirtyChange={(dirty) => {
-                        markActiveFileUnsaved(dirty)
-                        if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
-                      }}
-                    />
-                  ) : (
-                    <WorkspaceSectionFileList
-                      files={workspaceFiles.filter((f) => f.kind === 'whiteboard')}
-                      icon={Paintbrush}
-                      kindLabel="Whiteboard"
-                      onCreate={() => createWorkspaceFile('whiteboard', activeFolderId)}
-                      onOpen={openWorkspaceFile}
-                      onDelete={deleteWorkspaceFile}
-                    />
-                  ))}
-                {activeItem === 'spreadsheet' &&
-                  (activeFile?.kind === 'spreadsheet' ? (
-                    <SpreadsheetSection
-                      key={activeFile.id}
-                      workspaceId={workspace?._id}
-                      activeFile={activeFile}
-                      onDirtyChange={(dirty) => {
-                        markActiveFileUnsaved(dirty)
-                        if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
-                      }}
-                    />
-                  ) : (
-                    <WorkspaceSectionFileList
-                      files={workspaceFiles.filter((f) => f.kind === 'spreadsheet')}
-                      icon={TableProperties}
-                      kindLabel="Spreadsheet"
-                      onCreate={() => createWorkspaceFile('spreadsheet', activeFolderId)}
-                      onOpen={openWorkspaceFile}
-                      onDelete={deleteWorkspaceFile}
-                    />
-                  ))}
-                {activeItem === 'presentation' &&
-                  (activeFile?.kind === 'presentation' ? (
-                    <PresentationSection
-                      key={activeFile.id}
-                      workspaceId={workspace?._id}
-                      activeFile={activeFile}
-                      onDirtyChange={(dirty) => {
-                        markActiveFileUnsaved(dirty)
-                        if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
-                      }}
-                    />
-                  ) : (
-                    <WorkspaceSectionFileList
-                      files={workspaceFiles.filter((f) => f.kind === 'presentation')}
-                      icon={Presentation}
-                      kindLabel="Presentation"
-                      onCreate={() => createWorkspaceFile('presentation', activeFolderId)}
-                      onOpen={openWorkspaceFile}
-                      onDelete={deleteWorkspaceFile}
-                    />
-                  ))}
+                {activeItem === 'documents' && (
+                  <SectionErrorBoundary name="Documents">
+                    {activeFile?.kind === 'document' ? (
+                      <DocumentsSection
+                        key={activeFile.id}
+                        workspaceId={workspace?._id}
+                        userName={getDisplayName(user)}
+                        activeFile={activeFile}
+                        onCreateFile={(options) => createWorkspaceFile('document', activeFolderId, options || {})}
+                        onRenameFile={renameWorkspaceFile}
+                        onDirtyChange={markActiveFileUnsaved}
+                        onSaveToActiveFolder={() => moveFileToActiveFolder(activeFile.id, { silent: true })}
+                        onSaveAs={(options) => saveAsInActiveFolder('document', options || {})}
+                      />
+                    ) : (
+                      <WorkspaceSectionFileList
+                        files={workspaceFiles.filter((f) => f.kind === 'document')}
+                        icon={FileText}
+                        kindLabel="Document"
+                        onCreate={() => createWorkspaceFile('document', activeFolderId)}
+                        onOpen={openWorkspaceFile}
+                        onDelete={deleteWorkspaceFile}
+                      />
+                    )}
+                  </SectionErrorBoundary>
+                )}
+                {activeItem === 'whiteboard' && (
+                  <SectionErrorBoundary name="Whiteboard">
+                    {activeFile?.kind === 'whiteboard' ? (
+                      <WhiteboardSection
+                        key={activeFile.id}
+                        workspaceId={workspace?._id}
+                        userName={getDisplayName(user)}
+                        activeFile={activeFile}
+                        onDirtyChange={(dirty) => {
+                          markActiveFileUnsaved(dirty)
+                          if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
+                        }}
+                      />
+                    ) : (
+                      <WorkspaceSectionFileList
+                        files={workspaceFiles.filter((f) => f.kind === 'whiteboard')}
+                        icon={Paintbrush}
+                        kindLabel="Whiteboard"
+                        onCreate={() => createWorkspaceFile('whiteboard', activeFolderId)}
+                        onOpen={openWorkspaceFile}
+                        onDelete={deleteWorkspaceFile}
+                      />
+                    )}
+                  </SectionErrorBoundary>
+                )}
+                {activeItem === 'spreadsheet' && (
+                  <SectionErrorBoundary name="Spreadsheet">
+                    {activeFile?.kind === 'spreadsheet' ? (
+                      <SpreadsheetSection
+                        key={activeFile.id}
+                        workspaceId={workspace?._id}
+                        activeFile={activeFile}
+                        onDirtyChange={(dirty) => {
+                          markActiveFileUnsaved(dirty)
+                          if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
+                        }}
+                      />
+                    ) : (
+                      <WorkspaceSectionFileList
+                        files={workspaceFiles.filter((f) => f.kind === 'spreadsheet')}
+                        icon={TableProperties}
+                        kindLabel="Spreadsheet"
+                        onCreate={() => createWorkspaceFile('spreadsheet', activeFolderId)}
+                        onOpen={openWorkspaceFile}
+                        onDelete={deleteWorkspaceFile}
+                      />
+                    )}
+                  </SectionErrorBoundary>
+                )}
+                {activeItem === 'presentation' && (
+                  <SectionErrorBoundary name="Presentation">
+                    {activeFile?.kind === 'presentation' ? (
+                      <PresentationSection
+                        key={activeFile.id}
+                        workspaceId={workspace?._id}
+                        activeFile={activeFile}
+                        onDirtyChange={(dirty) => {
+                          markActiveFileUnsaved(dirty)
+                          if (!dirty) moveFileToActiveFolder(activeFile.id, { silent: true })
+                        }}
+                      />
+                    ) : (
+                      <WorkspaceSectionFileList
+                        files={workspaceFiles.filter((f) => f.kind === 'presentation')}
+                        icon={Presentation}
+                        kindLabel="Presentation"
+                        onCreate={() => createWorkspaceFile('presentation', activeFolderId)}
+                        onOpen={openWorkspaceFile}
+                        onDelete={deleteWorkspaceFile}
+                      />
+                    )}
+                  </SectionErrorBoundary>
+                )}
                 {activeItem === 'meetings' && (
-                  <MeetingsSection workspaceId={workspace?._id} userName={getDisplayName(user)} />
+                  <SectionErrorBoundary name="Meetings">
+                    <MeetingsSection workspaceId={workspace?._id} userName={getDisplayName(user)} />
+                  </SectionErrorBoundary>
                 )}
                 {activeItem === 'shared-files' && (
-                  <SharedFilesSection
-                    workspaceId={workspace?._id}
-                    userName={getDisplayName(user)}
-                    workspaceFiles={workspaceFiles}
-                    activeFolderId={activeFolderId}
-                    onCreateWorkspaceFile={createWorkspaceFile}
-                    onOpenWorkspaceFile={openWorkspaceFile}
-                    onSelectFolder={setActiveFolderId}
-                    onDeleteFile={deleteWorkspaceFile}
-                    onCreateFolder={(name) => {
-                      const timestamp = new Date().toISOString()
-                      const folder = {
-                        id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                        type: 'folder',
-                        name: name || 'New folder',
-                        parentId: activeFolderId || null,
-                        updatedAt: timestamp
-                      }
-                      const next = [...workspaceFiles, folder]
-                      setWorkspaceFiles(next)
-                      filesChannel.emit('update-files', { roomId: workspaceId, files: next })
-                      setActiveFolderId(folder.id)
-                      toast.success(`Folder "${folder.name}" ready for uploads`)
-                      return folder
-                    }}
-                    onFilesChange={(nextFiles) => {
-                      setWorkspaceFiles(nextFiles)
-                      filesChannel.emit('update-files', { roomId: workspaceId, files: nextFiles })
-                    }}
-                  />
+                  <SectionErrorBoundary name="Shared files">
+                    <SharedFilesSection
+                      workspaceId={workspace?._id}
+                      userName={getDisplayName(user)}
+                      workspaceFiles={workspaceFiles}
+                      activeFolderId={activeFolderId}
+                      onCreateWorkspaceFile={createWorkspaceFile}
+                      onOpenWorkspaceFile={openWorkspaceFile}
+                      onSelectFolder={setActiveFolderId}
+                      onDeleteFile={deleteWorkspaceFile}
+                      onCreateFolder={(name) => {
+                        const timestamp = new Date().toISOString()
+                        const folder = {
+                          id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                          type: 'folder',
+                          name: name || 'New folder',
+                          parentId: activeFolderId || null,
+                          updatedAt: timestamp
+                        }
+                        const next = [...workspaceFiles, folder]
+                        setWorkspaceFiles(next)
+                        filesChannel.emit('update-files', { roomId: workspaceId, files: next })
+                        setActiveFolderId(folder.id)
+                        toast.success(`Folder "${folder.name}" ready for uploads`)
+                        return folder
+                      }}
+                      onFilesChange={(nextFiles) => {
+                        setWorkspaceFiles(nextFiles)
+                        filesChannel.emit('update-files', { roomId: workspaceId, files: nextFiles })
+                      }}
+                    />
+                  </SectionErrorBoundary>
                 )}
               </div>
             </Suspense>
@@ -1224,9 +1274,9 @@ function WorkspaceOverview({
               </div>
             </div>
           </div>
-          <Button 
-            type="button" 
-            onClick={onCopyInviteLink} 
+          <Button
+            type="button"
+            onClick={onCopyInviteLink}
             disabled={workspace?.visibility === 'private'}
             className="h-10 shrink-0"
           >
@@ -1321,24 +1371,55 @@ function WorkspaceSection({ workspace, title }) {
   )
 }
 
-function WorkspaceChat({ messages, userName, onSend }) {
+/** Chat attachments are stored as base64 in JSON — keep under body/content caps. */
+const CHAT_MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024 // 8MB
+
+function WorkspaceChat({ messages, userName, onSend, onEdit, onDelete }) {
   const [draft, setDraft] = useState('')
   const [pendingAttachments, setPendingAttachments] = useState([])
   const [previewImage, setPreviewImage] = useState(null)
+  const [contextMenu, setContextMenu] = useState(null) // { x, y, message }
+  const [editingId, setEditingId] = useState(null)
+  const [editDraft, setEditDraft] = useState('')
   const fileInputRef = useRef(null)
   const listRef = useRef(null)
+  const menuRef = useRef(null)
+
+  const visibleMessages = useMemo(
+    () => (Array.isArray(messages) ? messages.filter((m) => m && !m.deleted) : []),
+    [messages]
+  )
 
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight
     }
-  }, [messages])
+  }, [visibleMessages.length])
+
+  useEffect(() => {
+    if (!contextMenu) return undefined
+    const close = (event) => {
+      if (menuRef.current?.contains(event.target)) return
+      setContextMenu(null)
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') setContextMenu(null)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('scroll', close, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('scroll', close, true)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [contextMenu])
 
   const addFiles = (fileList) => {
     const files = Array.from(fileList || [])
     files.forEach((file) => {
-      if (file.size > 2_000_000) {
-        toast.error(`"${file.name}" is too large (max 2MB for chat)`)
+      if (file.size > CHAT_MAX_ATTACHMENT_BYTES) {
+        toast.error(`"${file.name}" is too large (max 8MB for chat)`)
         return
       }
       const reader = new FileReader()
@@ -1365,6 +1446,49 @@ function WorkspaceChat({ messages, userName, onSend }) {
     setPendingAttachments([])
   }
 
+  const openMessageMenu = (event, message) => {
+    event.preventDefault()
+    // Only the author can edit/delete their messages.
+    if (message.user !== userName) return
+    const pad = 8
+    const menuW = 160
+    const menuH = 88
+    const x = Math.min(event.clientX, window.innerWidth - menuW - pad)
+    const y = Math.min(event.clientY, window.innerHeight - menuH - pad)
+    setContextMenu({ x: Math.max(pad, x), y: Math.max(pad, y), message })
+  }
+
+  const startEdit = (message) => {
+    setEditingId(message.id)
+    setEditDraft(message.text || '')
+    setContextMenu(null)
+  }
+
+  const saveEdit = () => {
+    if (!editingId) return
+    const text = editDraft.trim()
+    if (!text) {
+      toast.error('Message cannot be empty')
+      return
+    }
+    onEdit?.(editingId, text)
+    setEditingId(null)
+    setEditDraft('')
+    toast.success('Message updated')
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditDraft('')
+  }
+
+  const deleteMessage = (message) => {
+    setContextMenu(null)
+    if (editingId === message.id) cancelEdit()
+    onDelete?.(message.id)
+    toast.success('Message deleted')
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card shadow-card">
       <div className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-4">
@@ -1373,59 +1497,110 @@ function WorkspaceChat({ messages, userName, onSend }) {
         </span>
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-text">Workspace Chat</h1>
-          <p className="text-sm text-muted">Synced across devices · attach images or files (up to 2MB).</p>
+          <p className="text-sm text-muted">
+            Synced across devices · attach images or files (up to 8MB) · right-click your messages to edit or delete.
+          </p>
         </div>
       </div>
 
       <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-card-sunken p-5 pb-8 no-scrollbar">
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <div className="rounded-card border border-dashed border-border bg-card p-8 text-center text-sm text-muted">
             Start a workspace conversation.
           </div>
         ) : (
-          messages.map((message) => {
+          visibleMessages.map((message) => {
             const mine = message.user === userName
             const attachments = Array.isArray(message.attachments) ? message.attachments : []
+            const isEditing = editingId === message.id
             return (
               <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                 <div
+                  onContextMenu={(event) => openMessageMenu(event, message)}
                   className={`max-w-[78%] rounded-card px-4 py-3 shadow-card ${
                     mine ? 'bg-primary text-on-primary' : 'border border-border bg-card text-text'
-                  }`}
+                  } ${mine ? 'cursor-context-menu' : ''}`}
                 >
                   <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold opacity-80">
                     <span>{message.user}</span>
                     <span>{formatTime(message.createdAt)}</span>
+                    {message.edited ? <span className="italic opacity-70">(edited)</span> : null}
                   </div>
-                  {message.text ? <p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p> : null}
-                  {attachments.length > 0 && (
-                    <div className="mt-2 space-y-2">
-                      {attachments.map((att) => {
-                        const isImage = String(att.type || '').startsWith('image/')
-                        return (
-                          <div key={att.id || att.name} className="rounded-lg border border-white/20 bg-black/10 p-2">
-                            {isImage && att.dataUrl ? (
-                              <button type="button" onClick={() => setPreviewImage(att.dataUrl)} className="cursor-zoom-in text-left">
-                                <img
-                                  src={att.dataUrl}
-                                  alt={att.name}
-                                  className="max-h-48 max-w-full rounded-md object-contain"
-                                />
-                              </button>
-                            ) : (
-                              <a
-                                href={att.dataUrl}
-                                download={att.name}
-                                className="flex items-center gap-2 text-xs font-semibold underline"
-                              >
-                                <FileText className="h-3.5 w-3.5" />
-                                {att.name || 'Attachment'}
-                              </a>
-                            )}
-                          </div>
-                        )
-                      })}
+                  {isEditing ? (
+                    <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <textarea
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            saveEdit()
+                          }
+                          if (e.key === 'Escape') cancelEdit()
+                        }}
+                        rows={3}
+                        className="w-full resize-y rounded-lg border border-white/30 bg-black/10 px-3 py-2 text-sm text-inherit outline-none placeholder:opacity-60"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="rounded-lg border border-white/30 px-3 py-1 text-xs font-semibold opacity-90 hover:opacity-100"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={saveEdit}
+                          className="rounded-lg bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30"
+                        >
+                          Save
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      {message.text ? (
+                        <p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p>
+                      ) : null}
+                      {attachments.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          {attachments.map((att) => {
+                            const isImage = String(att.type || '').startsWith('image/')
+                            return (
+                              <div
+                                key={att.id || att.name}
+                                className="rounded-lg border border-white/20 bg-black/10 p-2"
+                              >
+                                {isImage && att.dataUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewImage(att.dataUrl)}
+                                    className="cursor-zoom-in text-left"
+                                  >
+                                    <img
+                                      src={att.dataUrl}
+                                      alt={att.name}
+                                      className="max-h-48 max-w-full rounded-md object-contain"
+                                    />
+                                  </button>
+                                ) : (
+                                  <a
+                                    href={att.dataUrl}
+                                    download={att.name}
+                                    className="flex items-center gap-2 text-xs font-semibold underline"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    {att.name || 'Attachment'}
+                                  </a>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1433,6 +1608,34 @@ function WorkspaceChat({ messages, userName, onSend }) {
           })
         )}
       </div>
+
+      {contextMenu && (
+        <div
+          ref={menuRef}
+          role="menu"
+          className="fixed z-[1300] min-w-[10rem] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-dropdown"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text hover:bg-primary/10"
+            onClick={() => startEdit(contextMenu.message)}
+          >
+            <Pencil className="h-3.5 w-3.5 text-primary" />
+            Edit
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-danger hover:bg-danger/10"
+            onClick={() => deleteMessage(contextMenu.message)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
+      )}
 
       {pendingAttachments.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-border bg-card-sunken px-4 py-2">
@@ -1491,8 +1694,9 @@ function WorkspaceChat({ messages, userName, onSend }) {
               addFiles(items)
             }
           }}
-          placeholder="Message the workspace..."
+          placeholder="Message the workspace… (Shift+Enter for new line)"
           className="min-w-0 flex-1"
+          title="Right-click your sent messages to edit or delete"
         />
         <Button type="button" onClick={send} className="h-12 shrink-0">
           Send
@@ -1500,16 +1704,16 @@ function WorkspaceChat({ messages, userName, onSend }) {
       </div>
 
       {previewImage && (
-        <div 
+        <div
           className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setPreviewImage(null)}
         >
-          <img 
-            src={previewImage} 
-            alt="Preview full screen" 
-            className="max-h-full max-w-full rounded-md object-contain" 
+          <img
+            src={previewImage}
+            alt="Preview full screen"
+            className="max-h-full max-w-full rounded-md object-contain"
           />
-          <button 
+          <button
             type="button"
             className="absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/40 transition"
             onClick={() => setPreviewImage(null)}
@@ -1539,6 +1743,24 @@ function WorkspaceSettings({
   const [saving, setSaving] = useState(false)
   const [removingId, setRemovingId] = useState('')
   const [confirmAction, setConfirmAction] = useState(null)
+
+  // Re-sync local form when workspace props change (refresh/accept flows).
+  // Parent also remounts this component via a settings key; this covers partial updates.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional prop → local form sync
+    setName(workspace?.name || '')
+    setDescription(workspace?.description || '')
+    setIcon(workspace?.icon || '')
+    setJoinApproval(workspace?.joinApproval ?? true)
+    setVisibility(workspace?.visibility || 'invite_only')
+  }, [
+    workspace?._id,
+    workspace?.name,
+    workspace?.description,
+    workspace?.icon,
+    workspace?.joinApproval,
+    workspace?.visibility
+  ])
 
   const ownerId = getOwnerId(workspace)?.toString()
 
@@ -1641,10 +1863,10 @@ function WorkspaceSettings({
               <div>
                 <p className="text-sm font-medium text-muted">Review members, roles, and invite access.</p>
               </div>
-              <Button 
-                type="button" 
-                variant="secondary" 
-                onClick={onCopyInviteLink} 
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onCopyInviteLink}
                 disabled={workspace?.visibility === 'private'}
                 className="h-10"
               >
@@ -1856,7 +2078,7 @@ function SettingToggle({ label, description, checked, disabled, onChange }) {
         <p className="text-sm font-semibold text-text">{label}</p>
         <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
       </div>
-      <Switch checked={checked} disabled={disabled} onClick={onChange} />
+      <Switch checked={checked} disabled={disabled} onClick={onChange} aria-label={label} />
     </div>
   )
 }
@@ -1875,10 +2097,10 @@ function MembersAndRequests({ workspace, isOwner, pendingRequests, onCopyInviteL
             <h2 className="text-base font-semibold text-text">Pending Requests</h2>
             <p className="mt-1 text-sm text-muted">Owners can accept or decline invite-link requests.</p>
           </div>
-          <Button 
-            type="button" 
-            variant="secondary" 
-            onClick={onCopyInviteLink} 
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCopyInviteLink}
             disabled={workspace?.visibility === 'private'}
             className="h-10"
           >

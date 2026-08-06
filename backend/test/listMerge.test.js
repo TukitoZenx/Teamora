@@ -108,4 +108,41 @@ describe('Messages merge (messages-v1)', () => {
     assert.equal(merged.format, 'messages-v1');
     assert.equal(merged.messages.length, 2);
   });
+
+  test('edit with newer updatedAt replaces message text', () => {
+    const existing = {
+      messages: [{ id: 'm1', text: 'old', createdAt: '2026-01-01T00:00:00.000Z' }]
+    };
+    const edited = mergeMessagesPayload(existing, {
+      messages: [
+        {
+          id: 'm1',
+          text: 'new',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-02T00:00:00.000Z'
+        }
+      ]
+    });
+    assert.equal(edited.messages.length, 1);
+    assert.equal(edited.messages[0].text, 'new');
+  });
+
+  test('soft-delete tombstone is kept for sync', () => {
+    const existing = {
+      messages: [{ id: 'm1', text: 'bye', createdAt: '2026-01-01T00:00:00.000Z' }]
+    };
+    const deleted = mergeMessagesPayload(existing, {
+      messages: [
+        {
+          id: 'm1',
+          text: 'bye',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+          deleted: true
+        }
+      ]
+    });
+    assert.equal(deleted.messages.length, 1);
+    assert.equal(deleted.messages[0].deleted, true);
+  });
 });

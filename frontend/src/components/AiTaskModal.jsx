@@ -1,43 +1,24 @@
-import { useState } from 'react';
-import { X, Sparkles, Loader2 } from 'lucide-react';
-import { getApiBaseUrl } from '../services/apiBaseUrl';
-import toast from 'react-hot-toast';
-import { v4 as uuidv4 } from 'uuid';
+import { useState } from 'react'
+import { X, Sparkles, Loader2 } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { v4 as uuidv4 } from 'uuid'
+import { generateTasks } from '../services/aiClient'
 
 export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceId }) {
-  const [prompt, setPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [prompt, setPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-    
-    setIsGenerating(true);
+    if (!prompt.trim()) return
+
+    setIsGenerating(true)
     try {
-      const url = `${getApiBaseUrl()}/api/v1/ai/generate-tasks`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, workspaceId }),
-        credentials: 'include'
-      });
+      const data = await generateTasks(prompt, workspaceId)
+      const rawTasks = data.tasks || []
 
-      if (!response.ok) {
-        let msg = 'Failed to generate tasks.';
-        try {
-          const data = await response.json();
-          if (data.message) msg = data.message;
-        } catch (e) {
-          // ignore
-        }
-        throw new Error(msg);
-      }
-
-      const data = await response.json();
-      const rawTasks = data.tasks || [];
-      
-      const formattedTasks = rawTasks.map(t => ({
+      const formattedTasks = rawTasks.map((t) => ({
         id: uuidv4(),
         title: t.title || 'Untitled Task',
         description: t.description || '',
@@ -45,19 +26,19 @@ export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceI
         dueDate: t.deadline || '', // YYYY-MM-DD
         priority: t.priority || 'Medium',
         completed: false
-      }));
+      }))
 
-      onInsertTasks(formattedTasks);
-      toast.success(`${formattedTasks.length} tasks generated successfully!`);
-      onClose();
-      setPrompt('');
+      onInsertTasks(formattedTasks)
+      toast.success(`${formattedTasks.length} tasks generated successfully!`)
+      onClose()
+      setPrompt('')
     } catch (err) {
-      console.error('Generate Error:', err);
-      toast.error(err.message || 'AI task generation failed');
+      console.error('Generate Error:', err)
+      toast.error(err.message || 'AI task generation failed')
     } finally {
-      setIsGenerating(false);
+      setIsGenerating(false)
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -70,7 +51,7 @@ export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceI
             </div>
             <h3 className="font-semibold text-text">AI Task Extractor</h3>
           </div>
-          <button 
+          <button
             onClick={onClose}
             disabled={isGenerating}
             className="p-1.5 text-muted hover:text-text hover:bg-muted/20 rounded-md transition-colors disabled:opacity-50"
@@ -123,5 +104,5 @@ export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceI
         </div>
       </div>
     </div>
-  );
+  )
 }

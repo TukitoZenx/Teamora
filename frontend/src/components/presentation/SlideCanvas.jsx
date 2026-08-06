@@ -120,9 +120,12 @@ export default function SlideCanvas({
     if (el.type === 'icon') {
       return (
         <div
-          className="flex h-full w-full select-none items-center justify-center pointer-events-none"
+          className="pointer-events-none flex h-full w-full select-none items-center justify-center"
           style={{
-            fontSize: el.fontSize || Math.min(el.width || 64, el.height || 64) * 0.55
+            // Explicit glyph color — never inherit app chrome `text-text` (flips light/dark).
+            color: el.color || '#0f172a',
+            fontSize: el.fontSize || Math.min(el.width || 64, el.height || 64) * 0.55,
+            lineHeight: 1
           }}
         >
           {el.icon || el.text || '★'}
@@ -172,7 +175,12 @@ export default function SlideCanvas({
               {child.type === 'image' ? (
                 <img src={child.src} className="h-full w-full object-cover" alt="" />
               ) : child.type === 'icon' ? (
-                <div className="flex h-full w-full items-center justify-center text-2xl">{child.icon || '★'}</div>
+                <div
+                  className="flex h-full w-full items-center justify-center text-2xl"
+                  style={{ color: child.color || '#0f172a', lineHeight: 1 }}
+                >
+                  {child.icon || '★'}
+                </div>
               ) : child.type === 'shape' || child.type === 'textbox' || child.type === 'text' ? (
                 <div
                   className="h-full w-full overflow-hidden whitespace-pre-wrap break-words p-2"

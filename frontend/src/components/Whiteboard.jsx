@@ -419,7 +419,7 @@ export default function Whiteboard({
     socket.emit?.('update-whiteboard-pages', { roomId, pages, activePageId })
   }, [activePageId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return
     const previous = undoStack[undoStack.length - 1]
     const verifiedPrev = Array.isArray(previous) ? previous : []
@@ -428,9 +428,9 @@ export default function Whiteboard({
     setElements(verifiedPrev)
     setUndoStack((prev) => prev.slice(0, -1))
     socket.emit('update-whiteboard-elements', { roomId, elements: verifiedPrev })
-  }
+  }, [undoStack, elements, socket, roomId])
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     if (redoStack.length === 0) return
     const next = redoStack[redoStack.length - 1]
     const verifiedNext = Array.isArray(next) ? next : []
@@ -439,28 +439,31 @@ export default function Whiteboard({
     setElements(verifiedNext)
     setRedoStack((prev) => prev.slice(0, -1))
     socket.emit('update-whiteboard-elements', { roomId, elements: verifiedNext })
-  }
+  }, [redoStack, elements, socket, roomId])
 
   const undoRef = useRef(handleUndo)
   const redoRef = useRef(handleRedo)
-  undoRef.current = handleUndo
-  redoRef.current = handleRedo
+
+  useEffect(() => {
+    undoRef.current = handleUndo
+    redoRef.current = handleRedo
+  }, [handleUndo, handleRedo])
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) redoRef.current();
-        else undoRef.current();
+        e.preventDefault()
+        if (e.shiftKey) redoRef.current()
+        else undoRef.current()
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        redoRef.current();
+        e.preventDefault()
+        redoRef.current()
       }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const handleElementTextChange = (elemId, newText) => {
     const safeElements = Array.isArray(elements) ? elements : []

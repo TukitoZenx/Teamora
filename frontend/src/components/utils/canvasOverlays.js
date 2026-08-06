@@ -36,10 +36,13 @@ export const newTextBox = (overrides = {}) => ({
   color: '#0f172a',
   bold: false,
   italic: false,
+  underline: false,
   align: 'left',
-  fill: 'rgba(255,255,255,0.92)',
+  fill: '#ffffff',
   borderColor: '#94a3b8',
   borderWidth: 1,
+  borderRadius: 4,
+  opacity: 1,
   ...overrides
 })
 
@@ -61,12 +64,29 @@ export const newShape = (shapeId = 'rect', overrides = {}) => {
     color: '#0f172a',
     bold: false,
     italic: false,
+    underline: false,
     align: 'center',
-    fill: 'color-mix(in srgb, var(--tw-primary) 12%, transparent)',
-    borderColor: 'var(--tw-primary)',
+    fill: '#ede9fe',
+    borderColor: '#7c3aed',
     borderWidth: 2,
+    borderRadius: 4,
+    opacity: 1,
     ...overrides
   }
+}
+
+/** Normalize color values for <input type="color"> (needs #rrggbb). */
+export function toColorInputValue(value, fallback = '#ffffff') {
+  if (typeof value !== 'string' || !value.trim()) return fallback
+  const v = value.trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) return v
+  if (/^#[0-9a-fA-F]{3}$/.test(v)) {
+    const r = v[1]
+    const g = v[2]
+    const b = v[3]
+    return `#${r}${r}${g}${g}${b}${b}`
+  }
+  return fallback
 }
 
 /** Convert lightweight latex-ish / ascii math to HTML with unicode + CSS. */

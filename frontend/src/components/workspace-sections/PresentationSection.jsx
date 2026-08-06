@@ -208,7 +208,7 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
     const provider = connectRestYjsProvider(ydoc, {
       workspaceId,
       key: contentKey,
-      pollMs: 2000
+      pollMs: 3000
     })
     providerRef.current = provider
 

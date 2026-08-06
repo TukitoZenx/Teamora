@@ -96,7 +96,11 @@ function SlideMiniPreview({ slide, theme }) {
             ) : el.type === 'icon' ? (
               <div
                 className="flex h-full w-full items-center justify-center"
-                style={{ fontSize: Math.min(el.width || 40, el.height || 40) * 0.55 }}
+                style={{
+                  color: el.color || '#0f172a',
+                  fontSize: Math.min(el.width || 40, el.height || 40) * 0.55,
+                  lineHeight: 1
+                }}
               >
                 {el.icon || el.text || '★'}
               </div>

@@ -1,5 +1,6 @@
 const { WebSocketServer, WebSocket } = require('ws');
 const Workspace = require('../models/Workspace');
+const logger = require('../utils/logger');
 
 /**
  * Lightweight collab WebSocket hub.
@@ -12,6 +13,8 @@ const roomKey = (workspaceId, key) => `${workspaceId}::${key}`;
 
 /** Set by attachCollabWs so services can kick clients when a workspace is deleted. */
 let activeHub = null;
+/** Active WebSocketServer instance for graceful shutdown / stats. */
+let activeWss = null;
 
 const isWorkspaceMember = (workspace, userId) =>
   workspace.members.some((memberId) => {
@@ -26,6 +29,48 @@ const isWorkspaceMember = (workspace, userId) =>
 const forceCloseWorkspace = (workspaceId) => {
   if (!activeHub || !workspaceId) return;
   activeHub.forceCloseWorkspace(String(workspaceId));
+};
+
+/** Snapshot for readiness / ops probes (no secrets). */
+const getCollabStats = () => {
+  if (!activeWss) {
+    return { attached: false, clients: 0 };
+  }
+  return {
+    attached: true,
+    clients: activeWss.clients?.size || 0
+  };
+};
+
+/**
+ * Close all collab sockets and stop the hub (graceful process shutdown).
+ */
+const closeCollabWs = async () => {
+  const wss = activeWss;
+  activeWss = null;
+  activeHub = null;
+  if (!wss) return;
+
+  for (const client of wss.clients) {
+    try {
+      client.close(1001, 'server shutting down');
+    } catch {
+      try {
+        client.terminate();
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  await new Promise((resolve) => {
+    try {
+      wss.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+  logger.info('Collab WebSocket hub closed');
 };
 
 const runSession = (sessionMiddleware, req) =>
@@ -399,12 +444,15 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
 
   wss.on('close', () => clearInterval(heartbeat));
 
-  console.log('[collab-ws] attached at path /collab');
+  activeWss = wss;
+  logger.info('Collab WebSocket attached at path /collab');
   return wss;
 };
 
 module.exports = {
   attachCollabWs,
   forceCloseWorkspace,
+  closeCollabWs,
+  getCollabStats,
   roomKey
 };

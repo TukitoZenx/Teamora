@@ -160,8 +160,8 @@ describe('Workspace Service - createWorkspace', () => {
     await assert.rejects(
       () => workspaceService.createWorkspace(ownerId, { name: 'Overflow Workspace' }),
       (error) => {
-        assert.equal(error.statusCode, 400);
-        assert.match(error.message, /Maximum 6 workspaces/i);
+        assert.equal(error.statusCode, 403);
+        assert.match(error.message, /Workspace limit reached \(6 max\)/i);
         return true;
       }
     );
@@ -310,5 +310,39 @@ describe('Workspace Service - requestWorkspaceAccess', () => {
     );
     assert.equal(mockWorkspace.joinRequests[0].status, 'accepted');
     assert.ok(mockWorkspace.joinRequests[0].resolvedAt instanceof Date);
+  });
+});
+
+describe('Workspace Service - declineJoinRequest', () => {
+  afterEach(() => {
+    mock.restoreAll();
+  });
+
+  test('should reject decline on archived workspaces', async () => {
+    const ownerId = new mongoose.Types.ObjectId();
+    const workspaceId = new mongoose.Types.ObjectId();
+    const requestId = new mongoose.Types.ObjectId();
+
+    const mockWorkspace = {
+      _id: workspaceId,
+      owner: ownerId,
+      archivedAt: new Date(),
+      joinRequests: {
+        id: () => ({ _id: requestId, status: 'pending' })
+      }
+    };
+
+    mock.method(Workspace, 'findById', () => ({
+      populate: () => Promise.resolve(mockWorkspace)
+    }));
+
+    await assert.rejects(
+      () => workspaceService.declineJoinRequest(ownerId, workspaceId.toString(), requestId.toString()),
+      (error) => {
+        assert.equal(error.statusCode, 404);
+        assert.match(error.message, /Workspace not found/i);
+        return true;
+      }
+    );
   });
 });

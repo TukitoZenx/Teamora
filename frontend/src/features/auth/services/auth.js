@@ -1,7 +1,7 @@
 import api from '../../../services/api'
-//why this file is imported ? ans : this file is imported to use the api instance for making HTTP requests to the backend server
+
 const extractUser = (data) => data?.user || null
-//where the data come from 
+
 export const register = async (payload) => {
   const { data } = await api.post('/api/auth/register', payload)
   return extractUser(data)

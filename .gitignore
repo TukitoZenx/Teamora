@@ -45,3 +45,6 @@ coverage/
 backend/local_db/
 backend/local_db.log
 *.wt
+
+# Orphaned ad-hoc test sandbox (not used by npm test)
+backend/tests/

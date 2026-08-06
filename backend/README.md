@@ -26,6 +26,15 @@ EMAIL_FROM=no-reply@teamora.com
 - **Development**: `npm run dev`
 - **Production**: `npm start`
 
+## Health probes
+
+| Path                            | Use                                                     |
+| ------------------------------- | ------------------------------------------------------- |
+| `GET /health` or `/health/live` | Liveness (process up)                                   |
+| `GET /health/ready`             | Readiness (Mongo connected) — prefer for load balancers |
+
+Responses include uptime/version; readiness embeds Mongo + collab WS stats. See `docs/OPERATIONS.md`.
+
 ## Running Tests
 
 Automated unit tests use Node's native test runner (`node:test`) and run in isolation without requiring MongoDB:

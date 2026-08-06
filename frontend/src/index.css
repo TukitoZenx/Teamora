@@ -32,10 +32,10 @@
   --tw-card-sunken: #f1f5f9;
   --tw-overlay: rgba(15, 23, 42, 0.4);
 
-  /* Text & borders */
+  /* Text & borders — muted tuned for ≥4.5:1 on background/card (WCAG AA body text) */
   --tw-text: #0f172a;
   --tw-text-secondary: #334155;
-  --tw-muted: #64748b;
+  --tw-muted: #475569;
   --tw-border: #e2e8f0;
   --tw-border-strong: #cbd5e1;
   --tw-ring: rgba(124, 58, 237, 0.18);
@@ -325,6 +325,25 @@
   outline-offset: 2px;
 }
 
+/* Skip link (see index.html) — becomes visible on keyboard focus */
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 0 !important;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Ensure primary interactive targets meet 44×44px minimum hit area on touch */
+@media (pointer: coarse) {
+  button,
+  [role='button'],
+  a.inline-flex,
+  .teamora-control {
+    min-height: var(--tw-touch-min);
+    min-width: var(--tw-touch-min);
+  }
+}
+
 /* Text fields use their own border/ring styles — avoid a second outer box */
 input:focus,
 input:focus-visible,
@@ -453,12 +472,17 @@ html[data-density='compact'] .teamora-content-fade {
 }
 
 @keyframes teamora-ai-glow {
-  0%, 100% {
-    box-shadow: 0 0 30px rgba(124, 58, 237, 0.4), inset 0 0 15px rgba(124, 58, 237, 0.1);
+  0%,
+  100% {
+    box-shadow:
+      0 0 30px rgba(124, 58, 237, 0.4),
+      inset 0 0 15px rgba(124, 58, 237, 0.1);
     border-color: rgba(124, 58, 237, 0.4);
   }
   50% {
-    box-shadow: 0 0 70px rgba(124, 58, 237, 0.9), inset 0 0 30px rgba(124, 58, 237, 0.3);
+    box-shadow:
+      0 0 70px rgba(124, 58, 237, 0.9),
+      inset 0 0 30px rgba(124, 58, 237, 0.3);
     border-color: rgba(124, 58, 237, 1);
   }
 }
@@ -541,6 +565,18 @@ html[data-presentation-mode='true'] #presentation-fullscreen-root {
     color var(--tw-duration-normal) var(--tw-ease-standard),
     box-shadow var(--tw-duration-normal) var(--tw-ease-standard),
     opacity var(--tw-duration-normal) var(--tw-ease-standard);
+}
+
+/*
+ * Spreadsheet grid: thousands of cells — never animate color/theme transitions
+ * or theme flips feel multi-second laggy on the sheet.
+ */
+.teamora-sheet-grid,
+.teamora-sheet-grid *,
+.teamora-sheet-grid *::before,
+.teamora-sheet-grid *::after {
+  transition: none !important;
+  animation: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -658,7 +694,10 @@ textarea {
     margin: 1in;
   }
 
-  body, html, #root, .teamora-page {
+  body,
+  html,
+  #root,
+  .teamora-page {
     background: white !important;
     color: black !important;
     min-height: auto !important;
@@ -669,7 +708,8 @@ textarea {
   }
 
   /* Prevent content flowing into the gap and ensure proper page breaks */
-  .quill-editor-wrapper, .quill-editor-wrapper .ql-editor {
+  .quill-editor-wrapper,
+  .quill-editor-wrapper .ql-editor {
     height: auto !important;
     min-height: auto !important;
     overflow: visible !important;
@@ -686,17 +726,31 @@ textarea {
     page-break-inside: avoid;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     page-break-after: avoid;
   }
 
-  img, table, pre, blockquote {
+  img,
+  table,
+  pre,
+  blockquote {
     page-break-inside: avoid;
   }
 
   /* Hide UI elements that shouldn't be printed */
-  nav, header, aside, .no-print, [data-app-navbar], [data-workspace-sidebar], button, .teamora-control {
+  nav,
+  header,
+  aside,
+  .no-print,
+  [data-app-navbar],
+  [data-workspace-sidebar],
+  button,
+  .teamora-control {
     display: none !important;
   }
 }
-

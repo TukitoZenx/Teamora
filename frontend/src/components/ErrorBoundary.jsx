@@ -2,7 +2,7 @@ import React from 'react'
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
 import TeamoraLogo from './ui/TeamoraLogo'
 
-const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
+import { LAST_WORKSPACE_KEY } from '../utils/workspaceStorage'
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -41,7 +41,12 @@ export default class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex min-h-screen w-screen flex-col items-center justify-center bg-background p-6 font-sans text-text">
+        <main
+          id="main-content"
+          role="alert"
+          tabIndex={-1}
+          className="flex min-h-screen w-screen flex-col items-center justify-center bg-background p-6 font-sans text-text outline-none"
+        >
           <TeamoraLogo size="lg" className="mb-4" />
           <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-danger/30 bg-danger/10 text-danger">
             <AlertTriangle className="h-8 w-8" aria-hidden />
@@ -55,7 +60,7 @@ export default class ErrorBoundary extends React.Component {
             <button
               type="button"
               onClick={this.handleRetry}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary shadow-sm transition-colors hover:bg-primary-hover"
+              className="inline-flex min-h-[var(--tw-touch-min)] cursor-pointer items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-on-primary shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
             >
               <RotateCcw className="h-4 w-4" aria-hidden />
               <span>Retry</span>
@@ -63,13 +68,13 @@ export default class ErrorBoundary extends React.Component {
             <button
               type="button"
               onClick={this.handleReturnToDashboard}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-text transition-colors hover:bg-primary/10"
+              className="inline-flex min-h-[var(--tw-touch-min)] cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-text transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
             >
               <Home className="h-4 w-4" aria-hidden />
               <span>Return to Dashboard</span>
             </button>
           </div>
-        </div>
+        </main>
       )
     }
 

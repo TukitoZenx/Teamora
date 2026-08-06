@@ -19,26 +19,27 @@ Teamora is a real-time collaborative workspace application similar to Notion or 
 - Shared File Storage
 - AI Assistants (Text generation, Data/Formula generation, Slide generation, Task extraction)
 
-**Technology Stack:**
+**Technology Stack (current as of production-readiness audit):**
 
 *   **Frontend Technologies:**
-    *   React 18 (Vite)
-    *   React Router v6
-    *   TailwindCSS (Styling)
-    *   Yjs (Real-time CRDT collaboration)
+    *   React 19 + Vite 8
+    *   React Router v7
+    *   Tailwind CSS 4 (design tokens in `index.css`)
+    *   Yjs + custom REST/WS collab provider
     *   Lucide React (Icons)
     *   React Hot Toast (Notifications)
 *   **Backend Technologies:**
-    *   Node.js & Express.js
-    *   Socket.IO & WebSockets (Real-time signaling and Yjs sync)
-    *   Passport.js (Authentication via Google & Local)
-    *   Mongoose (MongoDB ODM)
-    *   Multer (File uploads)
+    *   Node.js ≥20.8 + Express 5
+    *   Native `ws` hub (`/collab`) for Yjs fanout + meeting signaling (not Socket.IO)
+    *   Passport.js (Google OAuth + local sessions via `express-session` / `connect-mongo`)
+    *   Mongoose 9 (MongoDB ODM)
+    *   Multer (file imports)
 *   **Database:**
-    *   MongoDB (Stores user data, workspace metadata, and Yjs document blobs)
+    *   MongoDB (users, workspace metadata, `WorkspaceContent` Yjs blobs)
 *   **External Services:**
-    *   Google OAuth (SSO Authentication)
-    *   Ollama / Local AI models (For AI assistant generation)
+    *   Google OAuth (SSO)
+    *   Optional Google GenAI (`@google/genai`) when configured
+    *   SMTP (Nodemailer) for password reset + task reminders
 
 ---
 
@@ -59,19 +60,19 @@ frontend/src/main.jsx (Entry Point)
 Providers (AuthProvider, MeetingProvider, etc.)
  |
  ↓
-frontend/src/App.jsx (Routing & Global State)
+frontend/src/App.jsx (Shell routing + workspace list state)
  |
  ↓
-Router (React Router DOM)
+Router (React Router DOM, lazy routes)
  |
  ↓
-Pages (Dashboard, WorkspaceHome, AuthPage)
+Pages (Dashboard, WorkspaceHome, Auth pages under features/auth)
  |
  ↓
-Components (Documents, Whiteboard, Calendar)
+Components + workspace-sections (Documents, Whiteboard, Calendar, …)
  |
  ↓
-Services/API (api.js, aiClient.js, Yjs WebSockets)
+Services (api.js CSRF session client, restYjsProvider, collabSocket, aiClient)
 ```
 
 ### Backend Architecture

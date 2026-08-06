@@ -7,9 +7,10 @@ const variants = {
 }
 
 const sizes = {
-  sm: 'h-8 w-8 min-h-8 min-w-8 rounded-control',
-  md: 'h-10 w-10 min-h-10 min-w-10 rounded-button',
-  lg: 'h-11 w-11 min-h-11 min-w-11 rounded-button'
+  // Keep visual size compact but enforce ≥44px touch/hit target via min-* utilities.
+  sm: 'h-9 w-9 min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] rounded-control',
+  md: 'h-11 w-11 min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] rounded-button',
+  lg: 'h-12 w-12 min-h-12 min-w-12 rounded-button'
 }
 
 export default function IconButton({
@@ -21,10 +22,12 @@ export default function IconButton({
   'aria-label': ariaLabel,
   ...props
 }) {
+  const accessibleName = ariaLabel || label
   return (
     <button
       type="button"
-      aria-label={ariaLabel || label}
+      aria-label={accessibleName}
+      title={label || ariaLabel}
       className={clsx(
         'inline-flex items-center justify-center transition duration-normal ease-standard',
         'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20',
@@ -36,6 +39,7 @@ export default function IconButton({
       {...props}
     >
       {children}
+      {!accessibleName ? <span className="sr-only">Action</span> : null}
     </button>
   )
 }

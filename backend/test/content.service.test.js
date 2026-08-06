@@ -33,6 +33,29 @@ describe('Content Service', () => {
     );
   });
 
+  test('rejects non-members from writing content (membership guard)', async () => {
+    const workspaceId = new mongoose.Types.ObjectId();
+    const outsiderId = new mongoose.Types.ObjectId();
+    const ownerId = new mongoose.Types.ObjectId();
+
+    mock.method(Workspace, 'findById', () => ({
+      select: () =>
+        Promise.resolve({
+          _id: workspaceId,
+          members: [ownerId],
+          archivedAt: null
+        })
+    }));
+
+    await assert.rejects(
+      () => contentService.putContent(outsiderId, workspaceId.toString(), 'files', { format: 'files-v1', files: [] }),
+      (error) => {
+        assert.equal(error.statusCode, 404);
+        return true;
+      }
+    );
+  });
+
   test('rejects invalid content keys', async () => {
     const workspaceId = new mongoose.Types.ObjectId();
     const userId = new mongoose.Types.ObjectId();

@@ -20,6 +20,13 @@ Teamora is a comprehensive real-time collaboration workspace designed for remote
 - **Database:** MongoDB / Mongoose (for durable persistence of users, workspaces, and workspace content blobs).
 - **Authentication:** Passport.js (Local Strategy and Google OAuth20) with `express-session`.
 
+## Operations
+
+Production health probes, env checklist, failure modes, and deploy steps: **[docs/OPERATIONS.md](docs/OPERATIONS.md)**.
+
+- Liveness: `GET /health` · `GET /health/live`
+- Readiness: `GET /health/ready` (Mongo must be connected)
+
 ## High-Level Architecture
 
 ```mermaid

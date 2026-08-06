@@ -31,7 +31,9 @@ import {
   Circle,
   Square,
   FolderUp,
-  Sparkles, Download } from 'lucide-react'
+  Sparkles,
+  Download
+} from 'lucide-react'
 import { listThemeCards } from './utils/slideThemes'
 import api from '../../services/api'
 
@@ -298,25 +300,16 @@ export default function TopToolbar({
           AI Assistant
         </button>
 
-                <button
+        <button
           type="button"
           onClick={onExportPptx}
-          className="mb-1 mr-2 flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/25 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all sm:px-4 cursor-pointer"
+          className="mb-1 mr-2 flex items-center gap-1.5 rounded-md border border-primary/25 bg-primary/10 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all hover:bg-primary/20 sm:px-4 cursor-pointer"
         >
           <Download className="h-4 w-4" />
           <span>Export PPTX</span>
         </button>
 
         <button
-          type="button"
-          onClick={onExportPptx}
-          className="mb-1 mr-2 flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/25 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all sm:px-4 cursor-pointer"
-        >
-          <Download className="h-4 w-4" />
-          <span>Export PPTX</span>
-        </button>
-
-<button
           type="button"
           onClick={handleImportClick}
           className="mb-1 mr-2 flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/25 px-3 py-1.5 text-[13px] font-semibold text-primary shadow-sm transition-all sm:px-4 cursor-pointer"
@@ -616,7 +609,7 @@ export default function TopToolbar({
             ))}
             <button
               type="button"
-              onClick={() => onInsertElement?.('icon', { icon: '★', fill: '#fef3c7' })}
+              onClick={() => onInsertElement?.('icon', { icon: '★', fill: '#fef3c7', color: '#d97706' })}
               className="flex h-16 w-12 flex-col items-center justify-center rounded text-text transition-colors hover:bg-muted/50 sm:w-14"
             >
               <Star className="mb-1 h-5 w-5 text-amber-500" />
@@ -624,7 +617,7 @@ export default function TopToolbar({
             </button>
             <button
               type="button"
-              onClick={() => onInsertElement?.('icon', { icon: '♥', fill: '#fee2e2' })}
+              onClick={() => onInsertElement?.('icon', { icon: '♥', fill: '#fee2e2', color: '#e11d48' })}
               className="flex h-16 w-12 flex-col items-center justify-center rounded text-text transition-colors hover:bg-muted/50 sm:w-14"
             >
               <Heart className="mb-1 h-5 w-5 text-rose-500" />

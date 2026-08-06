@@ -252,19 +252,19 @@ export default function SharedFilesSection({
     try {
       toast.loading(`Downloading ${file.name}...`, { id: 'download' })
       const { getWorkspaceContent } = await import('../../services/workspaceContent')
-      
+
       let res = null
       if (file.kind === 'document') {
-         res = await getWorkspaceContent(workspaceId, `documents:${file.id}`)
+        res = await getWorkspaceContent(workspaceId, `documents:${file.id}`)
       } else if (file.kind === 'whiteboard') {
-         res = await getWorkspaceContent(workspaceId, `whiteboards:${file.id}`)
+        res = await getWorkspaceContent(workspaceId, `whiteboards:${file.id}`)
       } else if (file.kind === 'spreadsheet') {
-         res = await getWorkspaceContent(workspaceId, `spreadsheets:${file.id}`)
+        res = await getWorkspaceContent(workspaceId, `spreadsheets:${file.id}`)
       } else if (file.kind === 'presentation') {
-         res = await getWorkspaceContent(workspaceId, `presentations:${file.id}`)
+        res = await getWorkspaceContent(workspaceId, `presentations:${file.id}`)
       } else {
-         toast.error('Unsupported file kind for download', { id: 'download' })
-         return
+        toast.error('Unsupported file kind for download', { id: 'download' })
+        return
       }
 
       const contentData = extractYjsContent(res, file.kind)
@@ -285,7 +285,7 @@ export default function SharedFilesSection({
     }
   }
 
-    const handleDownloadFolder = async (folder) => {
+  const handleDownloadFolder = async (folder) => {
     if (!workspaceId) return
     try {
       toast.loading(`Zipping folder...`, { id: 'zip' })
@@ -294,7 +294,7 @@ export default function SharedFilesSection({
 
       async function* getFiles() {
         const fetchFolderContents = async function* (folderId, path = '') {
-          const children = (workspaceFiles || []).filter(f => f.parentId === folderId)
+          const children = (workspaceFiles || []).filter((f) => f.parentId === folderId)
           for (const child of children) {
             if (child.type === 'folder') {
               yield* fetchFolderContents(child.id, `${path}${child.name}/`)
@@ -327,7 +327,7 @@ export default function SharedFilesSection({
       }
 
       const response = downloadZip(getFiles())
-      
+
       if (window.showSaveFilePicker) {
         try {
           const fileHandle = await window.showSaveFilePicker({
@@ -347,7 +347,7 @@ export default function SharedFilesSection({
           return
         }
       }
-      
+
       const blob = await response.blob()
       const element = document.createElement('a')
       element.href = URL.createObjectURL(blob)

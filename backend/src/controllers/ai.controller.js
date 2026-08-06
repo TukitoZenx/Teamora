@@ -52,7 +52,7 @@ const generateSlides = async (req, res) => {
   if (!prompt) {
     return res.status(400).json({ success: false, message: 'Prompt is required' });
   }
-  
+
   try {
     const jsonStr = await AiService.generateSlides(prompt);
     // Parse it to ensure it's valid JSON before sending
@@ -69,7 +69,7 @@ const generateSpreadsheet = async (req, res) => {
   if (!prompt || !mode) {
     return res.status(400).json({ success: false, message: 'Prompt and mode are required' });
   }
-  
+
   try {
     const result = await AiService.generateSpreadsheet(prompt, mode);
     res.json({ success: true, result });
@@ -84,7 +84,7 @@ const generateTasks = async (req, res) => {
   if (!prompt) {
     return res.status(400).json({ success: false, message: 'Prompt is required' });
   }
-  
+
   try {
     const result = await AiService.generateTasks(prompt);
     res.json({ success: true, tasks: result });

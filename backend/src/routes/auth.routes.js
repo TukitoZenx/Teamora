@@ -7,11 +7,9 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Only throttle unauthenticated, brute-forceable/enumerable endpoints. Routes
-// that already require a valid session (`/me`, `/profile`, `/logout`) are
-// deliberately excluded so normal app usage (e.g. `/me` on every page load)
-// can never lock a legitimate, already-authenticated user out of their own
-// session. Disabled outside production so local development isn't throttled.
+// Throttle only unauthenticated, brute-forceable endpoints.
+// /me, /logout, /profile, /google*, /csrf are intentionally unthrottled so
+// legitimate session traffic cannot lock a user out mid-session.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -24,8 +22,8 @@ const authLimiter = rateLimit({
 });
 
 const forgotPasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 forgot password requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -35,18 +33,33 @@ const forgotPasswordLimiter = rateLimit({
 });
 
 const sensitive = isProduction ? [authLimiter] : [];
+const forgot = [forgotPasswordLimiter];
+// Enumeration surface: always throttle check-email (even in development).
+const checkEmailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many email checks. Please try again later.'
+  }
+});
 
 router.post('/register', ...sensitive, authController.register);
-router.post('/check-email', ...sensitive, authController.checkEmail);
+router.post('/check-email', checkEmailLimiter, authController.checkEmail);
 router.post('/login', ...sensitive, authController.login);
-router.post('/forgot-password', forgotPasswordLimiter, authController.forgotPassword);
+router.post('/forgot-password', ...forgot, authController.forgotPassword);
 router.post('/reset-password/:token', ...sensitive, authController.resetPassword);
 router.post('/reset-password', ...sensitive, authController.resetPassword);
+
+// Unthrottled session / OAuth / CSRF endpoints
+router.get('/csrf', authController.csrfToken);
 router.post('/logout', authController.logout);
 router.get('/me', requireAuth, authController.me);
 router.patch('/profile', requireAuth, authController.updateProfile);
-router.get('/google', ...sensitive, authController.google);
-router.post('/google', ...sensitive, authController.google);
+router.get('/google', authController.google);
+router.post('/google', authController.google);
 router.get('/google/callback', authController.googleCallback);
 
 module.exports = router;

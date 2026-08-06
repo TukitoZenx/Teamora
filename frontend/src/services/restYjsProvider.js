@@ -2,18 +2,22 @@ import * as Y from 'yjs'
 import { getWorkspaceContent, putWorkspaceContent } from './workspaceContent'
 import { connectCollabSocket } from './collabSocket'
 
+/** Chunked base64 — avoids per-byte string concat on large Yjs updates. */
 const toBase64 = (u8) => {
-  let s = ''
-  u8.forEach((b) => {
-    s += String.fromCharCode(b)
-  })
-  return btoa(s)
+  const bytes = u8 instanceof Uint8Array ? u8 : new Uint8Array(u8)
+  const chunk = 0x8000
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
 }
 
 const fromBase64 = (b64) => {
-  const s = atob(b64)
-  const u8 = new Uint8Array(s.length)
-  for (let i = 0; i < s.length; i += 1) u8[i] = s.charCodeAt(i)
+  const binary = atob(b64)
+  const len = binary.length
+  const u8 = new Uint8Array(len)
+  for (let i = 0; i < len; i += 1) u8[i] = binary.charCodeAt(i)
   return u8
 }
 
@@ -21,11 +25,11 @@ const fromBase64 = (b64) => {
  * Yjs provider over REST content API + optional WebSocket fanout.
  * - Pushes local updates (debounced) to REST for durability
  * - Broadcasts same updates over WS for low latency when available
- * - Polls server as backup (slower when WS connected)
+ * - Polls server as backup (much slower when WS connected; pauses when tab hidden)
  */
 export function connectRestYjsProvider(
   ydoc,
-  { workspaceId, key, pollMs = 1200, user, onAwareness, onPeerLeave, onWsStatus, onWorkspaceDeleted }
+  { workspaceId, key, pollMs = 3000, user, onAwareness, onPeerLeave, onWsStatus, onWorkspaceDeleted }
 ) {
   let destroyed = false
   let pending = []
@@ -33,9 +37,11 @@ export function connectRestYjsProvider(
   let pollTimer = null
   let pushing = false
   let lastPushedState = null
+  let lastRemoteState = null
   let wsConnected = false
   let wsPending = []
   let wsFlushTimer = null
+  let pullInFlight = false
 
   const handleWorkspaceDeleted = (msg) => {
     destroyed = true
@@ -51,6 +57,41 @@ export function connectRestYjsProvider(
       // ignore
     }
     onWorkspaceDeleted?.(msg)
+  }
+
+  let blockedByPayload = false
+
+  // Poll helpers must exist before connectCollabSocket: onStatus can fire
+  // synchronously during connect() ('connecting' / 'unavailable').
+  const currentPollMs = () => (wsConnected ? Math.max(pollMs, 15000) : pollMs)
+
+  const pull = async () => {
+    if (destroyed || !workspaceId || pullInFlight) return
+    pullInFlight = true
+    try {
+      const content = await getWorkspaceContent(workspaceId, key)
+      const remote = content?.data
+      if (!remote || remote.format !== 'yjs-v1' || typeof remote.state !== 'string') return
+      // Skip expensive apply when nothing changed.
+      if (remote.state === lastPushedState || remote.state === lastRemoteState) return
+      lastRemoteState = remote.state
+      Y.applyUpdate(ydoc, fromBase64(remote.state), 'remote')
+    } catch {
+      // Offline — keep local.
+    } finally {
+      pullInFlight = false
+    }
+  }
+
+  const pullIfVisible = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    return pull()
+  }
+
+  const reschedulePoll = () => {
+    if (destroyed) return
+    if (pollTimer) window.clearInterval(pollTimer)
+    pollTimer = window.setInterval(pullIfVisible, currentPollMs())
   }
 
   const collab =
@@ -73,17 +114,11 @@ export function connectRestYjsProvider(
               if (status === 'workspace-deleted') return
               wsConnected = status === 'joined' || status === 'open'
               onWsStatus?.(status)
-              // Tighten / loosen poll when WS availability changes.
-              if (pollTimer) {
-                window.clearInterval(pollTimer)
-                pollTimer = window.setInterval(pull, wsConnected ? Math.max(pollMs, 8000) : pollMs)
-              }
+              reschedulePoll()
             }
           }
         )
       : null
-
-  let blockedByPayload = false
 
   const flush = async () => {
     if (destroyed || pushing || pending.length === 0 || !workspaceId) return
@@ -105,6 +140,7 @@ export function connectRestYjsProvider(
         update: updateB64
       })
       lastPushedState = toBase64(Y.encodeStateAsUpdate(ydoc))
+      lastRemoteState = lastPushedState
       blockedByPayload = false
     } catch (err) {
       const status = err?.status || err?.response?.status
@@ -124,17 +160,19 @@ export function connectRestYjsProvider(
     } finally {
       pushing = false
       if (pending.length > 0 && !destroyed && !blockedByPayload) {
-        flushTimer = window.setTimeout(flush, 400)
+        flushTimer = window.setTimeout(flush, 500)
       }
     }
   }
 
   const scheduleFlush = () => {
     if (flushTimer) return
+    // Slightly longer debounce when live WS is up — durability is secondary to typing latency.
+    const delay = wsConnected ? 700 : 450
     flushTimer = window.setTimeout(() => {
       flushTimer = null
       flush()
-    }, 350)
+    }, delay)
   }
 
   const flushWs = () => {
@@ -167,21 +205,18 @@ export function connectRestYjsProvider(
 
   ydoc.on('update', onLocalUpdate)
 
-  const pull = async () => {
-    if (destroyed || !workspaceId) return
-    try {
-      const content = await getWorkspaceContent(workspaceId, key)
-      const remote = content?.data
-      if (!remote || remote.format !== 'yjs-v1' || typeof remote.state !== 'string') return
-      if (remote.state === lastPushedState) return
-      Y.applyUpdate(ydoc, fromBase64(remote.state), 'remote')
-    } catch {
-      // Offline — keep local.
+  pull()
+  pollTimer = window.setInterval(pullIfVisible, currentPollMs())
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      reschedulePoll()
+      pull()
     }
   }
-
-  pull()
-  pollTimer = window.setInterval(pull, pollMs)
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibility)
+  }
 
   return {
     destroy() {
@@ -194,6 +229,9 @@ export function connectRestYjsProvider(
       if (flushTimer) window.clearTimeout(flushTimer)
       if (wsFlushTimer) window.clearTimeout(wsFlushTimer)
       if (pollTimer) window.clearInterval(pollTimer)
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility)
+      }
       collab?.destroy?.()
       return finalFlush
     },

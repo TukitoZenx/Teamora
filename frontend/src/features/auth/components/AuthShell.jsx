@@ -10,7 +10,11 @@ import AuthBrandPanel from './AuthBrandPanel'
  */
 export default function AuthShell({ children, mode = 'signin' }) {
   return (
-    <main className="min-h-screen bg-background font-sans text-text md:grid md:grid-cols-[minmax(0,60%)_minmax(0,40%)]">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="min-h-screen bg-background font-sans text-text outline-none md:grid md:grid-cols-[minmax(0,60%)_minmax(0,40%)]"
+    >
       <AuthBrandPanel mode={mode} />
 
       <section className="relative flex min-h-screen flex-col overflow-hidden bg-background">

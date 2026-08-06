@@ -27,6 +27,9 @@ jobs:
       - name: Install backend dependencies
         run: npm ci
 
+      - name: Audit backend dependencies (high+)
+        run: npm audit --audit-level=high
+
       - name: Check backend code formatting
         run: npm run format:check
 
@@ -53,11 +56,20 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Audit frontend dependencies (high+)
+        run: node scripts/audit-check.mjs
+
       - name: Check frontend code formatting
         run: npm run format:check
 
       - name: Run frontend linter
         run: npm run lint
 
+      - name: Run frontend unit tests
+        run: npm test
+
       - name: Build frontend application
         run: npm run build
+        env:
+          VITE_API_URL: http://localhost:5000
+

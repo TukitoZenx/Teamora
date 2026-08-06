@@ -44,7 +44,7 @@ function StepIndicator({ step }) {
   )
 }
 
-export default function AuthPage({ mode }) {
+export default function AuthPage({ mode }) {// what is the purpose of this function ? ans : it is used to render the authentication page, it takes a mode prop which can be either signin or signup and based on that it renders the appropriate form and also it uses the useAuthForm hook to handle the form state and submission . this function is used in the App.jsx file to render the authentication page when the user navigates to /signin or /signup route.
   const {
     error,
     form,
@@ -123,14 +123,19 @@ export default function AuthPage({ mode }) {
             )}
 
             {error && (
-              <div className="mb-4">
+              <div className="mb-4" id="auth-form-error">
                 <AuthAlert>{error}</AuthAlert>
               </div>
             )}
 
             {!isSignup && (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4"
+                aria-describedby={error ? 'auth-form-error' : undefined}
+              >
                 <AuthField
+                  id="signin-email"
                   icon={Mail}
                   label="Email"
                   type="email"
@@ -139,9 +144,11 @@ export default function AuthPage({ mode }) {
                   value={form.email}
                   onChange={(event) => updateField('email', event.target.value)}
                   placeholder="you@company.com"
+                  aria-describedby={error ? 'auth-form-error' : undefined}
                 />
 
                 <AuthField
+                  id="signin-password"
                   icon={Lock}
                   label="Password"
                   type="password"
@@ -150,6 +157,7 @@ export default function AuthPage({ mode }) {
                   value={form.password}
                   onChange={(event) => updateField('password', event.target.value)}
                   placeholder="Enter your password"
+                  aria-describedby={error ? 'auth-form-error' : undefined}
                   hint={
                     <Link to="/forgot-password" className="text-xs font-medium text-primary hover:underline">
                       Forgot password?
@@ -166,8 +174,13 @@ export default function AuthPage({ mode }) {
             )}
 
             {isSignup && signupStep === 1 && (
-              <form onSubmit={continueSignup} className="space-y-4">
+              <form
+                onSubmit={continueSignup}
+                className="space-y-4"
+                aria-describedby={error ? 'auth-form-error' : undefined}
+              >
                 <AuthField
+                  id="signup-email"
                   icon={Mail}
                   label="Work email"
                   type="email"
@@ -176,9 +189,11 @@ export default function AuthPage({ mode }) {
                   value={form.email}
                   onChange={(event) => updateField('email', event.target.value)}
                   placeholder="you@company.com"
+                  aria-describedby={error ? 'auth-form-error' : undefined}
                 />
 
                 <AuthField
+                  id="signup-password"
                   icon={Lock}
                   label="Password"
                   type="password"
@@ -187,6 +202,7 @@ export default function AuthPage({ mode }) {
                   value={form.password}
                   onChange={(event) => updateField('password', event.target.value)}
                   placeholder="At least 8 characters"
+                  aria-describedby={error ? 'auth-form-error' : undefined}
                 />
 
                 <p className="text-xs leading-relaxed text-muted">
@@ -202,8 +218,13 @@ export default function AuthPage({ mode }) {
             )}
 
             {isSignup && signupStep === 2 && (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4"
+                aria-describedby={error ? 'auth-form-error' : undefined}
+              >
                 <AuthField
+                  id="signup-fullname"
                   icon={User}
                   label="Full name"
                   autoComplete="name"
@@ -211,9 +232,11 @@ export default function AuthPage({ mode }) {
                   value={form.fullName}
                   onChange={(event) => updateField('fullName', event.target.value)}
                   placeholder="Alex Morgan"
+                  aria-describedby={error ? 'auth-form-error' : undefined}
                 />
 
                 <AuthField
+                  id="signup-username"
                   icon={Users}
                   label="Username"
                   autoComplete="username"
@@ -221,6 +244,7 @@ export default function AuthPage({ mode }) {
                   value={form.username}
                   onChange={(event) => updateField('username', event.target.value)}
                   placeholder="alex"
+                  aria-describedby={error ? 'auth-form-error' : undefined}
                 />
 
                 <div className="flex flex-col gap-2.5 pt-1">

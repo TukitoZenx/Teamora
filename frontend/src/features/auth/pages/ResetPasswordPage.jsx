@@ -58,6 +58,7 @@ export default function ResetPasswordPage() {
 
       {error && (
         <div
+          id="reset-password-error"
           className="mb-4 rounded-input border border-danger/20 bg-danger/10 px-3.5 py-3 text-sm text-danger"
           role="alert"
         >
@@ -67,6 +68,7 @@ export default function ResetPasswordPage() {
 
       {success && (
         <div
+          id="reset-password-success"
           className="mb-4 rounded-input border border-success/20 bg-success/10 px-3.5 py-3 text-sm text-success"
           role="status"
         >
@@ -74,8 +76,13 @@ export default function ResetPasswordPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        aria-describedby={error ? 'reset-password-error' : success ? 'reset-password-success' : undefined}
+      >
         <AuthField
+          id="reset-password-new"
           icon={Lock}
           label="New password"
           type="password"
@@ -84,9 +91,11 @@ export default function ResetPasswordPage() {
           value={form.password}
           onChange={(event) => updateField('password', event.target.value)}
           placeholder="At least 8 characters"
+          aria-describedby={error ? 'reset-password-error' : undefined}
         />
 
         <AuthField
+          id="reset-password-confirm"
           icon={Lock}
           label="Confirm password"
           type="password"
@@ -95,6 +104,7 @@ export default function ResetPasswordPage() {
           value={form.confirmPassword}
           onChange={(event) => updateField('confirmPassword', event.target.value)}
           placeholder="Repeat new password"
+          aria-describedby={error ? 'reset-password-error' : undefined}
         />
 
         <div className="pt-1">

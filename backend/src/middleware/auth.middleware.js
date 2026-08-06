@@ -1,16 +1,24 @@
 const authService = require('../services/auth.service');
 
+/** Unified 401 shape: both `message` and `error` for client compatibility. */
+const unauthorized = (res) =>
+  res.status(401).json({
+    success: false,
+    message: 'Not authenticated',
+    error: 'Not authenticated'
+  });
+
 const requireAuth = async (req, res, next) => {
   try {
     if (!req.session?.userId) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+      return unauthorized(res);
     }
 
     const user = await authService.findById(req.session.userId);
 
     if (!user) {
       req.session.destroy(() => {});
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+      return unauthorized(res);
     }
 
     req.user = user;

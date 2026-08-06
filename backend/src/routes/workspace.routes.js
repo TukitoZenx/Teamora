@@ -72,8 +72,8 @@ router.put('/:id/content/:key', ...maybe(contentWriteLimiter), contentController
 // File import routes
 router.post('/:id/files/import', importController.importFile);
 
-// DOCX export route
-router.post('/export-docx', contentController.exportDocx);
+// DOCX export — workspace-scoped (membership checked in controller)
+router.post('/:id/export-docx', ...maybe(contentWriteLimiter), contentController.exportDocx);
 
 router.get('/:id', workspaceController.getWorkspaceById);
 router.put('/:id', workspaceController.updateWorkspace);

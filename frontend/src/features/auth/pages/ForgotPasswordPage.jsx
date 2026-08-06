@@ -52,6 +52,7 @@ export default function ForgotPasswordPage() {
 
       {error && (
         <div
+          id="forgot-password-error"
           className="mb-4 rounded-input border border-danger/20 bg-danger/10 px-3.5 py-3 text-sm text-danger"
           role="alert"
         >
@@ -61,6 +62,7 @@ export default function ForgotPasswordPage() {
 
       {success && (
         <div
+          id="forgot-password-success"
           className="mb-4 rounded-input border border-success/20 bg-success/10 px-3.5 py-3 text-sm text-success"
           role="status"
         >
@@ -68,8 +70,13 @@ export default function ForgotPasswordPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+        aria-describedby={error ? 'forgot-password-error' : success ? 'forgot-password-success' : undefined}
+      >
         <AuthField
+          id="forgot-password-email"
           icon={Mail}
           label="Email"
           type="email"
@@ -78,6 +85,7 @@ export default function ForgotPasswordPage() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@company.com"
+          aria-describedby={error ? 'forgot-password-error' : undefined}
         />
 
         <div className="pt-1">

@@ -72,7 +72,11 @@ export default function useAuthForm(mode) {
 
     setSubmitting(true)
     try {
-      await checkEmailAvailability(form.email)
+      const result = await checkEmailAvailability(form.email)
+      if (result && result.available === false) {
+        setError('Email already exists.')
+        return
+      }
       setSignupStep(2)
     } catch (authError) {
       setError(getFriendlyAuthError(authError.message))

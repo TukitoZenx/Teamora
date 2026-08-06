@@ -42,6 +42,18 @@ const populateWorkspace = (query) =>
     .populate('notifications.requester', USER_SELECT)
     .populate('tasks.creator', USER_SELECT);
 
+/**
+ * Dashboard list path — avoid hydrating full tasks/notifications graphs for every workspace.
+ * Members stay as ObjectIds (length is enough for cards); owner is populated for display.
+ */
+const populateWorkspaceList = (query) =>
+  query
+    .select(
+      'name description owner members inviteCode updatedAt createdAt visibility joinApproval active icon archivedAt'
+    )
+    .populate('owner', USER_SELECT)
+    .lean();
+
 const validateObjectId = (id) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw createError('Invalid workspace id', 400);
@@ -381,7 +393,8 @@ const createWorkspace = async (userId, payload) => {
   });
 
   if (ownedCount >= MAX_OWNED_WORKSPACES) {
-    throw createError(`Maximum ${MAX_OWNED_WORKSPACES} workspaces can be created.`, 400);
+    // Server-side hard cap (client checks are UX only and can be bypassed).
+    throw createError('Workspace limit reached (6 max)', 403);
   }
 
   const workspace = await Workspace.create({
@@ -399,20 +412,23 @@ const createWorkspace = async (userId, payload) => {
 };
 
 const getWorkspaces = async (userId) => {
-  const workspaces = await populateWorkspace(
-    Workspace.find({ members: userId, archivedAt: null }).sort({ updatedAt: -1 })
-  );
+  // Parallel: active membership list (light) + user recent history (trimmed populate).
+  const [workspaces, user] = await Promise.all([
+    populateWorkspaceList(Workspace.find({ members: userId, archivedAt: null }).sort({ updatedAt: -1 })),
+    User.findById(userId)
+      .select('recentWorkspaces')
+      .populate({
+        path: 'recentWorkspaces.workspace',
+        // Keep join/approval fields for rejoin UX without full member profile graphs.
+        select:
+          'name owner members inviteCode updatedAt archivedAt active visibility approvedMembers joinRequests icon',
+        populate: [{ path: 'owner', select: USER_SELECT }]
+      })
+      .populate('recentWorkspaces.owner', USER_SELECT)
+      .lean()
+  ]);
 
   const activeWorkspaceIds = new Set(workspaces.map((workspace) => workspace._id.toString()));
-  const user = await User.findById(userId)
-    .populate({
-      path: 'recentWorkspaces.workspace',
-      populate: [
-        { path: 'owner', select: USER_SELECT },
-        { path: 'joinRequests.requester', select: USER_SELECT }
-      ]
-    })
-    .populate('recentWorkspaces.owner', USER_SELECT);
 
   const recentWorkspaces = (user?.recentWorkspaces || [])
     .filter((entry) => entry.workspace)
@@ -433,11 +449,17 @@ const getWorkspaces = async (userId) => {
       statusLabel: 'Active',
       canOpen: true,
       canRequestAccess: false,
-      lastSeenAt: workspace.updatedAt
+      lastSeenAt: workspace.updatedAt,
+      memberCount: workspace.members?.length || 0
     }));
 
   return {
-    workspaces: workspaces.map((workspace) => cleanWorkspace(workspace, userId)),
+    workspaces: workspaces.map((workspace) => {
+      const cleaned = cleanWorkspace(workspace, userId);
+      // Ensure memberCount without full member population.
+      cleaned.memberCount = cleaned.members?.length || 0;
+      return cleaned;
+    }),
     recentWorkspaces: [...activeRecentWorkspaces, ...recentWorkspaces]
   };
 };
@@ -655,9 +677,11 @@ const requestWorkspaceAccess = async (userId, inviteCode) => {
     return autoJoin();
   }
 
-  // Private workspaces cannot be joined through an invite code by new users.
+  // Visibility semantics:
+  // - "private": no join via invite link for non-members (owner must add/approve offline).
+  // - "invite_only": invite links work; joinApproval may still require owner accept.
   if ((workspace.visibility || 'invite_only') === 'private') {
-    throw createError('This workspace is private and does not accept invite joins.', 403);
+    throw createError('This workspace is private', 403);
   }
 
   // Owners can disable join approval in workspace settings.
@@ -775,31 +799,41 @@ const declineJoinRequest = async (ownerId, workspaceId, requestId) => {
 };
 
 const getNotifications = async (userId) => {
-  const workspaces = await populateWorkspace(
-    Workspace.find({ 'notifications.recipient': userId }).sort({
-      updatedAt: -1
-    })
-  );
+  // Only hydrate notification-related fields — avoid full task/member graphs.
+  const workspaces = await Workspace.find({ 'notifications.recipient': userId })
+    .select('name notifications joinRequests')
+    .populate('notifications.requester', USER_SELECT)
+    .populate('joinRequests.requester', USER_SELECT)
+    .sort({ updatedAt: -1 })
+    .lean();
 
   return workspaces
-    .flatMap((workspace) =>
-      workspace.notifications
+    .flatMap((workspace) => {
+      const requests = Array.isArray(workspace.joinRequests) ? workspace.joinRequests : [];
+      const notifications = Array.isArray(workspace.notifications) ? workspace.notifications : [];
+      return notifications
         .filter((notification) => getEntityId(notification.recipient)?.toString() === userId.toString())
-        .map((notification) => ({
-          _id: notification._id,
-          type: notification.type,
-          title: notification.type === 'join_request' ? 'Join Request' : 'Workspace Access',
-          message: notification.message,
-          requester: notification.requester,
-          requesterName: getDisplayName(notification.requester),
-          requestId: notification.request,
-          workspaceId: workspace._id,
-          workspaceName: workspace.name,
-          read: notification.read,
-          createdAt: notification.createdAt,
-          requestStatus: workspace.joinRequests.id(notification.request)?.status || null
-        }))
-    )
+        .map((notification) => {
+          const requestId = notification.request?.toString?.() || notification.request;
+          const linked = requests.find(
+            (r) => getEntityId(r)?._id?.toString() === requestId || r._id?.toString() === requestId
+          );
+          return {
+            _id: notification._id,
+            type: notification.type,
+            title: notification.type === 'join_request' ? 'Join Request' : 'Workspace Access',
+            message: notification.message,
+            requester: notification.requester,
+            requesterName: getDisplayName(notification.requester),
+            requestId: notification.request,
+            workspaceId: workspace._id,
+            workspaceName: workspace.name,
+            read: notification.read,
+            createdAt: notification.createdAt,
+            requestStatus: linked?.status || null
+          };
+        });
+    })
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 };
 
@@ -859,15 +893,17 @@ const createTask = async (userId, workspaceId, payload) => {
     reminderGapMinutes: Number(payload.reminderGapMinutes) || 0,
     reminderLimit: Number(payload.reminderLimit) || 1,
     remindersSent: 0,
-    nextReminderTime: payload.reminderEnabled ? (() => {
-      try {
-        const dateStr = validateDateKey(payload.date);
-        const timeStr = validateOptionalText(payload.startTime, 'Start time', 10) || '09:00';
-        return new Date(`${dateStr}T${timeStr}:00`);
-      } catch (e) {
-        return null;
-      }
-    })() : null,
+    nextReminderTime: payload.reminderEnabled
+      ? (() => {
+          try {
+            const dateStr = validateDateKey(payload.date);
+            const timeStr = validateOptionalText(payload.startTime, 'Start time', 10) || '09:00';
+            return new Date(`${dateStr}T${timeStr}:00`);
+          } catch (e) {
+            return null;
+          }
+        })()
+      : null,
     workspaceName: validateOptionalText(payload.workspaceName, 'Workspace', 120),
     creator: userId
   });
@@ -902,10 +938,11 @@ const updateTask = async (userId, workspaceId, taskId, payload) => {
   if (payload.endTime !== undefined) task.endTime = validateOptionalText(payload.endTime, 'End time', 10);
   if (payload.reminder !== undefined) task.reminder = validateOptionalText(payload.reminder, 'Reminder', 40);
   if (payload.reminderEnabled !== undefined) task.reminderEnabled = Boolean(payload.reminderEnabled);
-  if (payload.reminderEmail !== undefined) task.reminderEmail = validateOptionalText(payload.reminderEmail, 'Reminder Email', 120);
+  if (payload.reminderEmail !== undefined)
+    task.reminderEmail = validateOptionalText(payload.reminderEmail, 'Reminder Email', 120);
   if (payload.reminderGapMinutes !== undefined) task.reminderGapMinutes = Number(payload.reminderGapMinutes) || 0;
   if (payload.reminderLimit !== undefined) task.reminderLimit = Number(payload.reminderLimit) || 1;
-  
+
   if (payload.reminderEnabled && !task.nextReminderTime && (payload.date || payload.startTime)) {
     try {
       const dateStr = task.date;
@@ -915,7 +952,7 @@ const updateTask = async (userId, workspaceId, taskId, payload) => {
   } else if (payload.reminderEnabled === false) {
     task.nextReminderTime = null;
   }
-  
+
   if (payload.workspaceName !== undefined)
     task.workspaceName = validateOptionalText(payload.workspaceName, 'Workspace', 120);
 

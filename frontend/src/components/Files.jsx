@@ -242,7 +242,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
     toast.success(`Downloading "${file.name}"...`)
   }
 
-    const handleDownloadFolder = async (folder) => {
+  const handleDownloadFolder = async (folder) => {
     toast.loading(`Zipping folder "${folder.name}"...`, { id: 'zip-folder' })
     try {
       const { downloadZip } = await import('client-zip')
@@ -283,7 +283,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
       }
 
       const response = downloadZip(getFiles())
-      
+
       if (window.showSaveFilePicker) {
         try {
           const fileHandle = await window.showSaveFilePicker({
@@ -303,7 +303,7 @@ export default function Files({ filesList = [], socket, roomId, userName, curren
           return
         }
       }
-      
+
       const blob = await response.blob()
       const element = document.createElement('a')
       element.href = URL.createObjectURL(blob)

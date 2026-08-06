@@ -1,5 +1,6 @@
 const passport = require('passport');
 const authService = require('../services/auth.service');
+const { rotateCsrfToken } = require('../middleware/csrf.middleware');
 
 const sessionCookieName = () => process.env.SESSION_COOKIE_NAME || 'teamora.sid';
 const clientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
@@ -36,7 +37,8 @@ const register = async (req, res, next) => {
   try {
     const user = await authService.register(req.body);
     await setSessionUser(req, user);
-    res.status(201).json({ success: true, user });
+    const csrfToken = rotateCsrfToken(req, res);
+    res.status(201).json({ success: true, user, csrfToken });
   } catch (error) {
     next(error);
   }
@@ -55,10 +57,17 @@ const login = async (req, res, next) => {
   try {
     const user = await authService.login(req.body);
     await setSessionUser(req, user);
-    res.status(200).json({ success: true, user });
+    const csrfToken = rotateCsrfToken(req, res);
+    res.status(200).json({ success: true, user, csrfToken });
   } catch (error) {
     next(error);
   }
+};
+
+/** Issue / refresh CSRF token for the SPA (cross-origin readable response). */
+const csrfToken = (req, res) => {
+  const token = rotateCsrfToken(req, res) || req.session?.csrfToken || null;
+  res.status(200).json({ success: true, csrfToken: token });
 };
 
 const forgotPassword = async (req, res, next) => {
@@ -99,7 +108,11 @@ const logout = (req, res, next) => {
 };
 
 const me = (req, res) => {
-  res.status(200).json({ success: true, user: req.user });
+  res.status(200).json({
+    success: true,
+    user: req.user,
+    csrfToken: req.session?.csrfToken || null
+  });
 };
 
 const updateProfile = async (req, res, next) => {
@@ -134,6 +147,7 @@ const googleCallback = (req, res, next) => {
 
     try {
       await setSessionUser(req, user);
+      rotateCsrfToken(req, res);
       const targetPath = user.profileComplete === false ? '/complete-profile' : '/dashboard';
       return res.redirect(`${clientUrl()}${targetPath}`);
     } catch (sessionError) {
@@ -146,6 +160,7 @@ module.exports = {
   register,
   checkEmail,
   login,
+  csrfToken,
   forgotPassword,
   resetPassword,
   logout,

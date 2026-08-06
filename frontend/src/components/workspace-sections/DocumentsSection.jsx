@@ -121,7 +121,7 @@ export default function DocumentsSection({
     const provider = connectRestYjsProvider(ydoc, {
       workspaceId,
       key: contentKey,
-      pollMs: 1200,
+      pollMs: 3000,
       user: { name: userName || 'User', color: presenceColor },
       onWsStatus: (status) => {
         if (status === 'joined') setActiveUsersCount(2)
@@ -158,8 +158,6 @@ export default function DocumentsSection({
     })
     providerRef.current = provider
 
-
-
     const quill = new Quill(mountEl, {
       theme: 'snow',
       modules: {
@@ -175,8 +173,8 @@ export default function DocumentsSection({
             redo: {
               key: 'y',
               shortKey: true,
-              handler: function() {
-                this.quill.history.redo();
+              handler: function () {
+                this.quill.history.redo()
               }
             }
           }
@@ -403,8 +401,10 @@ export default function DocumentsSection({
       const now = new Date().toISOString()
       const commentObj = {
         id: `comment-${Math.random().toString(36).slice(2, 9)}`,
+        author: userName || 'User',
         user: userName || 'User',
         text: text.trim(),
+        resolved: false,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         createdAt: now,
         updatedAt: now
