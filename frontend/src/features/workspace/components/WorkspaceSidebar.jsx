@@ -57,6 +57,7 @@ export default function WorkspaceSidebar({
   return (
     <aside
       data-workspace-sidebar="true"
+      aria-label="Workspace navigation"
       className={`flex h-full flex-col border-r border-border bg-card transition-[width] duration-slow ease-in-out ${collapsed ? 'w-sidebar-collapsed' : 'w-sidebar'} ${className}`}
     >
       <div className="flex h-16 items-center justify-between border-b border-border px-4">
@@ -78,10 +79,11 @@ export default function WorkspaceSidebar({
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                className={`absolute inset-0 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary hover:text-on-primary ${showExpandButton ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'}`}
+                className={`absolute inset-0 flex min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary hover:text-on-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${showExpandButton ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'}`}
                 aria-label="Expand sidebar"
+                aria-expanded={false}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4" aria-hidden />
               </button>
             )}
           </div>
@@ -92,16 +94,17 @@ export default function WorkspaceSidebar({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary/10 hover:text-primary"
+            className="flex min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
             aria-label="Collapse sidebar"
+            aria-expanded={true}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-4">
-        <nav className="space-y-3">
+        <nav className="space-y-3" aria-label="Workspace sections">
           {groups.map((group, groupIndex) => (
             <div key={groupIndex} className="space-y-1">
               {groupIndex > 0 && !collapsed && <div className="my-3 h-px bg-border" />}

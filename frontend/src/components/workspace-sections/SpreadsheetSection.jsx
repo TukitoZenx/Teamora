@@ -102,7 +102,7 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
     const provider = connectRestYjsProvider(ydoc, {
       workspaceId,
       key: contentKey,
-      pollMs: 1200
+      pollMs: 3000
     })
     providerRef.current = provider
 
@@ -131,20 +131,20 @@ export default function SpreadsheetSection({ workspaceId, activeFile, onDirtyCha
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         // If typing, let native undo handle the text field unless we want to intercept
-        if (e.key.toLowerCase() !== 'z' && e.key.toLowerCase() !== 'y') return;
+        if (e.key.toLowerCase() !== 'z' && e.key.toLowerCase() !== 'y') return
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         // Prevent default native undo so we can use Yjs collaborative undo
         if (e.shiftKey) {
-          e.preventDefault();
-          undoManager.redo();
+          e.preventDefault()
+          undoManager.redo()
         } else {
-          e.preventDefault();
-          undoManager.undo();
+          e.preventDefault()
+          undoManager.undo()
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        undoManager.redo();
+        e.preventDefault()
+        undoManager.redo()
       }
     }
     window.addEventListener('keydown', onKey)

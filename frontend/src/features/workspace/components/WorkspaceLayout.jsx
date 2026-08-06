@@ -136,7 +136,9 @@ export default function WorkspaceLayout({
       )}
 
       <main
-        className={`h-full pt-navbar transition-[padding-left] duration-slow ease-in-out ${
+        id="main-content"
+        tabIndex={-1}
+        className={`h-full pt-navbar outline-none transition-[padding-left] duration-slow ease-in-out ${
           isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'
         } ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
       >

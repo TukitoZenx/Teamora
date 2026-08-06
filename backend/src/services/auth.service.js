@@ -10,7 +10,9 @@ const USERNAME_PATTERN = /^[a-z0-9_][a-z0-9_.-]{2,39}$/;
 const MIN_PASSWORD_LENGTH = 8;
 /** bcrypt only uses 72 bytes; reject absurd lengths to prevent CPU DoS. */
 const MAX_PASSWORD_LENGTH = 72;
-const MAX_AVATAR_LENGTH = 200_000;
+// Base64 data URLs expand ~33% over raw file bytes. Client caps files at 140 KB;
+// ~190k chars leaves headroom for the data:image/...;base64, prefix.
+const MAX_AVATAR_LENGTH = 190_000;
 const RESET_TOKEN_EXPIRY_MS = 1000 * 60 * 15;
 const RESET_SUCCESS_MESSAGE = "If an account exists, we've sent a password reset email.";
 
@@ -24,7 +26,7 @@ const sanitizeAvatar = (avatar) => {
   if (!cleanAvatar) return '';
 
   if (cleanAvatar.length > MAX_AVATAR_LENGTH) {
-    throw createError('Avatar image is too large. Please use an image under 150 KB.');
+    throw createError('Image must be under 140 KB');
   }
 
   // Only allow empty, absolute http(s) URLs, or raster data:image URLs (no SVG — XSS risk).
@@ -165,13 +167,17 @@ const checkEmailAvailability = async ({ email }) => {
     throw createError('Please provide a valid email address');
   }
 
+  // Constant-ish response shape: always 200 with { available }.
+  // Still theoretically enumerable, but no 409 differential; pair with rate limits.
+  // Small fixed delay reduces trivial timing probes without blocking UX.
+  const started = Date.now();
   const existingUser = await User.exists({ email: cleanEmail });
-
-  if (existingUser) {
-    throw createError('Email is already in use', 409);
+  const elapsed = Date.now() - started;
+  if (elapsed < 80) {
+    await new Promise((r) => setTimeout(r, 80 - elapsed));
   }
 
-  return { available: true };
+  return { available: !existingUser };
 };
 
 const login = async ({ email, password }) => {
@@ -271,6 +277,21 @@ const forgotPassword = async ({ email }) => {
   return { message: RESET_SUCCESS_MESSAGE };
 };
 
+/** Best-effort: drop Mongo session store entries that reference this userId. */
+const invalidateUserSessions = async (userId) => {
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) return;
+    const id = userId.toString();
+    // connect-mongo stores serialized session JSON; match userId assignment.
+    await mongoose.connection.collection('sessions').deleteMany({
+      $or: [{ 'session.userId': id }, { session: new RegExp(`"userId":"${id}"`) }]
+    });
+  } catch (error) {
+    console.error('Session invalidation after password reset failed:', error.message);
+  }
+};
+
 const resetPassword = async ({ token, password }) => {
   const cleanToken = requireString(token, 'Reset token');
   validatePassword(password);
@@ -288,6 +309,9 @@ const resetPassword = async ({ token, password }) => {
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
   await user.save();
+
+  // Prevent stolen sessions from remaining valid after a password reset.
+  await invalidateUserSessions(user._id);
 
   return { message: 'Password updated successfully.' };
 };
@@ -361,5 +385,11 @@ module.exports = {
   findById,
   resetPassword,
   updateProfile,
-  findOrCreateGoogleUser
+  findOrCreateGoogleUser,
+  // Pure validators exported for unit tests / future shared use
+  validateRegistrationInput,
+  validateLoginInput,
+  validatePassword,
+  sanitizeAvatar,
+  sanitizeUser
 };

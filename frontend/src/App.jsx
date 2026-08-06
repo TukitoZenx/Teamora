@@ -1,79 +1,50 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import toast, { Toaster, ToastBar } from 'react-hot-toast'
 import { X } from 'lucide-react'
 import AppNavbar from './components/AppNavbar'
-import Dashboard from './components/Dashboard'
-import WorkspaceHome from './components/WorkspaceHome'
-import LandingPage from './components/LandingPage'
 import ProtectedRoute from './components/ProtectedRoute'
-import SettingsPage, { SettingsIndex, SettingsSection } from './components/SettingsPage'
-import AuthPage from './features/auth/pages/AuthPage'
-import CompleteProfilePage from './features/auth/pages/CompleteProfilePage'
-import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage'
-import ResetPasswordPage from './features/auth/pages/ResetPasswordPage'
+import InviteWorkspacePage from './components/InviteWorkspacePage'
+import WorkspaceRoute, { WorkspaceLoadingShell } from './components/WorkspaceRoute'
 import api from './services/api'
-
 import { useAuth } from './hooks/useAuth'
-
-import WorkspaceLayout from './features/workspace/components/WorkspaceLayout'
 import { addWorkspaceNotification } from './components/utils/notifications'
 import GlobalMeetings from './components/GlobalMeetings'
 import { useMeeting } from './contexts/MeetingContext'
 import BrandLoadingScreen from './components/ui/BrandLoadingScreen'
+import { extractInviteCode } from './utils/inviteCode'
+import { subscribeAppearance } from './utils/appearance'
+import {
+  LAST_PAGE_KEY,
+  RECENT_WORKSPACES_CACHE_KEY,
+  WORKSPACE_SECTIONS,
+  WORKSPACES_CACHE_KEY,
+  clearLastWorkspaceId,
+  getCachedWorkspace,
+  putCachedWorkspace,
+  readJsonCache,
+  removeWorkspaceCache,
+  setLastWorkspaceId,
+  writeJsonCache
+} from './utils/workspaceStorage'
 
+// Route-level code splitting: keep the auth/dashboard shell out of heavy editor chunks.
+const Dashboard = lazy(() => import('./components/Dashboard'))
+const WorkspaceHome = lazy(() => import('./components/WorkspaceHome'))
+const LandingPage = lazy(() => import('./components/LandingPage'))
+const SettingsPage = lazy(() => import('./components/SettingsPage'))
+const SettingsIndex = lazy(() => import('./components/SettingsPage').then((m) => ({ default: m.SettingsIndex })))
+const SettingsSection = lazy(() => import('./components/SettingsPage').then((m) => ({ default: m.SettingsSection })))
+const AuthPage = lazy(() => import('./features/auth/pages/AuthPage'))
+const CompleteProfilePage = lazy(() => import('./features/auth/pages/CompleteProfilePage'))
+const ForgotPasswordPage = lazy(() => import('./features/auth/pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./features/auth/pages/ResetPasswordPage'))
 
-//to store the date in localstorage...
-const LAST_WORKSPACE_KEY = 'teamora-last-workspace-id'
-const LAST_PAGE_KEY = 'teamora-last-page'
-const WORKSPACES_CACHE_KEY = 'teamora-workspaces-cache'
-const RECENT_WORKSPACES_CACHE_KEY = 'teamora-recent-workspaces-cache'
-const WORKSPACE_CACHE_KEY = 'teamora-workspace-cache'
-const WORKSPACE_SECTIONS = new Set([
-  'home',
-  'documents',
-  'whiteboard',
-  'spreadsheet',
-  'presentation',
-  'calendar',
-  'tasks',
-  'meetings',
-  'members',
-  'shared-files',
-  'settings',
-  'chat'
-])
-
-
-// what 48-54 lines done ? ans : it reads the cache from the local storage and returns it  , yeah if thier what it return and if not what it returns 
-const readJsonCache = (key, fallback) => {
-  try {
-    return JSON.parse(localStorage.getItem(key) || 'null') || fallback
-  } catch {
-    return fallback
-  }
-}
-
-// what 56-58 lines does ? ans : it writes the data to the local storage
-const writeJsonCache = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    // Cache writes are best-effort; API data remains authoritative.
-  }
-}
-
-const removeWorkspaceCache = (workspaceId) => {
-  const cache = readJsonCache(WORKSPACE_CACHE_KEY, {})
-  delete cache[workspaceId]// it deletes the workspace from the cache
-  writeJsonCache(WORKSPACE_CACHE_KEY, cache)// what it writes is the cache with the deleted workspace
-}
-
-//starting point of the app, handles routing and global state management
+/** App shell: routing, workspace list state, and global chrome (toasts, meetings). */
 export default function App() {
-  const { user, loading, authenticated, profileComplete } = useAuth()//how this line works and what is useAuth it is a custom hook, created in AuthContext.jsx file where can i find the custom hooks in my project it is in the contexts folder as well as hooks folder 
+  const { user, loading, authenticated, profileComplete } = useAuth()
   const { activeMeetingWorkspace, leaveMeeting } = useMeeting()
-  const navigate = useNavigate()// it stores current page and future page , am i right  ? ans : 
+  const navigate = useNavigate()
   const location = useLocation()
   const workspacesRequestRef = useRef(null)
   const workspaceRequestRef = useRef(new Map())
@@ -84,80 +55,13 @@ export default function App() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [authNotice, setAuthNotice] = useState('')
 
-  const displayName = useMemo(() => {// at where it is used either in the dahsboard or workspace or mention that place ? ans : 
+  const displayName = useMemo(() => {
     if (user?.fullName) return user.fullName
     if (user?.username) return user.username
     return user?.email?.split('@')[0] || 'User'
   }, [user])
 
-  useEffect(() => {
-    const applyAppearance = () => {
-      try {
-        const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')
-
-        // Handle density, language, etc.
-        const density = preferences?.density || 'Comfortable'
-        document.documentElement.dataset.density = String(density).toLowerCase()
-
-        const language = preferences?.language || 'English'
-        document.documentElement.lang = language === 'Español' ? 'es' : language === 'Français' ? 'fr' : 'en'
-
-        document.documentElement.dataset.timeZone = preferences?.timeZone || 'UTC'
-        document.documentElement.dataset.dateFormat = preferences?.dateFormat || 'MM/DD/YYYY'
-
-        // Theme engine — Light / Dark / System only.
-        // Migrate any legacy "High Contrast" preference to Light so users who
-        // hit the old navbar cycle are not stuck with thick black borders.
-        let theme = preferences?.theme || 'Light'
-        if (theme === 'High Contrast') {
-          theme = 'Light'
-          const migrated = { ...preferences, theme: 'Light' }
-          localStorage.setItem('teamora-appearance', JSON.stringify(migrated))
-        }
-
-        const root = document.documentElement
-        root.classList.remove('dark', 'high-contrast')
-
-        if (theme === 'Dark') {
-          root.classList.add('dark')
-        } else if (theme === 'System') {
-          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            root.classList.add('dark')
-          }
-        }
-      } catch {
-        // Appearance preferences are optional local UI state.
-      }
-    }
-
-    applyAppearance()
-
-    // Listen for storage changes (tab-to-tab sync)
-    window.addEventListener('storage', applyAppearance)
-
-    // Listen for custom appearance updates from Settings Page
-    window.addEventListener('teamora-appearance-changed', applyAppearance)
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleSystemThemeChange = () => {
-      try {
-        const preferences = JSON.parse(localStorage.getItem('teamora-appearance') || 'null')
-        if (preferences?.theme === 'System') {
-          document.documentElement.classList.toggle('dark', mediaQuery.matches)
-        }
-      } catch {
-        // Ignore errors in system theme detection.
-      }
-    }
-    mediaQuery.addEventListener('change', handleSystemThemeChange)
-
-    return () => {
-      window.removeEventListener('storage', applyAppearance)
-      window.removeEventListener('teamora-appearance-changed', applyAppearance)
-      mediaQuery.removeEventListener('change', handleSystemThemeChange)
-    }
-  }, [])
+  useEffect(() => subscribeAppearance(), [])
 
   useEffect(() => {
     if (authenticated) {
@@ -243,9 +147,7 @@ export default function App() {
         current.filter((workspace) => workspace.workspaceId !== deletedId && workspace._id !== deletedId)
       )
       removeWorkspaceCache(deletedId)
-      if (localStorage.getItem(LAST_WORKSPACE_KEY) === deletedId) {
-        localStorage.removeItem(LAST_WORKSPACE_KEY)
-      }
+      clearLastWorkspaceId(deletedId)
       if (activeMeetingWorkspace?._id === deletedId) {
         leaveMeeting()
       }
@@ -269,21 +171,8 @@ export default function App() {
     replaceWorkspaces
   ])
 
-  // cacheworkspace function below 272-282 explain more about it
-  // here we are storing the workspace in the cache for quick access
-  // and retreive the workspace from the cache for quick access 
-  // suppose you close the tab and reopen it then it will retreive the workspace from the cache for quick access
-  // suppose you open another tab and open the workspace then it will retreive the workspace from the cache for quick access
   const cacheWorkspace = useCallback((workspace) => {
-    if (!workspace?._id) return
-
-    try {
-      const cache = readJsonCache(WORKSPACE_CACHE_KEY, {})
-      cache[workspace._id] = workspace
-      writeJsonCache(WORKSPACE_CACHE_KEY, cache)
-    } catch {
-      // Ignore cache failures.
-    }
+    putCachedWorkspace(workspace)
   }, [])
 
   useEffect(() => {
@@ -334,7 +223,7 @@ export default function App() {
     ])
     setActiveWorkspace(data.workspace)
     cacheWorkspace(data.workspace)
-    localStorage.setItem(LAST_WORKSPACE_KEY, data.workspace._id)
+    setLastWorkspaceId(data.workspace._id)
     navigate(`/workspace/${data.workspace._id}`)
     toast.success('Workspace created')
   }
@@ -356,7 +245,7 @@ export default function App() {
       ])
       setActiveWorkspace(data.workspace)
       cacheWorkspace(data.workspace)
-      localStorage.setItem(LAST_WORKSPACE_KEY, data.workspace._id)
+      setLastWorkspaceId(data.workspace._id)
       navigate(`/workspace/${data.workspace._id}`)
       addWorkspaceNotification({
         type: 'workspace_joined',
@@ -407,9 +296,7 @@ export default function App() {
       leaveMeeting()
     }
     removeWorkspaceCache(workspaceId)
-    if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
-      localStorage.removeItem(LAST_WORKSPACE_KEY)
-    }
+    clearLastWorkspaceId(workspaceId)
     navigate('/dashboard', { replace: true })
     toast.success('Workspace deleted successfully.')
   }
@@ -431,21 +318,21 @@ export default function App() {
             )
             const nextEntry = existing
               ? {
-                ...existing,
-                status: 'previously_joined',
-                statusLabel: 'Previously Joined',
-                canOpen: false,
-                canRequestAccess: true
-              }
+                  ...existing,
+                  status: 'previously_joined',
+                  statusLabel: 'Previously Joined',
+                  canOpen: false,
+                  canRequestAccess: true
+                }
               : {
-                _id: workspaceId,
-                workspaceId,
-                status: 'previously_joined',
-                statusLabel: 'Previously Joined',
-                canOpen: false,
-                canRequestAccess: true,
-                lastSeenAt: new Date().toISOString()
-              }
+                  _id: workspaceId,
+                  workspaceId,
+                  status: 'previously_joined',
+                  statusLabel: 'Previously Joined',
+                  canOpen: false,
+                  canRequestAccess: true,
+                  lastSeenAt: new Date().toISOString()
+                }
 
             return [
               nextEntry,
@@ -458,10 +345,7 @@ export default function App() {
           leaveMeeting()
         }
         removeWorkspaceCache(workspaceId)
-
-        if (localStorage.getItem(LAST_WORKSPACE_KEY) === workspaceId) {
-          localStorage.removeItem(LAST_WORKSPACE_KEY)
-        }
+        clearLastWorkspaceId(workspaceId)
 
         await loadWorkspaces()
         navigate('/dashboard', { replace: true })
@@ -481,7 +365,7 @@ export default function App() {
 
   const fetchWorkspace = useCallback(
     async (workspaceId) => {
-      const cachedWorkspace = readJsonCache(WORKSPACE_CACHE_KEY, {})[workspaceId]
+      const cachedWorkspace = getCachedWorkspace(workspaceId)
       if (cachedWorkspace) {
         setActiveWorkspace(cachedWorkspace)
       }
@@ -496,7 +380,7 @@ export default function App() {
         .then(({ data }) => {
           setActiveWorkspace(data.workspace)
           cacheWorkspace(data.workspace)
-          localStorage.setItem(LAST_WORKSPACE_KEY, data.workspace._id)
+          setLastWorkspaceId(data.workspace._id)
           return data.workspace
         })
         .catch((error) => {
@@ -519,7 +403,7 @@ export default function App() {
   const openWorkspace = useCallback(
     async (workspaceId, section = 'home') => {
       const workspacePath = section === 'home' ? `/workspace/${workspaceId}` : `/workspace/${workspaceId}/${section}`
-      localStorage.setItem(LAST_WORKSPACE_KEY, workspaceId)
+      setLastWorkspaceId(workspaceId)
       navigate(workspacePath)
     },
     [navigate]
@@ -527,9 +411,7 @@ export default function App() {
 
   const goToDashboard = useCallback(() => {
     setActiveWorkspace(null)
-    if (localStorage.getItem(LAST_WORKSPACE_KEY)) {
-      localStorage.removeItem(LAST_WORKSPACE_KEY)
-    }
+    clearLastWorkspaceId()
     navigate('/dashboard', { replace: true })
   }, [navigate])
 
@@ -557,7 +439,7 @@ export default function App() {
                 nextPage === 'home'
                   ? `/workspace/${currentWorkspace._id}`
                   : `/workspace/${currentWorkspace._id}/${nextPage}`
-              localStorage.setItem(LAST_WORKSPACE_KEY, currentWorkspace._id)
+              setLastWorkspaceId(currentWorkspace._id)
               navigate(nextPath)
             }}
             onRefresh={async () => {
@@ -569,7 +451,7 @@ export default function App() {
       )
     }
 
-    if (forceWorkspace) {
+    if (forceWorkspace) {// 
       return (
         <ProtectedRoute>
           <WorkspaceLoadingShell activeItem={workspacePage} onBack={goToDashboard} />
@@ -650,263 +532,106 @@ export default function App() {
           </ToastBar>
         )}
       </Toaster>
-      <Routes>
-        <Route
-          path="/"
-          element={<RootRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete} />}
-        />
-        <Route
-          path="/signin"
-          element={
-            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
-              <AuthPage mode="signin" />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/signup"
-          element={
-            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
-              <AuthPage mode="signup" />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/forgot-password"
-          element={
-            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
-              <ForgotPasswordPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/reset-password/:token"
-          element={
-            <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
-              <ResetPasswordPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/complete-profile"
-          element={
-            <ProtectedRoute>
-              <CompleteProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/invite/:inviteCode"
-          element={
-            <ProtectedRoute>
-              <InviteWorkspacePage onOpenWorkspace={openWorkspace} />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/dashboard" element={DashboardRoute} />
-        <Route path="/settings" element={renderSettingsFrame()}>
-          <Route index element={<SettingsIndex />} />
-          <Route path=":section" element={<SettingsSection />} />
-        </Route>
-        <Route
-          path="/workspace"
-          element={
-            <WorkspaceRoute
-              authenticated={authenticated}
-              activeWorkspace={activeWorkspace}
-              fetchWorkspace={fetchWorkspace}
-              goToDashboard={goToDashboard}
-              renderAppFrame={renderAppFrame}
-            />
-          }
-        />
-        <Route
-          path="/workspace/:id"
-          element={
-            <WorkspaceRoute
-              authenticated={authenticated}
-              activeWorkspace={activeWorkspace}
-              fetchWorkspace={fetchWorkspace}
-              goToDashboard={goToDashboard}
-              renderAppFrame={renderAppFrame}
-            />
-          }
-        />
-        <Route
-          path="/workspace/:id/:section"
-          element={
-            <WorkspaceRoute
-              authenticated={authenticated}
-              activeWorkspace={activeWorkspace}
-              fetchWorkspace={fetchWorkspace}
-              goToDashboard={goToDashboard}
-              renderAppFrame={renderAppFrame}
-            />
-          }
-        />
-        <Route path="*" element={<Navigate to={authenticated ? '/dashboard' : '/'} replace />} />
-      </Routes>
+      <Suspense fallback={<BrandLoadingScreen message="Loading…" />}>
+        <Routes>
+          <Route
+            path="/"
+            element={<RootRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete} />}
+          />
+          <Route
+            path="/signin"
+            element={
+              <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+                <AuthPage mode="signin" />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+                <AuthPage mode="signup" />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+                <ForgotPasswordPage />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/reset-password/:token"
+            element={
+              <PublicRoute loading={loading} authenticated={authenticated} profileComplete={profileComplete}>
+                <ResetPasswordPage />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/complete-profile"
+            element={
+              <ProtectedRoute>
+                <CompleteProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/invite/:inviteCode"
+            element={
+              <ProtectedRoute>
+                <InviteWorkspacePage onOpenWorkspace={openWorkspace} />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/dashboard" element={DashboardRoute} />
+          <Route path="/settings" element={renderSettingsFrame()}>
+            <Route index element={<SettingsIndex />} />
+            <Route path=":section" element={<SettingsSection />} />
+          </Route>
+          <Route
+            path="/workspace"
+            element={
+              <WorkspaceRoute
+                authenticated={authenticated}
+                activeWorkspace={activeWorkspace}
+                fetchWorkspace={fetchWorkspace}
+                goToDashboard={goToDashboard}
+                renderAppFrame={renderAppFrame}
+              />
+            }
+          />
+          <Route
+            path="/workspace/:id"
+            element={
+              <WorkspaceRoute
+                authenticated={authenticated}
+                activeWorkspace={activeWorkspace}
+                fetchWorkspace={fetchWorkspace}
+                goToDashboard={goToDashboard}
+                renderAppFrame={renderAppFrame}
+              />
+            }
+          />
+          <Route
+            path="/workspace/:id/:section"
+            element={
+              <WorkspaceRoute
+                authenticated={authenticated}
+                activeWorkspace={activeWorkspace}
+                fetchWorkspace={fetchWorkspace}
+                goToDashboard={goToDashboard}
+                renderAppFrame={renderAppFrame}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to={authenticated ? '/dashboard' : '/'} replace />} />
+        </Routes>
+      </Suspense>
       {authenticated ? <GlobalMeetings /> : null}
     </>
-  )
-}
-
-function extractInviteCode(value) {
-  const trimmed = String(value || '').trim()
-
-  if (!trimmed) return ''
-
-  try {
-    const parsed = new URL(trimmed)
-    const parts = parsed.pathname.split('/').filter(Boolean)
-    return (parts[parts.length - 1] || '').toUpperCase()
-  } catch {
-    return trimmed.split('/').filter(Boolean).pop()?.toUpperCase() || trimmed.toUpperCase()
-  }
-}
-
-function InviteWorkspacePage({ onOpenWorkspace }) {
-  const { inviteCode } = useParams()
-  const navigate = useNavigate()
-  const [workspace, setWorkspace] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-
-    // Defer setState so we don't call it synchronously in the effect body
-    // (react-hooks/set-state-in-effect). inviteCode changes still re-fetch cleanly.
-    queueMicrotask(() => {
-      if (cancelled) return
-      setLoading(true)
-      setWorkspace(null)
-
-      api
-        .get(`/api/v1/workspaces/invite/${inviteCode}`)
-        .then(({ data }) => {
-          if (!cancelled) setWorkspace(data.workspace)
-        })
-        .catch((error) => {
-          if (cancelled) return
-          toast.error(error.message)
-          navigate('/dashboard', { replace: true })
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false)
-        })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [inviteCode, navigate])
-
-  const requestAccess = async () => {
-    setSubmitting(true)
-    try {
-      const { data } = await api.post(`/api/v1/workspaces/invite/${inviteCode}/request`, {})
-      if (data.joined && data.workspace?._id) {
-        toast.success('Joined workspace')
-        onOpenWorkspace(data.workspace._id)
-        return
-      }
-      setWorkspace(data.workspace)
-      toast.success('Access request sent')
-    } catch (error) {
-      toast.error(error.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background pt-navbar text-text">
-        <AppNavbar onDashboard={() => navigate('/dashboard')} />
-        <main className="mx-auto max-w-3xl px-5 py-10">
-          <div className="rounded-card border border-border bg-card p-8 shadow-sm">
-            <SkeletonBlock className="h-4 w-36" />
-            <SkeletonBlock className="mt-4 h-9 w-64" />
-            <SkeletonBlock className="mt-4 h-16 w-full" />
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <SkeletonBlock className="h-20 w-full" />
-              <SkeletonBlock className="h-20 w-full" />
-            </div>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-background pt-navbar text-text">
-      <AppNavbar onDashboard={() => navigate('/dashboard')} />
-      <main className="mx-auto flex min-h-[calc(100vh-var(--tw-navbar-height))] max-w-3xl items-center px-5 py-10">
-        <section className="w-full rounded-card border border-border bg-card p-8 shadow-sm">
-          <p className="text-sm font-semibold text-primary">
-            {workspace?.visibility === 'private' ? 'Private workspace' : 'Invite-only workspace'}
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{workspace?.name}</h1>
-          <p className="mt-3 text-sm leading-6 text-muted">{workspace?.description || 'No description provided.'}</p>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <InfoTile label="Workspace ID" value={workspace?.workspaceId} />
-            <InfoTile label="Members" value={String(workspace?.memberCount || 0)} />
-          </div>
-
-          {!workspace?.isMember && workspace?.allowsJoin === false && (
-            <p className="mt-6 rounded-button border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-              This workspace is private. Invite links cannot add new members. Ask the owner to switch visibility to
-              invite-only or to share access another way.
-            </p>
-          )}
-
-          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="h-12 rounded-button border border-border px-5 text-sm font-semibold text-text-secondary transition hover:bg-card-sunken"
-            >
-              Back to Dashboard
-            </button>
-            {workspace?.isMember ? (
-              <button
-                type="button"
-                onClick={() => onOpenWorkspace(workspace._id)}
-                className="h-12 rounded-button bg-primary px-5 text-sm font-semibold text-on-primary transition hover:bg-primary-hover"
-              >
-                Open Workspace
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={workspace?.allowsJoin === false || workspace?.hasPendingRequest || submitting}
-                onClick={requestAccess}
-                className="h-12 rounded-button bg-primary px-5 text-sm font-semibold text-on-primary transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary-muted"
-              >
-                {workspace?.allowsJoin === false
-                  ? 'Joining disabled'
-                  : workspace?.hasPendingRequest
-                    ? 'Request Pending'
-                    : submitting
-                      ? 'Sending...'
-                      : 'Request Access'}
-              </button>
-            )}
-          </div>
-        </section>
-      </main>
-    </div>
-  )
-}
-
-function InfoTile({ label, value }) {
-  return (
-    <div className="rounded-input border border-border bg-background p-4">
-      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <p className="mt-2 break-all text-sm font-semibold text-text">{value || 'N/A'}</p>
-    </div>
   )
 }
 
@@ -944,143 +669,4 @@ function RootRoute({ loading, authenticated, profileComplete }) {
   }
 
   return profileComplete ? <Navigate to="/dashboard" replace /> : <Navigate to="/complete-profile" replace />
-}
-
-function SkeletonBlock({ className = '' }) {
-  return <div className={`skeleton-shimmer ${className}`} />
-}
-
-function WorkspaceLoadingShell({ activeItem = 'home', onBack }) {
-  return (
-    <WorkspaceLayout
-      workspace={{ name: 'Workspace', members: [], owner: null }}
-      activeItem={activeItem}
-      onActiveItemChange={() => { }}
-      onBackToDashboard={onBack}
-      onLeaveWorkspace={() => { }}
-      onDeleteWorkspace={() => { }}
-    >
-      <div className="teamora-content-fade">
-        <WorkspaceContentSkeleton activeItem={activeItem} />
-      </div>
-    </WorkspaceLayout>
-  )
-}
-
-function WorkspaceContentSkeleton({ activeItem }) {
-  if (activeItem === 'whiteboard') {
-    return (
-      <section className="space-y-4">
-        <SkeletonBlock className="h-8 w-48" />
-        <SkeletonBlock className="h-[520px] w-full rounded-card" />
-      </section>
-    )
-  }
-
-  if (activeItem === 'spreadsheet') {
-    return (
-      <section className="space-y-4">
-        <SkeletonBlock className="h-8 w-52" />
-        <div className="rounded-card border border-border bg-card p-4">
-          <div className="grid grid-cols-6 gap-2">
-            {Array.from({ length: 36 }).map((_, index) => (
-              <SkeletonBlock key={index} className="h-10 w-full" />
-            ))}
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  if (activeItem === 'presentation') {
-    return (
-      <section className="grid gap-5 lg:grid-cols-[220px_1fr]">
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <SkeletonBlock key={index} className="h-28 w-full" />
-          ))}
-        </div>
-        <SkeletonBlock className="h-[460px] w-full rounded-card" />
-      </section>
-    )
-  }
-
-  if (activeItem === 'documents') {
-    return (
-      <section className="space-y-4">
-        <SkeletonBlock className="h-8 w-44" />
-        <div className="rounded-card border border-border bg-card p-6">
-          <SkeletonBlock className="h-7 w-2/3" />
-          <SkeletonBlock className="mt-5 h-4 w-full" />
-          <SkeletonBlock className="mt-3 h-4 w-11/12" />
-          <SkeletonBlock className="mt-3 h-4 w-10/12" />
-          <SkeletonBlock className="mt-8 h-64 w-full" />
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section className="space-y-5">
-      <div>
-        <SkeletonBlock className="h-4 w-32" />
-        <SkeletonBlock className="mt-3 h-8 w-64" />
-      </div>
-      <div className="grid gap-5 md:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="rounded-card border border-border bg-card p-5">
-            <SkeletonBlock className="h-5 w-40" />
-            <SkeletonBlock className="mt-4 h-4 w-full" />
-            <SkeletonBlock className="mt-3 h-4 w-3/4" />
-            <SkeletonBlock className="mt-6 h-10 w-32" />
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function WorkspaceRoute({ authenticated, activeWorkspace, fetchWorkspace, goToDashboard, renderAppFrame }) {
-  const { id, section } = useParams()
-  const navigate = useNavigate()
-  const workspacePage = WORKSPACE_SECTIONS.has(section) ? section : 'home'
-
-  useEffect(() => {
-    if (!authenticated) return
-
-    if (id && section && !WORKSPACE_SECTIONS.has(section)) {
-      navigate(`/workspace/${id}`, { replace: true })
-      return
-    }
-
-    if (id) {
-      if (activeWorkspace?._id === id) return
-
-      fetchWorkspace(id).catch((error) => {
-        // Drop stale last-workspace pointer and history cache so the user is
-        // not bounced back into a 404 loop on next dashboard open.
-        if (error.status === 404) {
-          if (localStorage.getItem(LAST_WORKSPACE_KEY) === id) {
-            localStorage.removeItem(LAST_WORKSPACE_KEY)
-          }
-          removeWorkspaceCache(id)
-          window.dispatchEvent(new Event('teamora-workspaces-refresh'))
-        }
-        toast.error(error.status === 404 ? 'Workspace not found or you no longer have access.' : error.message)
-        goToDashboard()
-      })
-      return
-    }
-
-    const lastWorkspaceId = localStorage.getItem(LAST_WORKSPACE_KEY)
-
-    if (lastWorkspaceId) {
-      navigate(`/workspace/${lastWorkspaceId}`, { replace: true })
-    } else {
-      goToDashboard()
-    }
-  }, [id, section, authenticated, activeWorkspace?._id, fetchWorkspace, goToDashboard, navigate])
-
-  const isCurrentWorkspaceLoaded = activeWorkspace?._id === id
-  return renderAppFrame({ forceWorkspace: Boolean(id && !isCurrentWorkspaceLoaded), workspacePage })
 }

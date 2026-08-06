@@ -326,8 +326,8 @@ export default function Calendar({
 
   const handleInsertAiTasks = useCallback(
     async (newTasks) => {
-      if (!canEdit || !newTasks || newTasks.length === 0) return;
-      
+      if (!canEdit || !newTasks || newTasks.length === 0) return
+
       const results = await Promise.allSettled(
         newTasks.map(async (task) => {
           const payload = {
@@ -339,48 +339,49 @@ export default function Calendar({
             endTime: '',
             reminder: '',
             workspaceName: ''
-          };
-          const { data } = await api.post(`/api/v1/workspaces/${workspaceId}/tasks`, payload);
-          return data.task;
+          }
+          const { data } = await api.post(`/api/v1/workspaces/${workspaceId}/tasks`, payload)
+          return data.task
         })
-      );
+      )
 
-      const saved = results
-        .filter((r) => r.status === 'fulfilled')
-        .map((r) => r.value);
-      
+      const saved = results.filter((r) => r.status === 'fulfilled').map((r) => r.value)
+
       if (saved.length > 0) {
-        setTasks((prev) => [...prev, ...saved]);
-        tasksChannel.emit('tasks-updated', {});
+        setTasks((prev) => [...prev, ...saved])
+        tasksChannel.emit('tasks-updated', {})
       }
 
-      const failed = results.filter((r) => r.status === 'rejected').length;
+      const failed = results.filter((r) => r.status === 'rejected').length
       if (failed > 0) {
-        toast.error(`${failed} task(s) failed to save.`);
+        toast.error(`${failed} task(s) failed to save.`)
       }
     },
     [canEdit, workspaceId, tasksChannel]
-  );
+  )
 
-  const openCreateModal = useCallback((dateKey) => {
-    if (!canEdit) return
-    setActiveDate(dateKey)
-    setEditingTask(null)
-    setTitle('')
-    setDescription('')
-    setDateInput(formatDateInput(dateKey))
-    setStartTime('')
-    setEndTime('')
-    setPriority('')
-    setReminder('')
-    setReminderEnabled(false)
-    setReminderEmail('')
-    setReminderGapMinutes(0)
-    setReminderLimit(1)
-    setWorkspaceName('')
-    setSubmitted(false)
-    setModalMode('create')
-  }, [canEdit])
+  const openCreateModal = useCallback(
+    (dateKey) => {
+      if (!canEdit) return
+      setActiveDate(dateKey)
+      setEditingTask(null)
+      setTitle('')
+      setDescription('')
+      setDateInput(formatDateInput(dateKey))
+      setStartTime('')
+      setEndTime('')
+      setPriority('')
+      setReminder('')
+      setReminderEnabled(false)
+      setReminderEmail('')
+      setReminderGapMinutes(0)
+      setReminderLimit(1)
+      setWorkspaceName('')
+      setSubmitted(false)
+      setModalMode('create')
+    },
+    [canEdit]
+  )
 
   const openEditModal = (task) => {
     if (!canEdit) return
@@ -729,7 +730,7 @@ export default function Calendar({
             <Sparkles className="h-4 w-4" />
             AI Extract Tasks
           </button>
-          
+
           <button
             type="button"
             onClick={() => (onOpenTasksPage ? onOpenTasksPage() : setTaskViewerOpen(true))}
@@ -1087,7 +1088,7 @@ export default function Calendar({
                     />
                     <span className="text-sm font-semibold text-text-secondary">Enable Email Reminders</span>
                   </label>
-                  
+
                   {reminderEnabled && (
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                       <label className="block col-span-2">

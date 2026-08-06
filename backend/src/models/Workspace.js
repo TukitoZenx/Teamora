@@ -258,4 +258,38 @@ const workspaceSchema = new mongoose.Schema(
   }
 );
 
+// Caps for embedded arrays. Workspace documents embed notifications + tasks
+// rather than separate collections — unbounded growth causes Mongo document
+// bloat and slow loads for active teams.
+const MAX_NOTIFICATIONS = 200;
+const MAX_TASKS = 500;
+
+workspaceSchema.pre('save', function capEmbeddedArrays() {
+  try {
+    if (Array.isArray(this.notifications) && this.notifications.length > MAX_NOTIFICATIONS) {
+      // Drop oldest (notifications are typically append-only; keep the newest N).
+      this.notifications = this.notifications.slice(-MAX_NOTIFICATIONS);
+    }
+
+    if (Array.isArray(this.tasks) && this.tasks.length > MAX_TASKS) {
+      // Drop oldest tasks by createdAt when available, otherwise truncate head.
+      const sorted = [...this.tasks].sort((a, b) => {
+        const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return at - bt;
+      });
+      this.tasks = sorted.slice(-MAX_TASKS);
+    }
+  } catch {
+    // Never block a save on cap bookkeeping errors.
+  }
+});
+
+// Speeds up dashboard list: members + non-archived workspaces.
+workspaceSchema.index({ members: 1, archivedAt: 1 });
+// Owner active count for workspace cap enforcement.
+workspaceSchema.index({ owner: 1, archivedAt: 1 });
+
 module.exports = mongoose.model('Workspace', workspaceSchema);
+module.exports.MAX_NOTIFICATIONS = MAX_NOTIFICATIONS;
+module.exports.MAX_TASKS = MAX_TASKS;

@@ -43,11 +43,18 @@ const getEmailConfig = () => {
     );
   }
 
-  const host = (SMTP_HOST || 'smtp.gmail.com').trim();
-  const port = Number(SMTP_PORT || 465);
+  // Require explicit host/port — no hardcoded Gmail service name.
+  const host = (SMTP_HOST || '').trim();
+  if (!host) {
+    throw createEmailError(
+      'Email service is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS (or SMTP_URL).',
+      500
+    );
+  }
 
+  const port = Number(SMTP_PORT || 465);
   if (!Number.isInteger(port) || port <= 0) {
-    throw createEmailError('Email service port is invalid.', 500);
+    throw createEmailError('Email service port is invalid. Set SMTP_PORT (e.g. 465 or 587).', 500);
   }
 
   const cleanPass = String(SMTP_PASS).replace(/\s+/g, '');
@@ -79,6 +86,7 @@ const getTransport = () => {
     return { transport: cachedTransport, config };
   }
 
+  // Explicit host/port transport only — never service: 'gmail'.
   const transport = config.connectionUrl
     ? nodemailer.createTransport(config.connectionUrl)
     : nodemailer.createTransport({
@@ -194,17 +202,15 @@ const sendPasswordResetEmail = async ({ to, resetUrl }) => {
       ].join('\n')
     });
 
+    // Do not log SMTP usernames, hosts, or message bodies.
     console.info('Teamora password reset email sent', {
-      to,
-      from: config.from,
-      messageId: info.messageId,
-      smtpResponse: info.response
+      messageId: info.messageId ? '[redacted-id]' : undefined,
+      accepted: Boolean(info.accepted?.length)
     });
 
     return { delivered: true, messageId: info.messageId };
   } catch (error) {
     console.error('Teamora password reset email failed:', {
-      to,
       code: error.code,
       responseCode: error.responseCode,
       message: error.message

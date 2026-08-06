@@ -108,8 +108,12 @@ const mergeVersionsPayload = (existing, incoming) => {
 };
 
 /**
- * Append-only chat / message list merge by id (cap length).
+ * Chat / message list merge by id (cap length).
+ * Newer `updatedAt` (then `createdAt`) wins so edits/deletes sync across clients.
+ * Soft-deleted messages keep a tombstone (`deleted: true`) so peers do not resurrect them.
  */
+const messageSortTime = (m) => toTime(m?.updatedAt || m?.createdAt || m?.timestamp);
+
 const mergeMessagesPayload = (existing, incoming, max = 500) => {
   const baseList = Array.isArray(existing?.messages) ? existing.messages : Array.isArray(existing) ? existing : [];
   const nextList = Array.isArray(incoming?.messages) ? incoming.messages : Array.isArray(incoming) ? incoming : [];
@@ -124,9 +128,12 @@ const mergeMessagesPayload = (existing, incoming, max = 500) => {
       byId.set(id, { ...raw, id });
       return;
     }
-    const pt = toTime(prev.createdAt || prev.timestamp);
-    const ct = toTime(raw.createdAt || raw.timestamp);
-    if (ct >= pt) byId.set(id, { ...prev, ...raw, id });
+    const pt = messageSortTime(prev);
+    const ct = messageSortTime(raw);
+    // Later revision wins; on equal timestamps, later payload in the list wins.
+    if (ct >= pt) {
+      byId.set(id, { ...prev, ...raw, id });
+    }
   });
 
   const messages = Array.from(byId.values()).sort(

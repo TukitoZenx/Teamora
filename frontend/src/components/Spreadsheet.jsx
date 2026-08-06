@@ -318,8 +318,13 @@ export default function Spreadsheet({
 
   // Import XLSX (SheetJS)
   const handleImportXLSX = (e) => {
-    const file = e.target.files[0]
+    const file = e.target.files?.[0]
     if (!file) return
+
+    if (typeof sheetOffset !== 'number' || Number.isNaN(sheetOffset)) {
+      toast.error('Spreadsheet is not ready to import yet.')
+      return
+    }
 
     const reader = new FileReader()
     reader.onload = (evt) => {
@@ -333,7 +338,11 @@ export default function Spreadsheet({
         // populate into active sheet offset (loop over the imported rows,
         // not the current viewport, so importing a larger file than the
         // currently-rendered grid doesn't silently drop rows)
-        const importedRowCount = Math.min(data.length, 1000)
+        const importedRowCount = Math.min(Array.isArray(data) ? data.length : 0, 1000)
+        if (!Number.isFinite(importedRowCount) || importedRowCount < 0) {
+          toast.error('Import failed: invalid row count.')
+          return
+        }
         for (let r = 0; r < importedRowCount; r++) {
           for (let c = 0; c < 26; c++) {
             const importedVal = data[r]?.[c] !== undefined ? String(data[r][c]) : ''
@@ -365,6 +374,8 @@ export default function Spreadsheet({
     }
   }
 
+  // Only the active cell mounts an <input>; focus is applied on mount.
+  // Keyboard moves just update activeCell — do not focus a ref that is not mounted yet.
   const handleCellKeyDown = (e, rIdx, cIdx) => {
     switch (e.key) {
       case 'Tab': {
@@ -372,64 +383,44 @@ export default function Spreadsheet({
         const newC = cIdx < columnCount - 1 ? cIdx + 1 : 0
         const newR = cIdx < columnCount - 1 ? rIdx : Math.min(rowCount - 1, rIdx + 1)
         setActiveCell({ r: newR, c: newC })
-        cellRefs.current[`${newR}-${newC}`]?.focus()
         break
       }
       case 'Enter':
         e.preventDefault()
         if (rIdx < rowCount - 1) {
           setActiveCell({ r: rIdx + 1, c: cIdx })
-          cellRefs.current[`${rIdx + 1}-${cIdx}`]?.focus()
         } else {
           setRowCount((prev) => prev + 10)
-          const nextR = rIdx + 1
-          setActiveCell({ r: nextR, c: cIdx })
-          setTimeout(() => cellRefs.current[`${nextR}-${cIdx}`]?.focus(), 10)
+          setActiveCell({ r: rIdx + 1, c: cIdx })
         }
         break
       case 'ArrowUp':
         e.preventDefault()
-        if (rIdx > 0) {
-          const nextR = rIdx - 1
-          setActiveCell({ r: nextR, c: cIdx })
-          cellRefs.current[`${nextR}-${cIdx}`]?.focus()
-        }
+        if (rIdx > 0) setActiveCell({ r: rIdx - 1, c: cIdx })
         break
       case 'ArrowDown':
         e.preventDefault()
         if (rIdx < rowCount - 1) {
-          const nextR = rIdx + 1
-          setActiveCell({ r: nextR, c: cIdx })
-          cellRefs.current[`${nextR}-${cIdx}`]?.focus()
+          setActiveCell({ r: rIdx + 1, c: cIdx })
         } else {
           setRowCount((prev) => prev + 10)
-          const nextR = rIdx + 1
-          setActiveCell({ r: nextR, c: cIdx })
-          setTimeout(() => cellRefs.current[`${nextR}-${cIdx}`]?.focus(), 10)
+          setActiveCell({ r: rIdx + 1, c: cIdx })
         }
         break
       case 'ArrowLeft':
         if (e.target.selectionStart === 0 || e.target.selectionStart === null) {
           e.preventDefault()
-          if (cIdx > 0) {
-            const nextC = cIdx - 1
-            setActiveCell({ r: rIdx, c: nextC })
-            cellRefs.current[`${rIdx}-${nextC}`]?.focus()
-          }
+          if (cIdx > 0) setActiveCell({ r: rIdx, c: cIdx - 1 })
         }
         break
       case 'ArrowRight':
         if (e.target.selectionStart === e.target.value.length || e.target.selectionStart === null) {
           e.preventDefault()
           if (cIdx < columnCount - 1) {
-            const nextC = cIdx + 1
-            setActiveCell({ r: rIdx, c: nextC })
-            cellRefs.current[`${rIdx}-${nextC}`]?.focus()
+            setActiveCell({ r: rIdx, c: cIdx + 1 })
           } else {
             setColumnCount((prev) => prev + 5)
-            const nextC = cIdx + 1
-            setActiveCell({ r: rIdx, c: nextC })
-            setTimeout(() => cellRefs.current[`${rIdx}-${nextC}`]?.focus(), 10)
+            setActiveCell({ r: rIdx, c: cIdx + 1 })
           }
         }
         break
@@ -445,11 +436,24 @@ export default function Spreadsheet({
     toast.success('Conditional formatting rule added!')
   }
 
-  const getCellFormatStyle = (r, c, value) => {
-    const activeRule = conditionalFormattingRules.find(
-      (rule) => rule.col === c && parseFloat(value) > parseFloat(rule.val)
-    )
-    return activeRule ? { backgroundColor: activeRule.color, color: '#ef4444', fontWeight: 'bold' } : {}
+  // Pre-index rules by column so theme/paint passes don't scan the rule list per cell.
+  const rulesByCol = useMemo(() => {
+    const map = new Map()
+    for (const rule of conditionalFormattingRules) {
+      const list = map.get(rule.col) || []
+      list.push(rule)
+      map.set(rule.col, list)
+    }
+    return map
+  }, [conditionalFormattingRules])
+
+  const getCellFormatStyle = (c, value) => {
+    const rules = rulesByCol.get(c)
+    if (!rules) return undefined
+    const num = parseFloat(value)
+    if (!Number.isFinite(num)) return undefined
+    const activeRule = rules.find((rule) => num > parseFloat(rule.val))
+    return activeRule ? { backgroundColor: activeRule.color, color: '#ef4444', fontWeight: 700 } : undefined
   }
 
   // Dynamic SVG Chart calculations
@@ -520,8 +524,22 @@ export default function Spreadsheet({
   }
 
   const handleDuplicateSheet = (sheetObj) => {
-    const nextOffset = sheetsMetadata.sheets.length * 1000
-    const dupName = `${sheetObj.name} (Copy)`
+    if (!sheetObj || typeof sheetObj.offset !== 'number' || Number.isNaN(sheetObj.offset)) {
+      toast.error('Cannot duplicate: invalid sheet.')
+      return
+    }
+    if (typeof rowCount !== 'number' || !Number.isFinite(rowCount) || rowCount <= 0) {
+      toast.error('Cannot duplicate: invalid row count.')
+      return
+    }
+    const sheetLen = sheetsMetadata?.sheets?.length
+    if (typeof sheetLen !== 'number' || !Number.isFinite(sheetLen)) {
+      toast.error('Cannot duplicate: sheet list is not ready.')
+      return
+    }
+
+    const nextOffset = sheetLen * 1000
+    const dupName = `${sheetObj.name || 'Sheet'} (Copy)`
 
     // Copy cell values in the global grid
     for (let r = 0; r < rowCount; r++) {
@@ -545,7 +563,7 @@ export default function Spreadsheet({
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken">
       {/* Menu / Headers */}
-      <div className="h-12 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 transition-colors z-20">
+      <div className="z-20 flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-4">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 bg-success/10 rounded-lg flex items-center justify-center text-success shrink-0">
             <TableProperties className="w-4 h-4" />
@@ -612,7 +630,7 @@ export default function Spreadsheet({
             <Download className="w-3.5 h-3.5" />
             <span>Export</span>
           </button>
-          
+
           <div className="w-px h-5 bg-border mx-0.5" />
 
           <button
@@ -642,18 +660,18 @@ export default function Spreadsheet({
       {/* Main Grid View */}
       <div className="flex-1 flex overflow-hidden">
         <div
-          className="flex-1 overflow-auto bg-card transition-colors"
+          className="teamora-sheet-grid flex-1 overflow-auto bg-card"
           ref={gridContainerRef}
           onScroll={handleGridScroll}
         >
-          <table className="border-collapse w-max min-w-full">
+          <table className="w-max min-w-full border-collapse">
             <thead>
-              <tr className="bg-card-sunken/80 select-none">
-                <th className="w-10 h-7 border border-border sticky top-0 left-0 bg-card-sunken z-30" />
+              <tr className="select-none bg-card-sunken/80">
+                <th className="sticky left-0 top-0 z-30 h-7 w-10 border border-border bg-card-sunken" />
                 {visibleGridRows[0]?.map((_, cIdx) => (
                   <th
                     key={cIdx}
-                    className="w-28 border border-border text-[10px] font-bold text-muted text-center uppercase tracking-wider sticky top-0 bg-card-sunken/90 z-20"
+                    className="sticky top-0 z-20 w-28 border border-border bg-card-sunken/90 text-center text-[10px] font-bold uppercase tracking-wider text-muted"
                   >
                     <span>{getColumnHeaderLabel(cIdx)}</span>
                   </th>
@@ -667,9 +685,9 @@ export default function Spreadsheet({
                 return (
                   <tr
                     key={rIdx}
-                    className={isFrozenRow ? 'sticky top-7 z-20 shadow-sm bg-primary/10' : 'hover:bg-primary/5'}
+                    className={isFrozenRow ? 'sticky top-7 z-20 bg-primary/10 shadow-sm' : 'hover:bg-primary/5'}
                   >
-                    <td className="w-10 h-7 border border-border text-[10px] font-bold text-muted text-center bg-card-sunken sticky left-0 z-20 select-none">
+                    <td className="sticky left-0 z-20 h-7 w-10 select-none border border-border bg-card-sunken text-center text-[10px] font-bold text-muted">
                       {rIdx + 1}
                     </td>
                     {row.map((cell, cIdx) => {
@@ -679,32 +697,48 @@ export default function Spreadsheet({
                       )
                       const hasOtherUsers = otherUsersOnCell.length > 0
                       const primaryOtherUser = otherUsersOnCell[0]
-
                       const isFrozenCol = freezeCol && cIdx === 0
+                      const formatStyle = getCellFormatStyle(cIdx, cell)
 
                       return (
                         <td
                           key={cIdx}
-                          style={getCellFormatStyle(rIdx, cIdx, cell)}
-                          className={`w-28 h-7 border border-border p-0 relative transition-all ${
+                          style={formatStyle}
+                          className={`relative h-7 w-28 border border-border p-0 ${
                             isActive
-                              ? 'ring-2 ring-primary ring-inset z-10 bg-primary/5'
+                              ? 'z-10 bg-primary/5 ring-2 ring-inset ring-primary'
                               : isFrozenCol
                                 ? 'sticky left-10 z-10 bg-primary/10'
                                 : ''
                           }`}
+                          onMouseDown={(e) => {
+                            // Activate cell without mounting an input on every cell.
+                            if (!isActive && e.button === 0) {
+                              setActiveCell({ r: rIdx, c: cIdx })
+                            }
+                          }}
                         >
-                          <input
-                            ref={(el) => {
-                              cellRefs.current[`${rIdx}-${cIdx}`] = el
-                            }}
-                            type="text"
-                            value={isActive ? cell : getCellDisplay(cell)}
-                            onFocus={() => setActiveCell({ r: rIdx, c: cIdx })}
-                            onChange={(e) => handleCellChange(sheetOffset + rIdx, cIdx, e.target.value)}
-                            onKeyDown={(e) => handleCellKeyDown(e, rIdx, cIdx)}
-                            className="w-full h-full bg-transparent border-none outline-none px-2 text-xs text-text font-mono focus:ring-0 focus:outline-none"
-                          />
+                          {isActive ? (
+                            <input
+                              ref={(el) => {
+                                cellRefs.current[`${rIdx}-${cIdx}`] = el
+                                // Focus once the active editor mounts.
+                                if (el && document.activeElement !== el) {
+                                  queueMicrotask(() => el.focus())
+                                }
+                              }}
+                              type="text"
+                              value={cell}
+                              onFocus={() => setActiveCell({ r: rIdx, c: cIdx })}
+                              onChange={(e) => handleCellChange(sheetOffset + rIdx, cIdx, e.target.value)}
+                              onKeyDown={(e) => handleCellKeyDown(e, rIdx, cIdx)}
+                              className="h-full w-full border-none bg-transparent px-2 font-mono text-xs text-text outline-none focus:outline-none focus:ring-0"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full cursor-cell items-center overflow-hidden px-2 font-mono text-xs text-text select-none">
+                              <span className="truncate">{getCellDisplay(cell)}</span>
+                            </div>
+                          )}
                           {isActive && (
                             <div
                               role="presentation"
@@ -715,7 +749,7 @@ export default function Spreadsheet({
                           )}
                           {!isActive && hasOtherUsers && (
                             <div
-                              className="absolute -top-3.5 left-0 text-[8px] text-on-primary px-1.5 py-0.5 rounded-t-md font-bold z-30 select-none pointer-events-none whitespace-nowrap"
+                              className="pointer-events-none absolute -top-3.5 left-0 z-30 select-none whitespace-nowrap rounded-t-md px-1.5 py-0.5 text-[8px] font-bold text-on-primary"
                               style={{ backgroundColor: primaryOtherUser.color }}
                             >
                               {primaryOtherUser.user}
@@ -960,29 +994,28 @@ export default function Spreadsheet({
           </div>
         </div>
       )}
-
-      <AiSpreadsheetModal 
-        isOpen={showAiModal} 
+      <AiSpreadsheetModal
+        isOpen={showAiModal}
         onClose={() => setShowAiModal(false)}
         onApplyAi={(result, mode) => {
           if (!activeCell) {
-            toast.error('Please select a cell first to place the AI content.');
-            return;
+            toast.error('Please select a cell first to place the AI content.')
+            return
           }
           if (mode === 'formula') {
-            handleCellChange(sheetOffset + activeCell.r, activeCell.c, result);
+            handleCellChange(sheetOffset + activeCell.r, activeCell.c, result)
           } else if (mode === 'data') {
             // result is a 2D array of strings
-            const numRows = result.length;
-            const numCols = result[0]?.length || 0;
-            
+            const numRows = result.length
+            const numCols = result[0]?.length || 0
+
             // Expand grid if needed (naively handled by scrolling normally, but here we just write to grid state)
-            if (activeCell.r + numRows > rowCount) setRowCount(activeCell.r + numRows + 5);
-            if (activeCell.c + numCols > columnCount) setColumnCount(activeCell.c + numCols + 5);
-            
+            if (activeCell.r + numRows > rowCount) setRowCount(activeCell.r + numRows + 5)
+            if (activeCell.c + numCols > columnCount) setColumnCount(activeCell.c + numCols + 5)
+
             for (let r = 0; r < numRows; r++) {
               for (let c = 0; c < numCols; c++) {
-                handleCellChange(sheetOffset + activeCell.r + r, activeCell.c + c, result[r][c] || '');
+                handleCellChange(sheetOffset + activeCell.r + r, activeCell.c + c, result[r][c] || '')
               }
             }
           }

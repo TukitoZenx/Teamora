@@ -1,17 +1,20 @@
-// this file is used for the express application setup
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const passport = require('passport');
+const compression = require('compression');
+const morgan = require('morgan');
+const helmet = require('helmet');
 const authRoutes = require('./routes/auth.routes');
 const workspaceRoutes = require('./routes/workspace.routes');
 const aiRoutes = require('./routes/ai.routes');
 const configurePassport = require('./config/passport');
 const { createSessionStore, createSessionMiddleware, isProduction } = require('./config/session');
-const compression = require('compression');
-const morgan = require('morgan');
+const { ensureCsrfCookie, verifyCsrf } = require('./middleware/csrf.middleware');
+const { requestIdMiddleware } = require('./middleware/requestId.middleware');
+const { getLiveness, getReadiness } = require('./services/health.service');
+const logger = require('./utils/logger');
 const app = express();
-const helmet = require('helmet');
 
 const normalizeUrl = (url) => (url || '').replace(/\/$/, '');
 const clientUrl = normalizeUrl(process.env.CLIENT_URL || 'http://localhost:5173');
@@ -81,8 +84,17 @@ const requireJsonContentType = (req, res, next) => {
 
 app.use(helmet());
 app.use(compression());
+// Correlation id first so access logs and errors can include it.
+app.use(requestIdMiddleware);
 configurePassport();
-app.use(morgan(isProduction ? 'combined' : 'dev'));
+morgan.token('request-id', (req) => req.requestId || '-');
+app.use(
+  morgan(
+    isProduction
+      ? ':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" rid=:request-id'
+      : ':method :url :status :response-time ms rid=:request-id'
+  )
+);
 if (isProduction) {
   app.set('trust proxy', 1);
 }
@@ -97,7 +109,15 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    // Include X-Request-Id so the SPA correlation header survives CORS preflight.
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-XSRF-TOKEN',
+      'X-CSRF-TOKEN',
+      'X-Request-Id',
+      'X-Correlation-Id'
+    ]
   })
 );
 // Cap JSON body size. 12mb allows presentation decks with a few compressed
@@ -109,9 +129,20 @@ app.use(cookieParser());
 app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
+// Double-submit / synchronizer CSRF: issue cookie+session token, verify on mutations.
+// (JSON Content-Type + CORS remain a first line of defence for browsers.)
+app.use(ensureCsrfCookie);
+app.use(verifyCsrf);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+// Liveness — process is up (Render/platform health check).
+app.get(['/health', '/health/live'], (req, res) => {
+  res.status(200).json(getLiveness());
+});
+
+// Readiness — Mongo connected; use for load-balancer routing / deploy gates.
+app.get('/health/ready', (req, res) => {
+  const body = getReadiness();
+  res.status(body.ready ? 200 : 503).json(body);
 });
 
 app.use('/api/auth', authRoutes);
@@ -119,28 +150,44 @@ app.use('/api/v1/workspaces', workspaceRoutes);
 app.use('/api/v1/ai', aiRoutes);
 
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' });
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    requestId: req.requestId
+  });
 });
 
 app.use((error, req, res, next) => {
+  const requestId = req.requestId;
+  const log = logger.with({ requestId });
+
   if (error.message === 'Not allowed by CORS') {
-    return res.status(403).json({ success: false, message: 'Origin is not allowed by CORS' });
+    return res.status(403).json({
+      success: false,
+      message: 'Origin is not allowed by CORS',
+      requestId
+    });
   }
 
   if (error.code === 11000) {
     const field = Object.keys(error.keyPattern || {})[0] || 'field';
-    return res.status(409).json({ success: false, message: `${field} is already in use` });
+    return res.status(409).json({
+      success: false,
+      message: `${field} is already in use`,
+      requestId
+    });
   }
 
   if (error.name === 'CastError') {
-    return res.status(400).json({ success: false, message: 'Invalid identifier' });
+    return res.status(400).json({ success: false, message: 'Invalid identifier', requestId });
   }
 
   if (error.name === 'ValidationError') {
     const first = error.errors && Object.values(error.errors)[0];
     return res.status(400).json({
       success: false,
-      message: first?.message || 'Validation failed'
+      message: first?.message || 'Validation failed',
+      requestId
     });
   }
 
@@ -148,10 +195,12 @@ app.use((error, req, res, next) => {
   const message = statusCode === 500 ? 'Internal server error' : error.message;
 
   if (statusCode === 500) {
-    console.error(error);
+    log.error('Unhandled request error', error);
+  } else if (statusCode >= 400) {
+    log.warn('Request failed', { statusCode, message: error.message });
   }
 
-  res.status(statusCode).json({ success: false, message });
+  res.status(statusCode).json({ success: false, message, requestId });
 });
 
 module.exports = app;

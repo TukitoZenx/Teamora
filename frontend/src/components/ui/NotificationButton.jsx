@@ -127,10 +127,26 @@ export default function NotificationButton() {
 
   useEffect(() => {
     let cancelled = false
+    let timer = null
+
+    const pollIfVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications()
+      }
+    }
+
     queueMicrotask(() => {
-      if (!cancelled) loadNotifications()
+      if (!cancelled) pollIfVisible()
     })
-    const timer = window.setInterval(loadNotifications, 5000)
+
+    // Visibility-aware polling: only while the tab is visible.
+    timer = window.setInterval(pollIfVisible, 8000)
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadNotifications()
+      }
+    }
 
     // External writers (addWorkspaceNotification) fire this. Never call
     // writeLocalNotifications with emit here — that caused the infinite loop.
@@ -142,15 +158,23 @@ export default function NotificationButton() {
     }
 
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, syncLocalNotifications)
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       cancelled = true
-      window.clearInterval(timer)
+      if (timer) window.clearInterval(timer)
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, syncLocalNotifications)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [loadNotifications, applyNotifications])
 
   useEffect(() => {
     if (!open) return undefined
+
+    const panel = rootRef.current?.querySelector('[data-notification-panel]')
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    // Move focus into the panel for keyboard users when opened.
+    const preferred = panel?.querySelector('button:not([disabled])') || panel
+    preferred?.focus?.()
 
     const handlePointerDown = (event) => {
       if (!rootRef.current?.contains(event.target)) {
@@ -158,7 +182,10 @@ export default function NotificationButton() {
       }
     }
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setOpen(false)
+      }
     }
 
     document.addEventListener('mousedown', handlePointerDown)
@@ -166,6 +193,7 @@ export default function NotificationButton() {
     return () => {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
+      previouslyFocused?.focus?.()
     }
   }, [open])
 
@@ -221,43 +249,58 @@ export default function NotificationButton() {
     toast.success('Opening meeting…')
   }
 
+  const bellLabel = unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+
   return (
     <div className="relative" ref={rootRef}>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl text-muted transition duration-normal ease-standard hover:bg-card-sunken hover:text-primary"
-        aria-label="Notifications"
+        className="relative flex h-11 w-11 min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] items-center justify-center rounded-xl text-muted transition duration-normal ease-standard hover:bg-card-sunken hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
+        aria-label={bellLabel}
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-controls={open ? 'teamora-notifications-panel' : undefined}
       >
-        <Bell className="h-4 w-4" />
-        {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5 rounded-full bg-primary" />}
+        <Bell className="h-4 w-4" aria-hidden />
+        {unreadCount > 0 && (
+          <span className="absolute right-1.5 top-1.5 flex h-2.5 w-2.5 rounded-full bg-primary" aria-hidden />
+        )}
       </button>
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {unreadCount > 0 ? `${unreadCount} unread notifications` : ''}
+      </span>
 
       {open && (
         <div
+          id="teamora-notifications-panel"
+          data-notification-panel
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 mt-2 w-[22rem] rounded-card border border-border bg-card p-3 shadow-dropdown"
+          tabIndex={-1}
+          className="absolute right-0 z-dropdown mt-2 w-[min(22rem,calc(100vw-1.5rem))] rounded-card border border-border bg-card p-3 shadow-dropdown outline-none"
         >
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold text-text">Notifications</p>
               <p className="text-xs text-muted">{unreadCount} unread</p>
             </div>
             <div className="flex items-center gap-1">
-              <button type="button" onClick={markAllAsRead} className="px-2 py-1 text-xs font-semibold text-primary">
+              <button
+                type="button"
+                onClick={markAllAsRead}
+                className="min-h-[var(--tw-touch-min)] rounded-control px-2 py-1 text-xs font-semibold text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
+              >
                 Clear all
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition hover:bg-card-sunken hover:text-text"
+                className="flex h-11 w-11 min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] items-center justify-center rounded-full text-muted transition hover:bg-card-sunken hover:text-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
                 aria-label="Close notifications"
                 title="Close notifications"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden />
               </button>
             </div>
           </div>
@@ -313,18 +356,18 @@ export default function NotificationButton() {
                               type="button"
                               disabled={busyId === item._id}
                               onClick={() => resolveRequest(item, 'accept')}
-                              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-hover disabled:opacity-60"
+                              className="inline-flex h-11 min-h-[var(--tw-touch-min)] flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:opacity-60"
                             >
-                              <Check className="h-3.5 w-3.5" />
+                              <Check className="h-3.5 w-3.5" aria-hidden />
                               Accept
                             </button>
                             <button
                               type="button"
                               disabled={busyId === item._id}
                               onClick={() => resolveRequest(item, 'decline')}
-                              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary transition hover:bg-card-sunken disabled:opacity-60"
+                              className="inline-flex h-11 min-h-[var(--tw-touch-min)] flex-1 items-center justify-center gap-1.5 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary transition hover:bg-card-sunken focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:opacity-60"
                             >
-                              <X className="h-3.5 w-3.5" />
+                              <X className="h-3.5 w-3.5" aria-hidden />
                               Decline
                             </button>
                           </div>
@@ -333,9 +376,9 @@ export default function NotificationButton() {
                             <button
                               type="button"
                               onClick={() => joinMeetingFromNotification(item)}
-                              className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-hover"
+                              className="inline-flex h-11 min-h-[var(--tw-touch-min)] flex-1 items-center justify-center gap-1.5 rounded-control bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
                             >
-                              <Video className="h-3.5 w-3.5" />
+                              <Video className="h-3.5 w-3.5" aria-hidden />
                               Join Meeting
                             </button>
                             <button
@@ -344,7 +387,7 @@ export default function NotificationButton() {
                                 dismissMeetingNotifications(item.workspaceId)
                                 dismissNotification(item._id)
                               }}
-                              className="inline-flex h-9 items-center justify-center gap-1 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary hover:bg-card-sunken"
+                              className="inline-flex h-11 min-h-[var(--tw-touch-min)] items-center justify-center gap-1 rounded-control border border-border px-3 text-xs font-semibold text-text-secondary hover:bg-card-sunken focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
                             >
                               Dismiss
                             </button>
@@ -353,9 +396,9 @@ export default function NotificationButton() {
                           <button
                             type="button"
                             onClick={() => dismissNotification(item._id)}
-                            className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                            className="mt-2 inline-flex min-h-[var(--tw-touch-min)] items-center gap-1 text-xs font-semibold text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
                           >
-                            <CheckCheck className="h-3.5 w-3.5" />
+                            <CheckCheck className="h-3.5 w-3.5" aria-hidden />
                             Dismiss
                           </button>
                         )}
@@ -370,9 +413,10 @@ export default function NotificationButton() {
           <button
             type="button"
             onClick={handleRefreshClick}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-button border border-border px-3 py-2 text-sm font-semibold text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary"
+            className="mt-3 flex min-h-[var(--tw-touch-min)] w-full items-center justify-center gap-2 rounded-button border border-border px-3 py-2 text-sm font-semibold text-text-secondary transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
+            aria-busy={isRefreshing || undefined}
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden />
             Refresh
           </button>
         </div>

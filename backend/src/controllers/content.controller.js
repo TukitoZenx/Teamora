@@ -1,5 +1,9 @@
 const contentService = require('../services/content.service');
+const workspaceService = require('../services/workspace.service');
 const htmlToDocx = require('html-to-docx');
+
+/** Cap export HTML to limit CPU/memory DoS via html-to-docx. */
+const MAX_EXPORT_HTML_CHARS = 1_500_000;
 
 const getContent = async (req, res, next) => {
   try {
@@ -36,11 +40,16 @@ const preprocessHtmlForDocx = (html) => {
   clean = clean.replace(/<([a-z0-9]+)\s+([^>]*class="[^"]*"[^>]*)>/gi, (match, tagName, attrs) => {
     const classMatch = attrs.match(/class="([^"]*)"/i);
     const styleMatch = attrs.match(/style="([^"]*)"/i);
-    
+
     const classes = classMatch ? classMatch[1].split(/\s+/) : [];
-    const styles = styleMatch ? styleMatch[1].split(';').map(s => s.trim()).filter(Boolean) : [];
-    
-    classes.forEach(cls => {
+    const styles = styleMatch
+      ? styleMatch[1]
+          .split(';')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+
+    classes.forEach((cls) => {
       if (cls === 'ql-align-center') styles.push('text-align: center');
       if (cls === 'ql-align-right') styles.push('text-align: right');
       if (cls === 'ql-align-justify') styles.push('text-align: justify');
@@ -53,17 +62,17 @@ const preprocessHtmlForDocx = (html) => {
       if (cls === 'ql-size-large') styles.push('font-size: 18pt');
       if (cls === 'ql-size-huge') styles.push('font-size: 28pt');
     });
-    
+
     let cleanAttrs = attrs
       .replace(/class="[^"]*"/gi, '')
       .replace(/style="[^"]*"/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
-      
+
     if (styles.length > 0) {
       cleanAttrs += ` style="${styles.join('; ')};"`;
     }
-    
+
     return `<${tagName} ${cleanAttrs}>`;
   });
 
@@ -72,10 +81,10 @@ const preprocessHtmlForDocx = (html) => {
     const styleMatch = attrs.match(/style="([^"]*)"/i);
     const widthMatch = attrs.match(/width="([^"]*)"/i);
     const heightMatch = attrs.match(/height="([^"]*)"/i);
-    
+
     let width = widthMatch ? widthMatch[1] : '';
     let height = heightMatch ? heightMatch[1] : '';
-    
+
     if (styleMatch) {
       const styles = styleMatch[1];
       const wMatch = styles.match(/width:\s*([\d.]+)px/i);
@@ -83,14 +92,14 @@ const preprocessHtmlForDocx = (html) => {
       if (wMatch && !width) width = wMatch[1];
       if (hMatch && !height) height = hMatch[1];
     }
-    
+
     if (!width) width = '400';
     if (!height) height = '300';
-    
+
     let cleanAttrs = attrs;
     if (!widthMatch) cleanAttrs += ` width="${width}"`;
     if (!heightMatch) cleanAttrs += ` height="${height}"`;
-    
+
     return `<img ${cleanAttrs}>`;
   });
 
@@ -104,25 +113,46 @@ const preprocessHtmlForDocx = (html) => {
   clean = clean.replace(/<table([^>]*)>/gi, (match, attrs) => {
     let nextAttrs = attrs;
     if (!attrs.includes('border=')) nextAttrs += ' border="1"';
-    if (!attrs.includes('style=')) nextAttrs += ' style="border-collapse: collapse; width: 100%; border: 1px solid #ccc;"';
+    if (!attrs.includes('style='))
+      nextAttrs += ' style="border-collapse: collapse; width: 100%; border: 1px solid #ccc;"';
     return `<table${nextAttrs}>`;
   });
 
   return clean;
 };
 
+/**
+ * Export HTML as DOCX for a workspace member only.
+ * Route: POST /api/v1/workspaces/:id/export-docx
+ * (Legacy unscoped POST /export-docx removed — was an IDOR/DoS risk.)
+ */
 const exportDocx = async (req, res, next) => {
   try {
+    const workspaceId = req.params.id;
+    // Membership gate — non-members must not consume export CPU.
+    await workspaceService.getWorkspaceById(req.user._id, workspaceId);
+
     const { html, title, orientation, margins } = req.body;
-    if (!html) {
+    if (typeof html !== 'string' || !html.trim()) {
       return res.status(400).json({ success: false, message: 'HTML content is required' });
     }
 
+    if (html.length > MAX_EXPORT_HTML_CHARS) {
+      return res.status(413).json({
+        success: false,
+        message: 'Document is too large to export'
+      });
+    }
+
     const preprocessedHtml = preprocessHtmlForDocx(html);
+    const safeTitle =
+      String(title || 'document')
+        .replace(/[\r\n"/\\]/g, '')
+        .slice(0, 120) || 'document';
 
     const opt = {
-      title: title || 'Document',
-      orientation: orientation || 'portrait',
+      title: safeTitle,
+      orientation: orientation === 'landscape' ? 'landscape' : 'portrait',
       font: 'Arial',
       fontSize: 12,
       margins: margins || {
@@ -134,9 +164,9 @@ const exportDocx = async (req, res, next) => {
     };
 
     const docxBuffer = await htmlToDocx(preprocessedHtml, null, opt);
-    
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(title || 'document')}.docx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeTitle)}.docx"`);
     res.status(200).send(docxBuffer);
   } catch (error) {
     next(error);

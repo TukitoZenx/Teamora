@@ -1,52 +1,32 @@
-import { useState } from 'react';
-import { X, Sparkles, Loader2, FunctionSquare, Database } from 'lucide-react';
-import { getApiBaseUrl } from '../services/apiBaseUrl';
-import toast from 'react-hot-toast';
+import { useState } from 'react'
+import { X, Sparkles, Loader2, FunctionSquare, Database } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { generateSpreadsheet } from '../services/aiClient'
 
 export default function AiSpreadsheetModal({ isOpen, onClose, onApplyAi }) {
-  const [prompt, setPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [mode, setMode] = useState('formula'); // 'formula' or 'data'
+  const [prompt, setPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [mode, setMode] = useState('formula') // 'formula' or 'data'
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-    
-    setIsGenerating(true);
+    if (!prompt.trim()) return
+
+    setIsGenerating(true)
     try {
-      const url = `${getApiBaseUrl()}/api/v1/ai/generate-spreadsheet`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, mode }),
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        let msg = 'Failed to generate content.';
-        try {
-          const data = await response.json();
-          if (data.message) msg = data.message;
-        } catch (e) {
-          // ignore
-        }
-        throw new Error(msg);
-      }
-
-      const data = await response.json();
-      
-      onApplyAi(data.result, mode);
-      toast.success(`AI ${mode} generated successfully!`);
-      onClose();
-      setPrompt('');
+      const data = await generateSpreadsheet(prompt, mode)
+      onApplyAi(data.result, mode)
+      toast.success(`AI ${mode} generated successfully!`)
+      onClose()
+      setPrompt('')
     } catch (err) {
-      console.error('Generate Error:', err);
-      toast.error(err.message || 'AI generation failed');
+      console.error('Generate Error:', err)
+      toast.error(err.message || 'AI generation failed')
     } finally {
-      setIsGenerating(false);
+      setIsGenerating(false)
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -59,7 +39,7 @@ export default function AiSpreadsheetModal({ isOpen, onClose, onApplyAi }) {
             </div>
             <h3 className="font-semibold text-text">AI Spreadsheet Assistant</h3>
           </div>
-          <button 
+          <button
             onClick={onClose}
             disabled={isGenerating}
             className="p-1.5 text-muted hover:text-text hover:bg-muted/20 rounded-md transition-colors disabled:opacity-50"
@@ -95,7 +75,11 @@ export default function AiSpreadsheetModal({ isOpen, onClose, onApplyAi }) {
               autoFocus
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder={mode === 'formula' ? "e.g., Calculate the sum of column B if column A is 'Yes'" : "e.g., Generate 5 rows with columns: Name, Role, Department"}
+              placeholder={
+                mode === 'formula'
+                  ? "e.g., Calculate the sum of column B if column A is 'Yes'"
+                  : 'e.g., Generate 5 rows with columns: Name, Role, Department'
+              }
               className="w-full h-32 px-3 py-2 text-sm bg-transparent border border-border rounded-lg outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 resize-none transition-all placeholder:text-muted"
               disabled={isGenerating}
             />
@@ -131,5 +115,5 @@ export default function AiSpreadsheetModal({ isOpen, onClose, onApplyAi }) {
         </div>
       </div>
     </div>
-  );
+  )
 }

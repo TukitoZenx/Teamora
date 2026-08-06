@@ -15,11 +15,12 @@ const variants = {
     'border-border bg-transparent text-text hover:border-primary hover:text-primary focus-visible:ring-primary/20'
 }
 
+// min-height uses touch target token (≥44px) for WCAG 2.2 target size on primary controls.
 const sizes = {
-  sm: 'h-9 min-h-9 gap-1.5 rounded-control px-3 text-xs',
-  md: 'h-11 min-h-11 gap-2 rounded-button px-5 text-sm',
+  sm: 'h-11 min-h-[var(--tw-touch-min)] gap-1.5 rounded-control px-3 text-xs',
+  md: 'h-11 min-h-[var(--tw-touch-min)] gap-2 rounded-button px-5 text-sm',
   lg: 'h-12 min-h-12 gap-2 rounded-button px-6 text-sm',
-  icon: 'h-10 w-10 min-h-10 min-w-10 rounded-button p-0'
+  icon: 'h-11 w-11 min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] rounded-button p-0'
 }
 
 export default function Button({

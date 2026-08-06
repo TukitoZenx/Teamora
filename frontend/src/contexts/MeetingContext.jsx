@@ -17,7 +17,7 @@ export function MeetingProvider({ children }) {
 
   // --- RESTORING THE MEETING AFTER A PAGE REFRESH ---
   // Try to restore from sessionStorage on mount.
-  // Why? If a user accidentally hits F5 (refresh) during a call, React deletes all State. 
+  // Why? If a user accidentally hits F5 (refresh) during a call, React deletes all State.
   // By saving it to sessionStorage, we can instantly rebuild the meeting without dropping the call.
   useEffect(() => {
     try {

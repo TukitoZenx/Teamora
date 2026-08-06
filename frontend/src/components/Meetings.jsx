@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {  Video,
+import {
+  Video,
   VideoOff,
   Mic,
   MicOff,
@@ -180,13 +181,8 @@ function ParticipantTile({
         </>
       ) : (
         <>
-          <RemoteVideo
-            stream={remoteStream}
-            hidden={!remoteStream || part.camActive === false}
-          />
-          {remoteStream && (
-            <RemoteAudio stream={remoteStream} audioOutputDeviceId={selectedSpeaker} />
-          )}
+          <RemoteVideo stream={remoteStream} hidden={!remoteStream || part.camActive === false} />
+          {remoteStream && <RemoteAudio stream={remoteStream} audioOutputDeviceId={selectedSpeaker} />}
           {(!remoteStream || part.camActive === false) && (
             <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
               <div className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-lg font-bold text-primary shadow-md">
@@ -204,9 +200,7 @@ function ParticipantTile({
 
       <div
         className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-[3px] transition-all duration-300 ${
-          speaking
-            ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)] scale-[0.98]'
-            : 'ring-transparent'
+          speaking ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)] scale-[0.98]' : 'ring-transparent'
         }`}
       />
       <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
@@ -226,11 +220,7 @@ function ParticipantTile({
               }`}
               title={`Network: ${networkQualityValue}`}
             >
-              {networkQualityValue === 'poor' ? (
-                <WifiOff className="w-3 h-3" />
-              ) : (
-                <Wifi className="w-3 h-3" />
-              )}
+              {networkQualityValue === 'poor' ? <WifiOff className="w-3 h-3" /> : <Wifi className="w-3 h-3" />}
             </div>
           )}
         </div>
@@ -369,9 +359,11 @@ function ParticipantThumbnailList({
 export default function Meetings({ socket, roomId, userName, isMaximized = true }) {
   const navigate = useNavigate()
   const { isMinimized, toggleMinimize, leaveMeeting: globalLeaveMeeting, joinMeeting: globalJoinMeeting } = useMeeting()
-    const [activeSpeakerId, setActiveSpeakerId] = useState(null)
+  const [activeSpeakerId, setActiveSpeakerId] = useState(null)
+  // Ref mirror avoids re-subscribing the speaking-interval effect on every speaker change.
+  const activeSpeakerIdRef = useRef(null)
   const lastSpeakerUpdateRef = useRef(0)
-const [inMeeting, setInMeeting] = useState(false)
+  const [inMeeting, setInMeeting] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
   const [position, setPosition] = useState(() => {
     const x = Math.max(16, window.innerWidth - 340)
@@ -381,6 +373,8 @@ const [inMeeting, setInMeeting] = useState(false)
   const dragRef = useRef(null)
   const [micActive, setMicActive] = useState(true)
   const [camActive, setCamActive] = useState(true)
+  /** Browser audio processing preference (re-applies on track re-acquire). */
+  const [noiseSuppression, setNoiseSuppression] = useState(true)
   const [handRaised, setHandRaised] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
@@ -408,6 +402,8 @@ const [inMeeting, setInMeeting] = useState(false)
   const screenStreamRef = useRef(null)
   const localVideoRef = useRef(null)
   const localStreamRef = useRef(null)
+  /** Mirror of localStreamRef for render (react-hooks/refs forbids reading refs in JSX). */
+  const [localStream, setLocalStream] = useState(null)
   const canvasStreamRef = useRef(null)
   const animationFrameRef = useRef(null)
   const recordIntervalRef = useRef(null)
@@ -545,7 +541,7 @@ const [inMeeting, setInMeeting] = useState(false)
               audio: {
                 deviceId: deviceId ? { exact: deviceId } : undefined,
                 echoCancellation: true,
-                noiseSuppression: true,
+                noiseSuppression,
                 autoGainControl: true
               }
             })
@@ -613,7 +609,7 @@ const [inMeeting, setInMeeting] = useState(false)
         toast.success('Speaker output device updated')
       }
     },
-    [micActive, camActive, socketId, attachSpeakingMonitor, clearSpeakingMonitor]
+    [micActive, camActive, socketId, noiseSuppression, attachSpeakingMonitor, clearSpeakingMonitor]
   )
 
   useEffect(() => {
@@ -628,6 +624,11 @@ const [inMeeting, setInMeeting] = useState(false)
   const emitSignal = useCallback(
     (targetSocketId, signal) => {
       if (!socket?.emit) return
+      // Never emit an empty-string target (ambiguous broadcast). Undefined = broadcast.
+      if (targetSocketId === '') {
+        console.warn('[meetings] Skipping signal with empty targetSocketId')
+        return
+      }
       socket.emit('meeting-signal', {
         roomId,
         targetSocketId,
@@ -636,8 +637,6 @@ const [inMeeting, setInMeeting] = useState(false)
     },
     [socket, roomId]
   )
-
-
 
   const attachRemoteStream = useCallback(
     (peerId, stream) => {
@@ -770,14 +769,18 @@ const [inMeeting, setInMeeting] = useState(false)
                 avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
                 isLoud = avg > 25
               }
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           } else if (audioAnalysersRef.current[id]) {
             try {
               const pack = audioAnalysersRef.current[id]
               pack.analyser.getByteFrequencyData(pack.data)
               avg = pack.data.reduce((a, b) => a + b, 0) / (pack.data.length || 1)
               isLoud = avg > 25
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           }
 
           if (isLoud && avg > maxAvg) {
@@ -799,14 +802,15 @@ const [inMeeting, setInMeeting] = useState(false)
             changed = true
           }
         })
-        
+
         // Active Speaker debounce/smoothing logic
         const now = Date.now()
         if (currentLoudest) {
-          if (currentLoudest !== activeSpeakerId) {
+          if (currentLoudest !== activeSpeakerIdRef.current) {
             const candidateScore = speakingScoresRef.current[currentLoudest] || 0
             // Require consistent speaking (score >= 4) and debounce switches to at most once per 1.5 seconds
             if (candidateScore >= 4 && now - lastSpeakerUpdateRef.current > 1500) {
+              activeSpeakerIdRef.current = currentLoudest
               setActiveSpeakerId(currentLoudest)
               lastSpeakerUpdateRef.current = now
             }
@@ -887,6 +891,7 @@ const [inMeeting, setInMeeting] = useState(false)
         track.stop()
       })
       localStreamRef.current = null
+      setLocalStream(null)
     }
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     if (canvasStreamRef.current) {
@@ -960,7 +965,7 @@ const [inMeeting, setInMeeting] = useState(false)
           audio: {
             deviceId: selectedMic ? { exact: selectedMic } : undefined,
             echoCancellation: true,
-            noiseSuppression: true,
+            noiseSuppression,
             autoGainControl: true
           }
         })
@@ -971,10 +976,12 @@ const [inMeeting, setInMeeting] = useState(false)
           )
         })
         localStreamRef.current = stream
+        setLocalStream(stream)
       } catch (err) {
         console.error('[RTC-AUDIO-AUDIT] [GetUserMedia Failure] Real media devices fail, using fallback:', err)
         stream = startMockVideoStream()
         localStreamRef.current = stream
+        setLocalStream(stream)
       }
 
       setInMeeting(true)
@@ -987,8 +994,11 @@ const [inMeeting, setInMeeting] = useState(false)
       )
       pushDiag(`joined ice hasTurn=${ice.hasTurn} self=${socketId}`)
 
+      // First joiner claims host so waiting-room / host signals always have a target.
       if (!hostInfoRef.current.hostSocketId) {
         socket.emit('meeting-claim-host', { hostSocketId: socketId, hostName: userName })
+        hostInfoRef.current = { hostSocketId: socketId, hostName: userName }
+        setHostInfo({ hostSocketId: socketId, hostName: userName })
       }
 
       const selfParticipant = {
@@ -1003,7 +1013,7 @@ const [inMeeting, setInMeeting] = useState(false)
       mgr?.setLocalStream(stream)
 
       socket.emit('meeting-join', { roomId, participant: selfParticipant })
-      // Untargeted sync so existing peers re-announce + we mesh
+      // Untargeted sync so existing peers re-announce + we mesh (undefined target = broadcast)
       emitSignal(undefined, {
         type: 'sync-request',
         from: socketId,
@@ -1056,7 +1066,13 @@ const [inMeeting, setInMeeting] = useState(false)
   }
 
   useEffect(() => {
-    if (sessionStorage.getItem('teamora-in-call') === roomId && !inMeeting && !isJoining && socketId && socket?.connected) {
+    if (
+      sessionStorage.getItem('teamora-in-call') === roomId &&
+      !inMeeting &&
+      !isJoining &&
+      socketId &&
+      socket?.connected
+    ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       handleJoinMeeting()
     }
@@ -1216,7 +1232,6 @@ const [inMeeting, setInMeeting] = useState(false)
 
     const onJoin = (p) => {
       if (!p?.socketId) return
-      
 
       setMeetingParticipants((prev) => {
         if (!prev[p.socketId] && p.socketId !== socketId) {
@@ -1239,7 +1254,7 @@ const [inMeeting, setInMeeting] = useState(false)
         delete next[peerId]
         return next
       })
-      
+
       peerManagerRef.current?.removePeer(peerId)
       setPinnedId((cur) => (cur === peerId ? null : cur))
     }
@@ -1268,12 +1283,6 @@ const [inMeeting, setInMeeting] = useState(false)
         await mgr?.handleSignal(senderSocketId, signal)
         return
       }
-
-      
-
-      
-
-      
 
       if (signal.type === 'screen-share-started') {
         toast(`${signal.from || 'A participant'} is sharing their screen`, { icon: '🖥️' })
@@ -1346,9 +1355,11 @@ const [inMeeting, setInMeeting] = useState(false)
             try {
               stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
               localStreamRef.current = stream
+              setLocalStream(stream)
             } catch {
               stream = startMockVideoStream()
               localStreamRef.current = stream
+              setLocalStream(stream)
             }
           }
           const mgr = ensurePeerManager()
@@ -1422,8 +1433,6 @@ const [inMeeting, setInMeeting] = useState(false)
     spawnReaction
   ])
 
-  
-
   // Host election
   useEffect(() => {
     if (!inMeeting || !socketId) return
@@ -1481,7 +1490,7 @@ const [inMeeting, setInMeeting] = useState(false)
     const s = (sec % 60).toString().padStart(2, '0')
     return `${m}:${s}`
   }
-  
+
   const speakerId = useMemo(() => {
     if (pinnedId && meetingParticipants[pinnedId]) return pinnedId
     if (activeSpeakerId && meetingParticipants[activeSpeakerId]) return activeSpeakerId
@@ -1496,16 +1505,14 @@ const [inMeeting, setInMeeting] = useState(false)
   }, [meetingParticipants])
 
   const activeParticipant = useMemo(() => {
-    return participantsList.find(p => p.id === speakerId)
+    return participantsList.find((p) => p.id === speakerId)
   }, [participantsList, speakerId])
 
   const otherParticipants = useMemo(() => {
-    return participantsList.filter(p => p.id !== speakerId)
+    return participantsList.filter((p) => p.id !== speakerId)
   }, [participantsList, speakerId])
 
   const iceInfo = useMemo(() => describeIceSetup(), [])
-
-
 
   const meetingContent = (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken text-text select-none lg:flex-row">
@@ -1532,7 +1539,6 @@ const [inMeeting, setInMeeting] = useState(false)
               </div>
             )}
             <div className="ml-auto flex items-center gap-2 pointer-events-auto">
-              
               <div className="flex items-center gap-1.5 bg-card/90 text-muted text-[10px] font-bold px-3 py-1.5 rounded-full shadow border border-border">
                 <Users className="w-3.5 h-3.5" />
                 <span>{Object.keys(meetingParticipants).length || 0}</span>
@@ -1542,7 +1548,7 @@ const [inMeeting, setInMeeting] = useState(false)
           </div>
         )}
 
-        { !inMeeting ? (
+        {!inMeeting ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
             <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 border border-primary/20">
               <Video className="w-8 h-8" />
@@ -1560,11 +1566,7 @@ const [inMeeting, setInMeeting] = useState(false)
             >
               <Video className="w-5 h-5" />
               <span>
-                {!socketId || !socket?.connected
-                  ? 'Connecting to Server…'
-                  : isJoining
-                    ? 'Joining…'
-                    : 'Join Meeting'}
+                {!socketId || !socket?.connected ? 'Connecting to Server…' : isJoining ? 'Joining…' : 'Join Meeting'}
               </span>
             </button>
           </div>
@@ -1576,7 +1578,7 @@ const [inMeeting, setInMeeting] = useState(false)
                 participant={activeParticipant}
                 isMe={activeParticipant?.id === socketId}
                 localVideoRef={localVideoRef}
-                localStream={localStreamRef.current}
+                localStream={localStream}
                 remoteStream={activeParticipant ? remoteStreams[activeParticipant.id]?.stream : null}
                 selectedSpeaker={selectedSpeaker}
                 speaking={activeParticipant ? speakingMap[activeParticipant.id] : false}
@@ -1595,7 +1597,7 @@ const [inMeeting, setInMeeting] = useState(false)
                 participants={otherParticipants}
                 socketId={socketId}
                 localVideoRef={localVideoRef}
-                localStream={localStreamRef.current}
+                localStream={localStream}
                 remoteStreams={remoteStreams}
                 selectedSpeaker={selectedSpeaker}
                 speakingMap={speakingMap}
@@ -1618,7 +1620,7 @@ const [inMeeting, setInMeeting] = useState(false)
                   part={part}
                   isMe={id === socketId}
                   localVideoRef={localVideoRef}
-                  localStream={localStreamRef.current}
+                  localStream={localStream}
                   remoteStream={remoteStreams[id]?.stream}
                   selectedSpeaker={selectedSpeaker}
                   speaking={speakingMap[id]}
@@ -1714,7 +1716,6 @@ const [inMeeting, setInMeeting] = useState(false)
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
-              
 
               <div className="relative">
                 <button
@@ -1790,6 +1791,62 @@ const [inMeeting, setInMeeting] = useState(false)
                           ))}
                       </select>
                     </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
+                      <div>
+                        <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Noise suppression</p>
+                        <p className="text-[10px] text-muted/80">Browser-dependent audio constraint</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={noiseSuppression}
+                        onClick={async () => {
+                          const next = !noiseSuppression
+                          setNoiseSuppression(next)
+                          if (!localStreamRef.current || !inMeeting) {
+                            toast(
+                              next
+                                ? 'Noise suppression will apply when you join.'
+                                : 'Noise suppression off for next join.'
+                            )
+                            return
+                          }
+                          try {
+                            const newStream = await navigator.mediaDevices.getUserMedia({
+                              audio: {
+                                deviceId: selectedMic ? { exact: selectedMic } : undefined,
+                                echoCancellation: true,
+                                noiseSuppression: next,
+                                autoGainControl: true
+                              }
+                            })
+                            const newTrack = newStream.getAudioTracks()[0]
+                            localStreamRef.current.getAudioTracks().forEach((t) => {
+                              t.stop()
+                              localStreamRef.current.removeTrack(t)
+                            })
+                            localStreamRef.current.addTrack(newTrack)
+                            newTrack.enabled = micActive
+                            peerManagerRef.current?.setLocalStream?.(localStreamRef.current)
+                            toast.success(next ? 'Noise suppression on' : 'Noise suppression off')
+                          } catch (err) {
+                            setNoiseSuppression(!next)
+                            toast.error('Could not update microphone settings')
+                            console.error('[RTC] noise suppression toggle failed', err)
+                          }
+                        }}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                          noiseSuppression ? 'bg-primary' : 'bg-border'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                            noiseSuppression ? 'translate-x-5' : ''
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1822,7 +1879,6 @@ const [inMeeting, setInMeeting] = useState(false)
             </div>
           </div>
         )}
-
       </div>
 
       {inMeeting && activeSidePanel && (
@@ -1885,7 +1941,6 @@ const [inMeeting, setInMeeting] = useState(false)
             </>
           ) : (
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar text-xs">
-              
               {Object.entries(meetingParticipants).map(([participantSocketId, part]) => {
                 const isUserHost = participantSocketId === hostInfo.hostSocketId
                 return (

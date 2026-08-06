@@ -20,8 +20,12 @@ export default function SettingsPage({ user }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-var(--tw-navbar-height))] max-w-7xl px-5 py-6">
-      <aside className="hidden w-60 shrink-0 pr-6 lg:block">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="mx-auto flex min-h-[calc(100vh-var(--tw-navbar-height))] max-w-7xl px-5 py-6 outline-none"
+    >
+      <aside className="hidden w-60 shrink-0 pr-6 lg:block" aria-label="Settings sections">
         <SettingsNav onNavigate={() => setDrawerOpen(false)} />
       </aside>
 
@@ -29,9 +33,11 @@ export default function SettingsPage({ user }) {
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="mb-5 inline-flex items-center gap-2 rounded-button border border-border bg-card px-4 py-2 text-sm font-semibold text-text-secondary shadow-sm transition duration-normal hover:bg-primary-subtle hover:text-primary lg:hidden"
+          className="mb-5 inline-flex min-h-[var(--tw-touch-min)] items-center gap-2 rounded-button border border-border bg-card px-4 py-2 text-sm font-semibold text-text-secondary shadow-sm transition duration-normal hover:bg-primary-subtle hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 lg:hidden"
+          aria-expanded={drawerOpen}
+          aria-controls="settings-mobile-nav"
         >
-          <Menu className="h-4 w-4" />
+          <Menu className="h-4 w-4" aria-hidden />
           Settings Menu
         </button>
 
@@ -46,16 +52,21 @@ export default function SettingsPage({ user }) {
             onClick={() => setDrawerOpen(false)}
             aria-label="Close settings menu"
           />
-          <div className="absolute left-0 top-0 h-full w-72 bg-card p-5 shadow-md">
+          <div
+            id="settings-mobile-nav"
+            className="absolute left-0 top-0 h-full w-72 bg-card p-5 shadow-md"
+            role="dialog"
+            aria-label="Settings menu"
+          >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-text">Settings</h2>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="rounded-xl p-2 text-muted transition duration-normal hover:bg-card-sunken hover:text-text"
+                className="inline-flex min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] items-center justify-center rounded-xl p-2 text-muted transition duration-normal hover:bg-card-sunken hover:text-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
                 aria-label="Close settings menu"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden />
               </button>
             </div>
             <SettingsNav onNavigate={() => setDrawerOpen(false)} />
@@ -71,7 +82,7 @@ export function SettingsIndex() {
 }
 
 export function SettingsSection() {
-  const { section = 'profile' } = useParams()// use parameters from different urls
+  const { section = 'profile' } = useParams() // use parameters from different urls
   const { user } = useOutletContext()
   const activeSection = sections.some((item) => item.id === section) ? section : 'profile'
 
@@ -100,7 +111,8 @@ function SettingsNav({ onNavigate }) {
               to={`/settings/${item.id}`}
               onClick={onNavigate}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-semibold transition duration-normal ${isActive ? 'bg-primary text-on-primary' : 'text-muted hover:bg-primary-subtle hover:text-primary'
+                `flex items-center gap-3 rounded-button px-3 py-2.5 text-sm font-semibold transition duration-normal ${
+                  isActive ? 'bg-primary text-on-primary' : 'text-muted hover:bg-primary-subtle hover:text-primary'
                 }`
               }
             >
@@ -146,25 +158,26 @@ function ProfileSection({ user }) {
   })
   const [saving, setSaving] = useState(false)
 
-  const handlePictureChange = (event) => {
+  const handlePictureChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
       toast.error('Please choose an image file.')
       return
     }
-    // Server stores avatars as data URLs capped at ~200k chars; base64 expands
-    // ~33%, so keep the raw file under ~140 KB to avoid a late 400/413.
-    if (file.size > 140 * 1024) {
-      toast.error('Choose an image smaller than 140 KB.')
+    // Server stores avatars as data URLs capped at ~190k chars; base64 expands
+    // ~33%, so reject raw files over 140 KB before reading.
+    const { isAvatarFileTooLarge } = await import('../utils/mergeHelpers')
+    if (isAvatarFileTooLarge(file)) {
+      toast.error('Image must be under 140 KB')
       return
     }
 
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = String(reader.result || '')
-      if (dataUrl.length > 200_000) {
-        toast.error('Image is too large after encoding. Try a smaller file.')
+      if (dataUrl.length > 190_000) {
+        toast.error('Image must be under 140 KB')
         return
       }
       setForm((current) => ({ ...current, avatar: dataUrl }))
@@ -258,7 +271,7 @@ function SecuritySection() {
             title="Password"
             description="Your account signs in with Google, so there is no Teamora password to change."
             action="Google sign-in"
-            onClick={() => { }}
+            onClick={() => {}}
           />
         ) : (
           <SettingsAction
@@ -280,10 +293,9 @@ function SecuritySection() {
         />
         <SettingsAction
           icon={Smartphone}
-          title="Active Sessions"
-          description={`You are signed in on this browser as ${user?.email || 'this account'}. Multi-device session management is not available yet.`}
-          action="This browser"
-          onClick={() => { }}
+          title="Active sessions"
+          description="Current browser session (started today). Multi-device session inventory is not available yet."
+          action="Current browser session (started today)"
         />
       </div>
     </>
@@ -297,12 +309,12 @@ function NotificationsSection() {
       return saved
         ? JSON.parse(saved)
         : {
-          emailNotifications: true,
-          workspaceInvitations: true,
-          meetingReminders: true,
-          documentActivity: true,
-          mentionNotifications: true
-        }
+            emailNotifications: true,
+            workspaceInvitations: true,
+            meetingReminders: true,
+            documentActivity: true,
+            mentionNotifications: true
+          }
     } catch {
       return {
         emailNotifications: true,
@@ -342,30 +354,30 @@ function NotificationsSection() {
       />
       <div className="space-y-3">
         <ToggleRow
-          label="Email notifications"
+          label="Email notifications (saved on this device only)"
           active={preferences.emailNotifications}
           onToggle={() => toggle('emailNotifications')}
           onTest={() => testNotification('Email notifications')}
         />
         <ToggleRow
-          label="Workspace invitations"
+          label="Workspace invitations (saved on this device only)"
           active={preferences.workspaceInvitations}
           onToggle={() => toggle('workspaceInvitations')}
         />
         <ToggleRow
-          label="Meeting reminders"
+          label="Meeting reminders (saved on this device only)"
           active={preferences.meetingReminders}
           onToggle={() => toggle('meetingReminders')}
           onTest={() => testNotification('Meeting notifications')}
         />
         <ToggleRow
-          label="Document activity"
+          label="Document activity (saved on this device only)"
           active={preferences.documentActivity}
           onToggle={() => toggle('documentActivity')}
           onTest={() => testNotification('Document notifications')}
         />
         <ToggleRow
-          label="Mention notifications"
+          label="Mention notifications (saved on this device only)"
           active={preferences.mentionNotifications}
           onToggle={() => toggle('mentionNotifications')}
           onTest={() => testNotification('Mention notifications')}
@@ -444,6 +456,10 @@ function SettingsInput({ label, type = 'text', placeholder, value = '', onChange
 }
 
 function SettingsAction({ icon: Icon = ShieldCheck, title, description, action, danger = false, onClick }) {
+  const actionClass = `h-10 rounded-button px-4 text-sm font-semibold transition duration-normal ${
+    danger ? 'text-danger hover:bg-red-50' : 'text-primary hover:bg-primary-subtle'
+  } ${typeof onClick === 'function' ? '' : 'cursor-default opacity-80'}`
+
   return (
     <div className="flex flex-col gap-4 rounded-card border border-border p-4 transition duration-normal hover:shadow-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
@@ -455,13 +471,13 @@ function SettingsAction({ icon: Icon = ShieldCheck, title, description, action, 
           <p className="mt-1 text-sm text-muted">{description}</p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className={`h-10 rounded-button px-4 text-sm font-semibold transition duration-normal ${danger ? 'text-danger hover:bg-red-50' : 'text-primary hover:bg-primary-subtle'}`}
-      >
-        {action}
-      </button>
+      {typeof onClick === 'function' ? (
+        <button type="button" onClick={onClick} className={actionClass}>
+          {action}
+        </button>
+      ) : (
+        <span className={actionClass}>{action}</span>
+      )}
     </div>
   )
 }

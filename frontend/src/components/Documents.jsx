@@ -22,18 +22,31 @@ import {
   List,
   ListOrdered,
   Sparkles,
-  FolderUp
+  FolderUp,
+  BringToFront,
+  SendToBack,
+  Maximize2,
+  Minimize2,
+  Underline
 } from 'lucide-react'
-import html2pdf from 'html2pdf.js'
+import DOMPurify from 'dompurify'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import AiAutocomplete from './editor/AiAutocomplete'
 import AiFloatingMenu from './editor/AiFloatingMenu'
 import AiGenerateModal from './editor/AiGenerateModal'
-import { SHAPE_LIBRARY, newTextBox, newShape, renderEquationHtml, shapeCss } from './utils/canvasOverlays'
+import {
+  SHAPE_LIBRARY,
+  newTextBox,
+  newShape,
+  renderEquationHtml,
+  shapeCss,
+  toColorInputValue
+} from './utils/canvasOverlays'
 
 const FONTS = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
-const SIZES = ['12px', '14px', '16px', '18px', '24px', '32px']
+// Match presentation font size choices for overlay text boxes / shapes.
+const SIZES = ['12px', '14px', '16px', '18px', '24px', '32px', '48px', '64px', '72px']
 const LINE_SPACINGS = ['1.0', '1.15', '1.5', '2.0']
 const MARGINS = ['0.5 in', '0.75 in', '1.0 in']
 const PAPER_SIZES = ['A4', 'Letter', 'Legal']
@@ -367,18 +380,19 @@ export default function Documents({
       case 'importDoc': {
         const input = document.createElement('input')
         input.type = 'file'
-        input.accept = '.docx,.txt,.html,.htm,.md,text/plain,text/html,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        input.accept =
+          '.docx,.txt,.html,.htm,.md,text/plain,text/html,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         input.onchange = async (e) => {
           const file = e.target.files?.[0]
           if (!file || !quill) return
-          
+
           const formData = new FormData()
           formData.append('file', file)
-          
+
           const importToast = toast.loading('Importing document...')
           try {
             const { data } = await api.post(`/api/v1/workspaces/${roomId}/files/import`, formData)
-            
+
             if (data.success) {
               const content = data.html || data.text || ''
               const looksHtml = /<\/?[a-z][\s\S]*>/i.test(content)
@@ -480,55 +494,39 @@ export default function Documents({
           html2canvas: { scale: 2 },
           jsPDF: { unit: 'in', format: 'letter', orientation: orientation }
         }
-        toast.promise(html2pdf().set(opt).from(quill.root).save(), {
-          loading: 'Preparing PDF export...',
-          success: 'Document exported successfully!',
-          error: 'Failed to export PDF.'
-        })
-        break
-      }
-      case 'exportDocx': {
-        const html = quill.root.innerHTML
-        const margins = {
-          top: marginToInches(pageMargin) * 1440,
-          bottom: marginToInches(pageMargin) * 1440,
-          left: marginToInches(pageMargin) * 1440,
-          right: marginToInches(pageMargin) * 1440
-        }
-
+        // Dynamic import keeps html2pdf out of the initial documents chunk until export.
         toast.promise(
-          (async () => {
-            const res = await api.post(
-              '/api/v1/workspaces/export-docx',
-              {
-                html,
-                title: docTitle || 'Document',
-                orientation,
-                margins
-              },
-              {
-                responseType: 'blob',
-                headers: {
-                  Accept: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                }
-              }
-            )
-            const blob = res.data
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `${docTitle || 'document'}.docx`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-          })(),
+          import('html2pdf.js').then((mod) => {
+            const html2pdf = mod.default || mod
+            return html2pdf().set(opt).from(quill.root).save()
+          }),
           {
-            loading: 'Generating DOCX...',
-            success: 'DOCX file exported successfully!',
-            error: 'Failed to export DOCX'
+            loading: 'Preparing PDF export...',
+            success: 'Document exported successfully!',
+            error: 'Failed to export PDF.'
           }
         )
+        break
+      }
+      case 'exportHtml': {
+        // Honest HTML export (not Word/DOCX). Sanitize Quill HTML (XSS advisory).
+        const safeTitle = String(docTitle || 'Document')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+        const cleanBody = DOMPurify.sanitize(quill.root.innerHTML)
+        const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle}</title></head><body>${cleanBody}</body></html>`
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `${docTitle || 'document'}.html`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        toast.success('Exported as HTML.')
         break
       }
       case 'printDoc': {
@@ -542,6 +540,7 @@ export default function Documents({
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
+        const cleanBody = DOMPurify.sanitize(quill.root.innerHTML)
         printWindow.document.write(`
           <html>
             <head>
@@ -551,7 +550,7 @@ export default function Documents({
               </style>
             </head>
             <body>
-              ${quill.root.innerHTML}
+              ${cleanBody}
             </body>
           </html>
         `)
@@ -716,6 +715,32 @@ export default function Documents({
     })
   }
 
+  const sendOverlayBackward = (id) => {
+    setOverlays((current) => {
+      const minZ = current.reduce((m, o) => Math.min(m, o.zIndex || 0), 0)
+      return current.map((o) => (o.id === id ? { ...o, zIndex: minZ - 1 } : o))
+    })
+  }
+
+  const scaleOverlay = (id, factor) => {
+    setOverlays((current) =>
+      current.map((o) => {
+        if (o.id !== id) return o
+        const width = Math.max(48, Math.round(o.width * factor))
+        const height = Math.max(32, Math.round(o.height * factor))
+        const cx = o.x + o.width / 2
+        const cy = o.y + o.height / 2
+        return {
+          ...o,
+          width,
+          height,
+          x: Math.max(0, Math.round(cx - width / 2)),
+          y: Math.max(0, Math.round(cy - height / 2))
+        }
+      })
+    )
+  }
+
   const startOverlayDrag = (event, item, mode = 'move') => {
     event.preventDefault()
     event.stopPropagation()
@@ -739,10 +764,33 @@ export default function Documents({
           x: Math.max(0, origin.x + dx),
           y: Math.max(0, origin.y + dy)
         })
-      } else if (mode === 'resize') {
+      } else if (mode === 'resize' || mode === 'resize-se') {
         updateOverlay(item.id, {
           width: Math.max(48, origin.width + dx),
           height: Math.max(32, origin.height + dy)
+        })
+      } else if (mode === 'resize-sw') {
+        const width = Math.max(48, origin.width - dx)
+        updateOverlay(item.id, {
+          x: origin.x + origin.width - width,
+          width,
+          height: Math.max(32, origin.height + dy)
+        })
+      } else if (mode === 'resize-ne') {
+        const height = Math.max(32, origin.height - dy)
+        updateOverlay(item.id, {
+          y: origin.y + origin.height - height,
+          width: Math.max(48, origin.width + dx),
+          height
+        })
+      } else if (mode === 'resize-nw') {
+        const width = Math.max(48, origin.width - dx)
+        const height = Math.max(32, origin.height - dy)
+        updateOverlay(item.id, {
+          x: origin.x + origin.width - width,
+          y: origin.y + origin.height - height,
+          width,
+          height
         })
       } else if (mode === 'rotate') {
         updateOverlay(item.id, {
@@ -963,10 +1011,12 @@ export default function Documents({
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => handleMenuAction('exportDocx')}
+                onClick={() => handleMenuAction('exportHtml')}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
               >
-                <Download className="w-3.5 h-3.5" />Export DOCX</button>
+                <Download className="w-3.5 h-3.5" />
+                Export as HTML
+              </button>
               <button
                 type="button"
                 role="menuitem"
@@ -1238,7 +1288,6 @@ export default function Documents({
             AI Assistant
           </button>
         </div>
-
       </div>
 
       {/* Editor Formatting Ribbon */}
@@ -1523,7 +1572,7 @@ export default function Documents({
                 onClick={(e) => e.stopPropagation()}
               />
 
-              {/* Movable / resizable text boxes & shapes */}
+              {/* Movable / resizable text boxes & shapes (presentation-parity chrome) */}
               {overlays.map((item) => {
                 const selected = selectedOverlayId === item.id
                 const fontCss =
@@ -1535,6 +1584,14 @@ export default function Documents({
                         ? 'monospace'
                         : item.fontFamily
                 const sc = item.kind === 'shape' ? shapeCss(item.shape, selected) : {}
+                const radius =
+                  sc.borderRadius != null
+                    ? sc.borderRadius
+                    : item.borderRadius != null
+                      ? `${item.borderRadius}px`
+                      : '4px'
+                const handleClass =
+                  'absolute z-[70] h-3 w-3 rounded-sm border-2 border-primary bg-card shadow pointer-events-auto'
                 return (
                   <div
                     key={item.id}
@@ -1545,25 +1602,33 @@ export default function Documents({
                       width: item.width,
                       height: item.shape === 'line' ? Math.max(item.borderWidth || 2, 2) : item.height,
                       transform: `rotate(${item.rotation || 0}deg)`,
-                      zIndex: item.zIndex || 10,
+                      transformOrigin: 'center center',
+                      zIndex: (item.zIndex || 10) + (selected ? 1000 : 0),
                       background: item.fill || 'transparent',
                       borderColor: item.borderColor,
                       borderWidth: sc.borderWidth === 0 ? 0 : (item.borderWidth ?? 1),
                       borderStyle: 'solid',
-                      borderRadius: sc.borderRadius,
+                      borderRadius: radius,
                       clipPath: sc.clipPath,
-                      boxShadow: item.kind === 'textbox' ? 'var(--tw-shadow-card)' : undefined
+                      opacity: item.opacity != null ? item.opacity : 1,
+                      boxShadow: item.kind === 'textbox' ? 'var(--tw-shadow-card)' : undefined,
+                      boxSizing: 'border-box'
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
                       setSelectedOverlayId(item.id)
                     }}
-                    onMouseDown={(e) => startOverlayDrag(e, item, 'move')}
+                    onMouseDown={(e) => {
+                      // Don't start drag when interacting with textarea or chrome controls.
+                      if (e.target.closest('textarea, button, select, input, label, [data-overlay-chrome]')) return
+                      startOverlayDrag(e, item, 'move')
+                    }}
                   >
                     <textarea
                       value={item.text || ''}
                       onChange={(e) => updateOverlay(item.id, { text: e.target.value })}
                       onMouseDown={(e) => e.stopPropagation()}
+                      onFocus={() => setSelectedOverlayId(item.id)}
                       placeholder={item.kind === 'shape' ? 'Shape text…' : 'Type…'}
                       className="h-full w-full resize-none border-none bg-transparent p-2 outline-none"
                       style={{
@@ -1572,25 +1637,65 @@ export default function Documents({
                         color: item.color,
                         fontWeight: item.bold ? 700 : 400,
                         fontStyle: item.italic ? 'italic' : 'normal',
+                        textDecoration: item.underline ? 'underline' : 'none',
                         textAlign: item.align || 'left'
                       }}
                     />
                     {selected && (
                       <>
-                        <div className="absolute -top-8 right-0 flex gap-1">
+                        {/* Arrange / delete — same affordances as presentation */}
+                        <div
+                          data-overlay-chrome
+                          className="absolute -top-9 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1"
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            className="rounded bg-card border border-border px-1.5 py-0.5 text-[10px] font-semibold text-text"
+                            className="inline-flex items-center gap-0.5 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-text shadow-sm hover:bg-primary/10"
                             onClick={(e) => {
                               e.stopPropagation()
                               bringOverlayForward(item.id)
                             }}
+                            title="Bring to front"
                           >
-                            Front
+                            <BringToFront className="h-3 w-3" /> Front
                           </button>
                           <button
                             type="button"
-                            className="rounded bg-danger/90 px-1.5 py-0.5 text-[10px] text-white"
+                            className="inline-flex items-center gap-0.5 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-text shadow-sm hover:bg-primary/10"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              sendOverlayBackward(item.id)
+                            }}
+                            title="Send to back"
+                          >
+                            <SendToBack className="h-3 w-3" /> Back
+                          </button>
+                          <button
+                            type="button"
+                            className="flex h-5 w-5 items-center justify-center rounded border border-border bg-card text-primary shadow-sm hover:bg-primary/10"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              scaleOverlay(item.id, 1.25)
+                            }}
+                            title="Larger"
+                          >
+                            <Maximize2 className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            className="flex h-5 w-5 items-center justify-center rounded border border-border bg-card text-primary shadow-sm hover:bg-primary/10"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              scaleOverlay(item.id, 0.8)
+                            }}
+                            title="Smaller"
+                          >
+                            <Minimize2 className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded bg-danger/90 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm hover:bg-danger"
                             onClick={(e) => {
                               e.stopPropagation()
                               removeOverlay(item.id)
@@ -1599,85 +1704,191 @@ export default function Documents({
                             Delete
                           </button>
                         </div>
+
+                        {/* Four-corner resize + rotate (presentation-style) */}
                         <div
-                          className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-se-resize rounded-sm border border-card bg-primary"
-                          onMouseDown={(e) => startOverlayDrag(e, item, 'resize')}
+                          data-overlay-chrome
+                          className={`${handleClass} -left-1.5 -top-1.5 cursor-nwse-resize`}
+                          onMouseDown={(e) => startOverlayDrag(e, item, 'resize-nw')}
                           title="Resize"
                         />
                         <div
-                          className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border border-card bg-primary"
+                          data-overlay-chrome
+                          className={`${handleClass} -right-1.5 -top-1.5 cursor-nesw-resize`}
+                          onMouseDown={(e) => startOverlayDrag(e, item, 'resize-ne')}
+                          title="Resize"
+                        />
+                        <div
+                          data-overlay-chrome
+                          className={`${handleClass} -bottom-1.5 -left-1.5 cursor-nesw-resize`}
+                          onMouseDown={(e) => startOverlayDrag(e, item, 'resize-sw')}
+                          title="Resize"
+                        />
+                        <div
+                          data-overlay-chrome
+                          className={`${handleClass} -bottom-1.5 -right-1.5 cursor-nwse-resize`}
+                          onMouseDown={(e) => startOverlayDrag(e, item, 'resize-se')}
+                          title="Resize"
+                        />
+                        <div
+                          data-overlay-chrome
+                          className="absolute -top-1.5 left-1/2 z-[70] h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border-2 border-primary bg-card shadow"
                           onMouseDown={(e) => startOverlayDrag(e, item, 'rotate')}
                           title="Rotate"
                         />
+
+                        {/* Format strip — typography + appearance like presentation PropertiesPanel */}
                         <div
-                          className="absolute -bottom-10 left-0 flex max-w-[280px] flex-wrap gap-1 rounded-lg border border-border bg-card p-1 shadow-dropdown"
+                          data-overlay-chrome
+                          className="absolute left-0 top-full z-[80] mt-2 flex max-w-[min(340px,calc(100vw-2rem))] flex-col gap-1.5 rounded-xl border border-border bg-card p-2 shadow-dropdown"
                           onMouseDown={(e) => e.stopPropagation()}
                         >
-                          <button
-                            type="button"
-                            className="rounded px-1.5 text-[10px] font-bold hover:bg-primary/10"
-                            onClick={() => updateOverlay(item.id, { bold: !item.bold })}
-                          >
-                            B
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded px-1.5 text-[10px] italic hover:bg-primary/10"
-                            onClick={() => updateOverlay(item.id, { italic: !item.italic })}
-                          >
-                            I
-                          </button>
-                          <select
-                            className="rounded border border-border bg-card-sunken px-1 text-[10px]"
-                            value={item.fontSize}
-                            onChange={(e) => updateOverlay(item.id, { fontSize: e.target.value })}
-                          >
-                            {SIZES.map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
-                          <label className="flex items-center gap-0.5 text-[9px] text-muted">
-                            Text
-                            <input
-                              type="color"
-                              value={item.color?.startsWith('#') ? item.color : '#0f172a'}
-                              onChange={(e) => updateOverlay(item.id, { color: e.target.value })}
-                              className="h-5 w-5 cursor-pointer"
-                            />
-                          </label>
-                          <label className="flex items-center gap-0.5 text-[9px] text-muted">
-                            Fill
-                            <input
-                              type="color"
-                              value={typeof item.fill === 'string' && item.fill.startsWith('#') ? item.fill : '#ffffff'}
-                              onChange={(e) => updateOverlay(item.id, { fill: e.target.value })}
-                              className="h-5 w-5 cursor-pointer"
-                            />
-                          </label>
-                          <label className="flex items-center gap-0.5 text-[9px] text-muted">
-                            Border
-                            <input
-                              type="color"
-                              value={
-                                typeof item.borderColor === 'string' && item.borderColor.startsWith('#')
-                                  ? item.borderColor
-                                  : '#6366f1'
-                              }
-                              onChange={(e) => updateOverlay(item.id, { borderColor: e.target.value })}
-                              className="h-5 w-5 cursor-pointer"
-                            />
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={12}
-                            value={item.borderWidth ?? 1}
-                            onChange={(e) => updateOverlay(item.id, { borderWidth: Number(e.target.value) || 0 })}
-                            className="w-10 rounded border border-border bg-card-sunken px-1 text-[10px]"
-                            title="Border width"
-                          />
+                          <div className="flex flex-wrap items-center gap-1">
+                            <button
+                              type="button"
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-bold hover:bg-primary/10 ${item.bold ? 'bg-primary/15 text-primary' : ''}`}
+                              onClick={() => updateOverlay(item.id, { bold: !item.bold })}
+                              title="Bold"
+                            >
+                              B
+                            </button>
+                            <button
+                              type="button"
+                              className={`rounded px-1.5 py-0.5 text-[10px] italic hover:bg-primary/10 ${item.italic ? 'bg-primary/15 text-primary' : ''}`}
+                              onClick={() => updateOverlay(item.id, { italic: !item.italic })}
+                              title="Italic"
+                            >
+                              I
+                            </button>
+                            <button
+                              type="button"
+                              className={`inline-flex items-center rounded px-1 py-0.5 hover:bg-primary/10 ${item.underline ? 'bg-primary/15 text-primary' : ''}`}
+                              onClick={() => updateOverlay(item.id, { underline: !item.underline })}
+                              title="Underline"
+                            >
+                              <Underline className="h-3 w-3" />
+                            </button>
+                            <select
+                              className="max-w-[7rem] rounded border border-border bg-card-sunken px-1 py-0.5 text-[10px]"
+                              value={item.fontFamily || 'Sans-Serif'}
+                              onChange={(e) => updateOverlay(item.id, { fontFamily: e.target.value })}
+                              title="Font"
+                            >
+                              {FONTS.map((f) => (
+                                <option key={f} value={f}>
+                                  {f}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              className="rounded border border-border bg-card-sunken px-1 py-0.5 text-[10px]"
+                              value={item.fontSize || '16px'}
+                              onChange={(e) => updateOverlay(item.id, { fontSize: e.target.value })}
+                              title="Font size"
+                            >
+                              {SIZES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className={`rounded p-0.5 hover:bg-primary/10 ${item.align === 'left' ? 'bg-primary/15 text-primary' : ''}`}
+                              onClick={() => updateOverlay(item.id, { align: 'left' })}
+                              title="Align left"
+                            >
+                              <AlignLeft className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              className={`rounded p-0.5 hover:bg-primary/10 ${item.align === 'center' ? 'bg-primary/15 text-primary' : ''}`}
+                              onClick={() => updateOverlay(item.id, { align: 'center' })}
+                              title="Align center"
+                            >
+                              <AlignCenter className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              className={`rounded p-0.5 hover:bg-primary/10 ${item.align === 'right' ? 'bg-primary/15 text-primary' : ''}`}
+                              onClick={() => updateOverlay(item.id, { align: 'right' })}
+                              title="Align right"
+                            >
+                              <AlignRight className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-1.5">
+                            <label className="flex items-center gap-0.5 text-[9px] text-muted">
+                              Text
+                              <input
+                                type="color"
+                                value={toColorInputValue(item.color, '#0f172a')}
+                                onChange={(e) => updateOverlay(item.id, { color: e.target.value })}
+                                className="h-5 w-5 cursor-pointer rounded border border-border"
+                              />
+                            </label>
+                            <label className="flex items-center gap-0.5 text-[9px] text-muted">
+                              Fill
+                              <input
+                                type="color"
+                                value={toColorInputValue(item.fill, '#ffffff')}
+                                onChange={(e) => updateOverlay(item.id, { fill: e.target.value })}
+                                className="h-5 w-5 cursor-pointer rounded border border-border"
+                              />
+                            </label>
+                            <label className="flex items-center gap-0.5 text-[9px] text-muted">
+                              Border
+                              <input
+                                type="color"
+                                value={toColorInputValue(item.borderColor, '#6366f1')}
+                                onChange={(e) => updateOverlay(item.id, { borderColor: e.target.value })}
+                                className="h-5 w-5 cursor-pointer rounded border border-border"
+                              />
+                            </label>
+                            <label className="flex items-center gap-0.5 text-[9px] text-muted" title="Border width (px)">
+                              W
+                              <input
+                                type="number"
+                                min={0}
+                                max={24}
+                                value={item.borderWidth ?? 1}
+                                onChange={(e) =>
+                                  updateOverlay(item.id, { borderWidth: Number(e.target.value) || 0 })
+                                }
+                                className="w-10 rounded border border-border bg-card-sunken px-1 py-0.5 text-[10px]"
+                              />
+                            </label>
+                            <label className="flex items-center gap-0.5 text-[9px] text-muted" title="Corner radius (px)">
+                              R
+                              <input
+                                type="number"
+                                min={0}
+                                max={48}
+                                value={item.borderRadius ?? 4}
+                                onChange={(e) =>
+                                  updateOverlay(item.id, { borderRadius: Number(e.target.value) || 0 })
+                                }
+                                className="w-10 rounded border border-border bg-card-sunken px-1 py-0.5 text-[10px]"
+                              />
+                            </label>
+                            <label className="flex items-center gap-0.5 text-[9px] text-muted" title="Opacity 0–1">
+                              Op
+                              <input
+                                type="number"
+                                min={0}
+                                max={1}
+                                step={0.1}
+                                value={item.opacity != null ? item.opacity : 1}
+                                onChange={(e) => {
+                                  const n = parseFloat(e.target.value)
+                                  updateOverlay(item.id, {
+                                    opacity: Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1
+                                  })
+                                }}
+                                className="w-12 rounded border border-border bg-card-sunken px-1 py-0.5 text-[10px]"
+                              />
+                            </label>
+                          </div>
                         </div>
                       </>
                     )}
@@ -1712,7 +1923,7 @@ export default function Documents({
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <div className="flex items-center justify-between text-[8px] font-bold text-muted mb-1">
-                      <span>{c.user}</span>
+                      <span>{c.author || c.user}</span>
                       <span>{c.timestamp}</span>
                     </div>
                     <p className="text-text leading-normal">{c.text}</p>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   CalendarDays,
@@ -335,7 +335,11 @@ export default function Dashboard({
   const showSkeletons = loading && hasNoWorkspaces
 
   return (
-    <main className="mx-auto flex h-[calc(100vh-var(--tw-navbar-height))] max-w-7xl flex-col px-5 py-6 overflow-hidden">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="mx-auto flex h-[calc(100vh-var(--tw-navbar-height))] max-w-7xl flex-col overflow-hidden px-5 py-6 outline-none"
+    >
       {authNotice && (
         <div className="mb-5 shrink-0 rounded-card border border-warning/20 bg-warning/10 px-4 py-3 text-sm font-medium text-warning">
           {authNotice}
@@ -540,7 +544,7 @@ function WorkspaceCardSkeleton() {
   )
 }
 
-function WorkspaceLauncherCard({
+const WorkspaceLauncherCard = memo(function WorkspaceLauncherCard({
   workspace,
   pinned,
   favorite,
@@ -678,7 +682,7 @@ function WorkspaceLauncherCard({
       </div>
     </article>
   )
-}
+})
 
 function IconAction({ active, label, onClick, children }) {
   return (

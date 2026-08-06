@@ -112,7 +112,8 @@ const createElementFromType = (type, extras = {}, isDarkSlide = false) => {
       width: extras.width ?? 72,
       height: extras.height ?? 72,
       fontSize: extras.fontSize ?? '40px',
-      color: extras.color ?? '#000000'
+      // Persist an absolute color so app light/dark chrome never recolors slide icons.
+      color: extras.color ?? colors.color ?? '#0f172a'
     }
   }
 
@@ -634,28 +635,34 @@ export default function PresentationModule({
     setEditingElemId(null)
   }, [commit, setActiveSlide])
 
-  const handleImportSlides = useCallback((newSlides) => {
-    if (!Array.isArray(newSlides) || newSlides.length === 0) return
-    commit(() => newSlides)
-    setActiveSlide(0)
-    setSelectedElemIds([])
-    setEditingElemId(null)
-    toast.success('Presentation slides imported!')
-  }, [commit, setActiveSlide])
+  const handleImportSlides = useCallback(
+    (newSlides) => {
+      if (!Array.isArray(newSlides) || newSlides.length === 0) return
+      commit(() => newSlides)
+      setActiveSlide(0)
+      setSelectedElemIds([])
+      setEditingElemId(null)
+      toast.success('Presentation slides imported!')
+    },
+    [commit, setActiveSlide]
+  )
 
-  const handleInsertAiSlides = useCallback((newSlides, append = false) => {
-    if (!Array.isArray(newSlides) || newSlides.length === 0) return
-    commit((curr) => {
-      if (append) {
-        return [...ensureArray(curr), ...newSlides]
-      }
-      return newSlides
-    })
-    // If not appending, go to slide 0, otherwise go to first appended slide
-    setActiveSlide(append ? ensureArray(slidesRef.current).length : 0)
-    setSelectedElemIds([])
-    setEditingElemId(null)
-  }, [commit, setActiveSlide])
+  const handleInsertAiSlides = useCallback(
+    (newSlides, append = false) => {
+      if (!Array.isArray(newSlides) || newSlides.length === 0) return
+      commit((curr) => {
+        if (append) {
+          return [...ensureArray(curr), ...newSlides]
+        }
+        return newSlides
+      })
+      // If not appending, go to slide 0, otherwise go to first appended slide
+      setActiveSlide(append ? ensureArray(slidesRef.current).length : 0)
+      setSelectedElemIds([])
+      setEditingElemId(null)
+    },
+    [commit, setActiveSlide]
+  )
 
   const handleDuplicateSlide = useCallback(
     (index) => {
@@ -725,7 +732,7 @@ export default function PresentationModule({
             y: pxToIn(el.y),
             w: pxToIn(el.width),
             h: pxToIn(el.height),
-            rotate: el.rotation || 0,
+            rotate: el.rotation || 0
           }
           if (el.type === 'textbox' || el.type === 'text') {
             opts.fontSize = (parseInt(el.fontSize) || 24) * 0.75
@@ -1104,9 +1111,9 @@ export default function PresentationModule({
           />
         </div>
       </div>
-      
-      <AiPresentationModal 
-        isOpen={showAiModal} 
+
+      <AiPresentationModal
+        isOpen={showAiModal}
         onClose={() => setShowAiModal(false)}
         onInsertSlides={handleInsertAiSlides}
       />

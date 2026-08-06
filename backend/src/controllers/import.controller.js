@@ -6,10 +6,35 @@ const xml2js = require('xml2js');
 const { v4: uuidv4 } = require('uuid');
 const workspaceService = require('../services/workspace.service');
 
+const ALLOWED_IMPORT_EXTS = new Set(['.docx', '.pptx', '.txt', '.md', '.html', '.htm']);
+const ALLOWED_MIME_PREFIXES = [
+  'application/vnd.openxmlformats',
+  'application/octet-stream', // browsers often send this for office files
+  'text/',
+  'application/zip' // pptx is a zip
+];
+
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 }, // 15MB — enough for docs; limits zip bomb surface
+  fileFilter(_req, file, cb) {
+    const rawName = path.basename(String(file.originalname || 'upload'));
+    const ext = path.extname(rawName).toLowerCase();
+    if (!ALLOWED_IMPORT_EXTS.has(ext)) {
+      return cb(new Error('Unsupported file type for import'));
+    }
+    const mime = String(file.mimetype || '').toLowerCase();
+    if (mime && !ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p))) {
+      // Soft check: some browsers send empty/odd MIME; extension remains authoritative.
+      if (mime !== 'application/msword' && mime !== 'application/vnd.ms-powerpoint') {
+        // still allow known office mimes
+      }
+    }
+    // Strip path components to prevent path-like names from propagating.
+    file.originalname = rawName.replace(/[^\w.\- ()[\]]+/g, '_').slice(0, 180);
+    return cb(null, true);
+  }
 }).single('file');
 
 const parsePptxFromBuffer = async (buffer) => {

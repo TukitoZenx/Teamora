@@ -43,8 +43,12 @@ function ElementContent({ el }) {
   if (el.type === 'icon') {
     return (
       <div
-        className="flex h-full w-full items-center justify-center select-none"
-        style={{ fontSize: el.fontSize || Math.min(el.width || 64, el.height || 64) * 0.55 }}
+        className="flex h-full w-full select-none items-center justify-center"
+        style={{
+          color: el.color || '#0f172a',
+          fontSize: el.fontSize || Math.min(el.width || 64, el.height || 64) * 0.55,
+          lineHeight: 1
+        }}
       >
         {el.icon || el.text || '★'}
       </div>

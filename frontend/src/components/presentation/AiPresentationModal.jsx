@@ -1,24 +1,24 @@
-import { useState } from 'react';
-import { X, Sparkles, Loader2, FilePlus, CopyPlus } from 'lucide-react';
-import { generateSlides } from '../../services/aiClient';
-import toast from 'react-hot-toast';
-import { v4 as uuidv4 } from 'uuid';
+import { useState } from 'react'
+import { X, Sparkles, Loader2, FilePlus, CopyPlus } from 'lucide-react'
+import { generateSlides } from '../../services/aiClient'
+import toast from 'react-hot-toast'
+import { v4 as uuidv4 } from 'uuid'
 
 export default function AiPresentationModal({ isOpen, onClose, onInsertSlides }) {
-  const [prompt, setPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [appendMode, setAppendMode] = useState(false);
+  const [prompt, setPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [appendMode, setAppendMode] = useState(false)
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-    
-    setIsGenerating(true);
+    if (!prompt.trim()) return
+
+    setIsGenerating(true)
     try {
       // Fetch slides JSON from backend AI model
-      const rawSlides = await generateSlides(prompt);
-      
+      const rawSlides = await generateSlides(prompt)
+
       // Parse into Teamora slide format
       const formattedSlides = rawSlides.map((slide) => ({
         id: uuidv4(),
@@ -50,7 +50,14 @@ export default function AiPresentationModal({ isOpen, onClose, onInsertSlides })
           {
             id: uuidv4(),
             type: 'text',
-            text: slide.content ? slide.content.replace(/\n/g, '<br/>').replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%; max-height: 250px; display:block; margin: 10px auto; border-radius: 8px;" />') : '',
+            text: slide.content
+              ? slide.content
+                  .replace(/\n/g, '<br/>')
+                  .replace(
+                    /!\[([^\]]*)\]\(([^)]+)\)/g,
+                    '<img src="$2" alt="$1" style="max-width:100%; max-height: 250px; display:block; margin: 10px auto; border-radius: 8px;" />'
+                  )
+              : '',
             x: 80,
             y: 160,
             width: 800,
@@ -67,19 +74,19 @@ export default function AiPresentationModal({ isOpen, onClose, onInsertSlides })
             align: 'left'
           }
         ]
-      }));
+      }))
 
-      onInsertSlides(formattedSlides, appendMode);
-      toast.success('AI slides generated successfully!');
-      onClose();
-      setPrompt('');
+      onInsertSlides(formattedSlides, appendMode)
+      toast.success('AI slides generated successfully!')
+      onClose()
+      setPrompt('')
     } catch (err) {
-      console.error('Generate Error:', err);
-      toast.error(err.message || 'AI generation failed');
+      console.error('Generate Error:', err)
+      toast.error(err.message || 'AI generation failed')
     } finally {
-      setIsGenerating(false);
+      setIsGenerating(false)
     }
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -92,7 +99,7 @@ export default function AiPresentationModal({ isOpen, onClose, onInsertSlides })
             </div>
             <h3 className="font-semibold text-text">AI Presentation Creator</h3>
           </div>
-          <button 
+          <button
             onClick={onClose}
             disabled={isGenerating}
             className="p-1.5 text-muted hover:text-text hover:bg-muted/20 rounded-md transition-colors disabled:opacity-50"
@@ -117,26 +124,30 @@ export default function AiPresentationModal({ isOpen, onClose, onInsertSlides })
 
           <div className="flex items-center gap-4 mt-2">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="radio" 
-                name="insertMode" 
-                checked={!appendMode} 
+              <input
+                type="radio"
+                name="insertMode"
+                checked={!appendMode}
                 onChange={() => setAppendMode(false)}
                 disabled={isGenerating}
                 className="text-purple-500 focus:ring-purple-500"
               />
-              <span className="text-sm flex items-center gap-1"><FilePlus className="w-4 h-4 text-muted"/> Replace existing</span>
+              <span className="text-sm flex items-center gap-1">
+                <FilePlus className="w-4 h-4 text-muted" /> Replace existing
+              </span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="radio" 
-                name="insertMode" 
-                checked={appendMode} 
+              <input
+                type="radio"
+                name="insertMode"
+                checked={appendMode}
                 onChange={() => setAppendMode(true)}
                 disabled={isGenerating}
                 className="text-purple-500 focus:ring-purple-500"
               />
-              <span className="text-sm flex items-center gap-1"><CopyPlus className="w-4 h-4 text-muted"/> Append to current</span>
+              <span className="text-sm flex items-center gap-1">
+                <CopyPlus className="w-4 h-4 text-muted" /> Append to current
+              </span>
             </label>
           </div>
         </div>
@@ -170,5 +181,5 @@ export default function AiPresentationModal({ isOpen, onClose, onInsertSlides })
         </div>
       </div>
     </div>
-  );
+  )
 }

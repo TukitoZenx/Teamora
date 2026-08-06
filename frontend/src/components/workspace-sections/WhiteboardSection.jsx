@@ -190,7 +190,7 @@ export default function WhiteboardSection({ workspaceId, userName, activeFile, o
     const provider = connectRestYjsProvider(ydoc, {
       workspaceId,
       key: contentKey,
-      pollMs: 1200
+      pollMs: 3000
     })
 
     const listeners = new Map()
