@@ -60,7 +60,7 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="cursor-pointer rounded-avatar focus:outline-none focus:ring-4 focus:ring-primary/20"
+        className="cursor-pointer rounded-full focus:outline-none focus:ring-4 focus:ring-primary/20"
         title={displayName}
       >
         <Avatar

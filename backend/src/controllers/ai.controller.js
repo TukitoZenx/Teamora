@@ -40,11 +40,18 @@ const executeCommand = async (req, res) => {
 };
 
 const generateDocument = async (req, res) => {
-  const { prompt } = req.body;
+  const { prompt, selectedText, documentContext, mode } = req.body;
   if (!prompt) {
     return res.status(400).json({ success: false, message: 'Prompt is required' });
   }
-  await handleStream(res, AiService.generateDocument(prompt));
+  await handleStream(
+    res,
+    AiService.generateDocument(prompt, {
+      selectedText: selectedText || '',
+      documentContext: documentContext || '',
+      mode: mode || ''
+    })
+  );
 };
 
 const generateSlides = async (req, res) => {

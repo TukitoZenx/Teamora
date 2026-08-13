@@ -15,6 +15,8 @@ export default function WorkspaceLayout({
   onBackToDashboard,
   onLeaveWorkspace,
   onDeleteWorkspace,
+  workspaceFiles = [],
+  onOpenFile,
   children
 }) {
   const { user } = useAuth()
@@ -95,6 +97,8 @@ export default function WorkspaceLayout({
         onWorkspaceSettings={() => selectItem('settings')}
         onLeaveWorkspace={requestLeaveWorkspace}
         onSelectSection={selectItem}
+        workspaceFiles={workspaceFiles}
+        onOpenFile={onOpenFile}
       />
 
       <div className="hidden lg:block">

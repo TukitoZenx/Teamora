@@ -78,22 +78,26 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
     setIsGenerating(true)
     onGenerating?.(true)
 
-    // We replace the selection with the streaming response.
-    // To do this smoothly, we clear the selection and start inserting.
-    quill.deleteText(selectedRange.index, selectedRange.length, 'user')
-
     let currentIndex = selectedRange.index
+    let removedOriginal = false
 
     try {
       const stream = getCommandStream(commandId, selectedText, fullText)
+      // Only remove the selection after the first successful chunk.
+      let first = true
       let fullGeneratedText = ''
 
       for await (const chunk of stream) {
+        if (first) {
+          quill.deleteText(selectedRange.index, selectedRange.length, 'user')
+          removedOriginal = true
+          currentIndex = selectedRange.index
+          first = false
+        }
         quill.insertText(currentIndex, chunk, 'user')
         quill.formatText(currentIndex, chunk.length, 'background', 'rgba(168, 85, 247, 0.2)')
         currentIndex += chunk.length
         fullGeneratedText += chunk
-        // Keep scrolling to cursor if needed
         quill.setSelection(currentIndex)
       }
 
@@ -131,6 +135,16 @@ export default function AiFloatingMenu({ quillRef, onGenerating }) {
     } catch (err) {
       console.error('Command Error:', err)
       toast.error('AI command failed')
+      if (!removedOriginal && selectedText) {
+        // Selection is still intact.
+      } else if (removedOriginal && selectedText) {
+        try {
+          quill.deleteText(selectedRange.index, Math.max(0, currentIndex - selectedRange.index), 'user')
+          quill.insertText(selectedRange.index, selectedText, 'user')
+        } catch {
+          // ignore restore races
+        }
+      }
     } finally {
       setIsGenerating(false)
       onGenerating?.(false)

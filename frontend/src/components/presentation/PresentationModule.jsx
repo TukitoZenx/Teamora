@@ -1002,7 +1002,10 @@ export default function PresentationModule({
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card">
+    <div
+      data-presentation-editor="true"
+      className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card"
+    >
       <TopToolbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}

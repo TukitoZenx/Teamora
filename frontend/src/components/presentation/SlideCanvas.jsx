@@ -224,9 +224,11 @@ export default function SlideCanvas({
       <div
         ref={canvasRef}
         id="slide-canvas-bg"
+        data-slide-canvas="true"
+        data-slide-dark={theme?.isDark ? 'true' : 'false'}
         className={`relative aspect-[16/9] w-full max-w-[850px] overflow-hidden rounded-lg bg-gradient-to-br pointer-events-auto ${
           theme?.gradient || 'from-white to-slate-50'
-        } ${isPresenting ? '' : 'shadow-2xl ring-1 ring-border/50'}`}
+        } ${isPresenting ? '' : 'shadow-2xl ring-1 ring-slate-200/80'}`}
         style={
           isPresenting
             ? { transform: `scale(${presentScale})`, transformOrigin: 'center' }
@@ -319,7 +321,10 @@ export default function SlideCanvas({
         })}
 
         {sortedElements.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-muted opacity-50">
+          <div
+            className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center opacity-50"
+            style={{ color: theme?.isDark ? '#94a3b8' : '#64748b' }}
+          >
             <h1 className="mb-4 text-2xl font-bold sm:text-4xl">{activeSlideData?.title || 'Blank Slide'}</h1>
             <p className="text-sm">Add text, shapes, images, or icons from the toolbar.</p>
           </div>

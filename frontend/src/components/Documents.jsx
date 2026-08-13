@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ensureArray } from './utils/arrayUtils'
 import {
   Download,
@@ -43,6 +43,8 @@ import {
   shapeCss,
   toColorInputValue
 } from './utils/canvasOverlays'
+import { reflowDocumentPages, stripPaginationFromHtml } from './editor/pageFlow'
+import { buildPrintHtml } from './editor/printDocument'
 
 const FONTS = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
 // Match presentation font size choices for overlay text boxes / shapes.
@@ -61,6 +63,40 @@ const PAGE_SIZE_PX = {
 const getPageDims = (paperSize, orientation) => {
   const base = PAGE_SIZE_PX[paperSize] || PAGE_SIZE_PX.Letter
   return orientation === 'landscape' ? { w: base.h, h: base.w } : { ...base }
+}
+
+const escapeHtmlText = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+
+const isSafeImageSrc = (url) => {
+  if (typeof url !== 'string' || !url.trim()) return false
+  if (url.startsWith('data:image/')) return true
+  try {
+    const parsed = new URL(url, window.location.origin)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const isSafeHref = (href) => {
+  if (typeof href !== 'string' || !href.trim()) return false
+  try {
+    const parsed = new URL(href, window.location.origin)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:'
+  } catch {
+    return false
+  }
+}
+
+const pasteSafeHtml = (quill, html, index) => {
+  const clean = DOMPurify.sanitize(html)
+  if (index == null) quill.clipboard.dangerouslyPasteHTML(clean)
+  else quill.clipboard.dangerouslyPasteHTML(index, clean)
 }
 
 const marginToInches = (marginLabel) => {
@@ -168,7 +204,7 @@ export default function Documents({
   const [orientation, setOrientation] = useState('portrait')
   const [pageColor, setPageColor] = useState('#ffffff')
   const [pageBorder, setPageBorder] = useState('none')
-  const [zoom, setZoom] = useState(100)
+  const [zoom, setZoom] = useState(115)
   const [printLayout, setPrintLayout] = useState(true)
   const [overlays, setOverlays] = useState([]) // text boxes + shapes
   const [selectedOverlayId, setSelectedOverlayId] = useState(null)
@@ -178,6 +214,17 @@ export default function Documents({
   const [outerPageBorder, setOuterPageBorder] = useState(true)
   const [showAiGenerateModal, setShowAiGenerateModal] = useState(false)
   const [isAiGenerating, setIsAiGenerating] = useState(false)
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strike: false,
+    align: '',
+    list: false,
+    background: false
+  })
+  const [hasEditorSelection, setHasEditorSelection] = useState(false)
+  const paginateTimerRef = useRef(null)
 
   // Stats
   const [stats, setStats] = useState({ words: 0, characters: 0, readTime: 1, pages: 1 })
@@ -206,22 +253,96 @@ export default function Documents({
     return () => el?.removeEventListener('scroll', handleScroll)
   }, [zoom, pageStride, stats.pages])
 
+  const syncActiveFormats = useCallback((range) => {
+    const quill = quillRef?.current
+    if (!quill) return
+    try {
+      const selection = range || quill.getSelection()
+      if (!selection) return
+      setHasEditorSelection(Boolean(selection.length > 0))
+      const fmt = quill.getFormat(selection) || {}
+      setActiveFormats({
+        bold: Boolean(fmt.bold),
+        italic: Boolean(fmt.italic),
+        underline: Boolean(fmt.underline),
+        strike: Boolean(fmt.strike),
+        align: fmt.align || '',
+        list: fmt.list || false,
+        background: Boolean(fmt.background)
+      })
+      if (fmt.font) {
+        const mapped =
+          fmt.font === 'sans-serif' ? 'Sans-Serif' : fmt.font === 'serif' ? 'Serif' : fmt.font === 'monospace' ? 'Monospace' : fmt.font
+        if (FONTS.includes(mapped)) setFontFamily(mapped)
+      }
+      if (fmt.size && SIZES.includes(fmt.size)) setFontSize(fmt.size)
+      if (typeof fmt.color === 'string' && fmt.color.startsWith('#')) setTextColor(fmt.color)
+    } catch (err) {
+      console.warn('Could not read editor formats', err)
+    }
+  }, [quillRef])
+
+  // Keep toolbar toggle state in sync with the actual caret/selection formats.
+  useEffect(() => {
+    const quill = quillRef?.current
+    if (!quill || !editorReady) return undefined
+
+    const onSelection = (range) => syncActiveFormats(range)
+    const onText = () => syncActiveFormats()
+    const onDomSelection = () => {
+      if (!quill.hasFocus?.() && document.activeElement !== quill.root) return
+      syncActiveFormats()
+    }
+
+    quill.on('selection-change', onSelection)
+    quill.on('text-change', onText)
+    document.addEventListener('selectionchange', onDomSelection)
+    syncActiveFormats(quill.getSelection())
+
+    return () => {
+      quill.off('selection-change', onSelection)
+      quill.off('text-change', onText)
+      document.removeEventListener('selectionchange', onDomSelection)
+    }
+  }, [quillRef, editorReady, syncActiveFormats])
+
+  const runPagination = useCallback(() => {
+    const quill = quillRef?.current
+    const root = quill?.root
+    if (!(root instanceof HTMLElement)) return
+    const pages = reflowDocumentPages(root, {
+      pageH: pageDims.h,
+      pageGap,
+      marginPx,
+      enabled: printLayout
+    })
+    const text = quill.getText().trim()
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0
+    const chars = text.length
+    const readTime = Math.max(1, Math.ceil(words / 200))
+    setStats({ words, characters: chars, readTime, pages })
+  }, [quillRef, pageDims.h, pageGap, marginPx, printLayout])
+
   // Monitor statistics + paginated page count
   useEffect(() => {
-    const interval = setInterval(() => {
-      const quill = quillRef?.current
-      if (quill) {
-        const text = quill.getText().trim()
-        const words = text ? text.split(/\s+/).filter(Boolean).length : 0
-        const chars = text.length
-        const readTime = Math.max(1, Math.ceil(words / 200))
-        const contentH = Math.max(quill.root.scrollHeight, pageDims.h)
-        const pages = Math.max(1, Math.ceil(contentH / pageDims.h))
-        setStats({ words, characters: chars, readTime, pages })
-      }
-    }, 800)
-    return () => clearInterval(interval)
-  }, [quillRef, editorReady, pageDims.h])
+    if (!editorReady) return undefined
+    const quill = quillRef?.current
+    if (!quill) return undefined
+
+    const schedule = () => {
+      if (paginateTimerRef.current) window.clearTimeout(paginateTimerRef.current)
+      paginateTimerRef.current = window.setTimeout(runPagination, 80)
+    }
+
+    runPagination()
+    quill.on('text-change', schedule)
+    const interval = window.setInterval(runPagination, 1200)
+    return () => {
+      quill.off('text-change', schedule)
+      window.clearInterval(interval)
+      if (paginateTimerRef.current) window.clearTimeout(paginateTimerRef.current)
+    }
+  }, [quillRef, editorReady, runPagination])
 
   // Print-layout styles on Quill root (true page bounds + repeating page bands)
   useEffect(() => {
@@ -236,10 +357,7 @@ export default function Documents({
           : fontFamily === 'Monospace'
             ? 'monospace'
             : fontFamily
-    const isDark = document.documentElement.classList.contains('dark')
-    const sheetBg = pageColor || (isDark ? '#0b1220' : '#ffffff')
-    const gapBg = isDark ? '#0f172a' : '#cbd5e1'
-    const pageH = pageDims.h
+    const sheetBg = pageColor || '#ffffff'
     const pageW = pageDims.w
 
     root.setAttribute(
@@ -252,12 +370,10 @@ export default function Documents({
         `column-count:${columnsCount}`,
         'column-gap:24px',
         `padding:${marginPx}px`,
-        pageBorder === 'none' ? 'border:none' : `border:2px ${pageBorder} #94a3b8`,
-        printLayout
-          ? `background:repeating-linear-gradient(to bottom,${sheetBg} 0,${sheetBg} ${pageH}px,${gapBg} ${pageH}px,${gapBg} ${pageH + pageGap}px);background-size:100% ${pageH + pageGap}px;background-clip:padding-box`
-          : `background:${sheetBg}`,
+        'border:none',
+        `background:${printLayout ? 'transparent' : sheetBg}`,
         `width:${pageW}px`,
-        `min-height:${pageH}px`,
+        `min-height:${pageDims.h}px`,
         'box-sizing:border-box',
         'outline:none'
       ].join(';')
@@ -304,29 +420,34 @@ export default function Documents({
     if (name === 'bold' || name === 'italic' || name === 'underline' || name === 'strike') {
       quill.format(name, !current[name])
       quill.focus()
+      syncActiveFormats(quill.getSelection())
       return
     }
 
     if (name === 'list') {
       quill.format('list', current.list === value ? false : value)
       quill.focus()
+      syncActiveFormats(quill.getSelection())
       return
     }
 
     if (name === 'align') {
       quill.format('align', value || false)
       quill.focus()
+      syncActiveFormats(quill.getSelection())
       return
     }
 
     if (name === 'background' && current.background === value) {
       quill.format('background', false)
       quill.focus()
+      syncActiveFormats(quill.getSelection())
       return
     }
 
     quill.format(name, value)
     quill.focus()
+    syncActiveFormats(quill.getSelection())
   }
 
   const handleMenuAction = (action) => {
@@ -362,7 +483,7 @@ export default function Documents({
             const raw = String(evt.target?.result || '')
             const looksHtml = /<\/?[a-z][\s\S]*>/i.test(raw)
             if (looksHtml) {
-              quill.clipboard.dangerouslyPasteHTML(raw)
+              pasteSafeHtml(quill, raw)
             } else {
               quill.setText(raw)
             }
@@ -397,7 +518,7 @@ export default function Documents({
               const content = data.html || data.text || ''
               const looksHtml = /<\/?[a-z][\s\S]*>/i.test(content)
               if (looksHtml) {
-                quill.clipboard.dangerouslyPasteHTML(content)
+                pasteSafeHtml(quill, content)
               } else {
                 quill.setText(content)
               }
@@ -416,7 +537,7 @@ export default function Documents({
                 const raw = String(evt.target?.result || '')
                 const looksHtml = /<\/?[a-z][\s\S]*>/i.test(raw)
                 if (looksHtml) {
-                  quill.clipboard.dangerouslyPasteHTML(raw)
+                  pasteSafeHtml(quill, raw)
                 } else {
                   quill.setText(raw)
                 }
@@ -436,8 +557,12 @@ export default function Documents({
         break
       }
       case 'saveDoc': {
-        Promise.resolve(onForceSave?.()).catch(() => {})
-        onDirtyChange?.(false)
+        Promise.resolve(onForceSave?.())
+          .then(() => onDirtyChange?.(false))
+          .catch((err) => {
+            console.error('Save failed', err)
+            toast.error('Could not save document')
+          })
         break
       }
       case 'saveAsDoc': {
@@ -452,7 +577,7 @@ export default function Documents({
             versionId: 'ver-' + Math.random().toString(36).substring(7),
             timestamp: new Date().toLocaleTimeString() + ' ' + new Date().toLocaleDateString(),
             user: userName,
-            data: quill.root.innerHTML
+            data: stripPaginationFromHtml(quill.root.innerHTML)
           }
           const updatedHistory = [draftVersion, ...ensureArray(versions)]
           socket?.emit?.('update-document-versions', { roomId, versions: updatedHistory })
@@ -474,7 +599,7 @@ export default function Documents({
       case 'duplicateDoc': {
         const dupTitle = `${docTitle} (Copy)`
         if (onDuplicateDocument) {
-          onDuplicateDocument({ title: dupTitle, html: quill.root.innerHTML })
+          onDuplicateDocument({ title: dupTitle, html: stripPaginationFromHtml(quill.root.innerHTML) })
         } else {
           setDocTitle(dupTitle)
           onRenameDocument?.(dupTitle)
@@ -487,18 +612,22 @@ export default function Documents({
         break
       }
       case 'exportPdf': {
+        const format = paperSize === 'Legal' ? 'legal' : paperSize === 'A4' ? 'a4' : 'letter'
         const opt = {
-          margin: 0.5,
+          margin: marginIn,
           filename: `${docTitle}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'in', format: 'letter', orientation: orientation }
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: pageColor || '#ffffff' },
+          jsPDF: { unit: 'in', format, orientation: orientation === 'landscape' ? 'landscape' : 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'], after: '.page-break' }
         }
+        const exportRoot = document.createElement('div')
+        exportRoot.innerHTML = DOMPurify.sanitize(stripPaginationFromHtml(quill.root.innerHTML))
         // Dynamic import keeps html2pdf out of the initial documents chunk until export.
         toast.promise(
           import('html2pdf.js').then((mod) => {
             const html2pdf = mod.default || mod
-            return html2pdf().set(opt).from(quill.root).save()
+            return html2pdf().set(opt).from(exportRoot).save()
           }),
           {
             loading: 'Preparing PDF export...',
@@ -509,14 +638,22 @@ export default function Documents({
         break
       }
       case 'exportHtml': {
-        // Honest HTML export (not Word/DOCX). Sanitize Quill HTML (XSS advisory).
-        const safeTitle = String(docTitle || 'Document')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-        const cleanBody = DOMPurify.sanitize(quill.root.innerHTML)
-        const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle}</title></head><body>${cleanBody}</body></html>`
+        const htmlContent = buildPrintHtml({
+          title: docTitle || 'Document',
+          bodyHtml: DOMPurify.sanitize(quill.root.innerHTML),
+          paperSize,
+          orientation,
+          marginIn,
+          pageColor,
+          fontFamily,
+          fontSize,
+          lineSpacing,
+          columnsCount,
+          pageBorder,
+          overlays,
+          pageNumberFormat,
+          showPageNumbers
+        })
         const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
@@ -535,36 +672,68 @@ export default function Documents({
           toast.error('Pop-up blocked. Allow pop-ups to print.')
           break
         }
-        const safeTitle = String(docTitle || 'Document')
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-        const cleanBody = DOMPurify.sanitize(quill.root.innerHTML)
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>${safeTitle}</title>
-              <style>
-                body { font-family: sans-serif; padding: 2in; line-height: 1.5; }
-              </style>
-            </head>
-            <body>
-              ${cleanBody}
-            </body>
-          </html>
-        `)
+        printWindow.document.write(
+          buildPrintHtml({
+            title: docTitle || 'Document',
+            bodyHtml: DOMPurify.sanitize(quill.root.innerHTML),
+            paperSize,
+            orientation,
+            marginIn,
+            pageColor,
+            fontFamily,
+            fontSize,
+            lineSpacing,
+            columnsCount,
+            pageBorder,
+            overlays,
+            pageNumberFormat,
+            showPageNumbers
+          })
+        )
         printWindow.document.close()
-        printWindow.print()
+        printWindow.focus()
+        window.setTimeout(() => printWindow.print(), 250)
         break
       }
       case 'insertImage': {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = () => {
+          const file = input.files?.[0]
+          if (!file) {
+            const url = prompt('Enter Image URL:')
+            if (!url || !isSafeImageSrc(url)) {
+              if (url) toast.error('Image URL must be http(s) or a data image.')
+              return
+            }
+            quill.focus()
+            const range = quill.getSelection() || { index: quill.getLength() }
+            quill.insertEmbed(range.index, 'image', url)
+            toast.success('Image inserted!')
+            return
+          }
+          const reader = new FileReader()
+          reader.onload = () => {
+            quill.focus()
+            const range = quill.getSelection() || { index: quill.getLength() }
+            quill.insertEmbed(range.index, 'image', reader.result)
+            toast.success('Image inserted!')
+          }
+          reader.readAsDataURL(file)
+        }
+        input.click()
+        break
+      }
+      case 'insertImageUrl': {
         const url = prompt('Enter Image URL:')
-        if (url) {
+        if (url && isSafeImageSrc(url)) {
           quill.focus()
           const range = quill.getSelection() || { index: quill.getLength() }
           quill.insertEmbed(range.index, 'image', url)
           toast.success('Image inserted!')
+        } else if (url) {
+          toast.error('Image URL must be http(s) or a data image.')
         }
         break
       }
@@ -583,7 +752,7 @@ export default function Documents({
           tableHTML += '</table>'
           quill.focus()
           const range = quill.getSelection() || { index: quill.getLength() }
-          quill.clipboard.dangerouslyPasteHTML(range.index, tableHTML)
+          pasteSafeHtml(quill, tableHTML, range.index)
           toast.success('Table inserted!')
         }
         break
@@ -591,36 +760,41 @@ export default function Documents({
       case 'insertLink': {
         const text = prompt('Link Text:')
         const href = prompt('Link URL (https://...):')
-        if (text && href) {
+        if (text && href && isSafeHref(href)) {
           quill.focus()
           const range = quill.getSelection() || { index: quill.getLength() }
           quill.insertText(range.index, text, 'link', href)
           toast.success('Hyperlink inserted!')
+        } else if (text && href) {
+          toast.error('Link must be http(s) or mailto.')
         }
         break
       }
       case 'insertPageBreak': {
         quill.focus()
         const rangePb = quill.getSelection() || { index: quill.getLength() }
-        quill.clipboard.dangerouslyPasteHTML(
-          rangePb.index,
-          '<div class="page-break" style="page-break-after: always; border-bottom: 2px dashed var(--tw-color-border); margin: 20px 0; text-align: center; font-size: 10px; color: var(--tw-color-muted); user-select: none;">--- Page Break ---</div>'
+        pasteSafeHtml(
+          quill,
+          '<div class="page-break" data-page-break="true" contenteditable="false">Page break</div>',
+          rangePb.index
         )
+        window.setTimeout(runPagination, 40)
         break
       }
       case 'insertHr': {
         quill.focus()
         const rangeHr = quill.getSelection() || { index: quill.getLength() }
-        quill.clipboard.dangerouslyPasteHTML(rangeHr.index, '<hr class="my-4 border-border" />')
+        pasteSafeHtml(quill, '<hr class="my-4 border-border" />', rangeHr.index)
         break
       }
       case 'insertHeader': {
         const headerText = prompt('Enter header text:')
         if (headerText) {
           quill.focus()
-          quill.clipboard.dangerouslyPasteHTML(
-            0,
-            `<div style="font-size: 10px; color: var(--tw-color-muted); border-bottom: 1px solid var(--tw-color-border); margin-bottom: 10px;">${headerText}</div>`
+          pasteSafeHtml(
+            quill,
+            `<div style="font-size: 10px; color: var(--tw-color-muted); border-bottom: 1px solid var(--tw-color-border); margin-bottom: 10px;">${escapeHtmlText(headerText)}</div>`,
+            0
           )
         }
         break
@@ -629,9 +803,10 @@ export default function Documents({
         const footerText = prompt('Enter footer text:')
         if (footerText) {
           quill.focus()
-          quill.clipboard.dangerouslyPasteHTML(
-            quill.getLength(),
-            `<div style="font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; margin-top: 10px;">${footerText}</div>`
+          pasteSafeHtml(
+            quill,
+            `<div style="font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; margin-top: 10px;">${escapeHtmlText(footerText)}</div>`,
+            quill.getLength()
           )
         }
         break
@@ -1055,7 +1230,16 @@ export default function Documents({
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
               >
                 <Image className="w-3.5 h-3.5" />
-                Image URL
+                Image
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => handleMenuAction('insertImageUrl')}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
+              >
+                <Link className="w-3.5 h-3.5" />
+                Image from URL
               </button>
               <button
                 type="button"
@@ -1348,27 +1532,42 @@ export default function Documents({
         <button
           type="button"
           onClick={() => applyFormat('bold')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary font-bold cursor-pointer"
+          className={`min-w-8 rounded-md px-2 py-1 font-bold cursor-pointer transition-colors ${
+            activeFormats.bold
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Bold"
           aria-label="Bold"
+          aria-pressed={activeFormats.bold}
         >
           B
         </button>
         <button
           type="button"
           onClick={() => applyFormat('italic')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary italic cursor-pointer"
+          className={`min-w-8 rounded-md px-2 py-1 italic cursor-pointer transition-colors ${
+            activeFormats.italic
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Italic"
           aria-label="Italic"
+          aria-pressed={activeFormats.italic}
         >
           I
         </button>
         <button
           type="button"
           onClick={() => applyFormat('underline')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary underline cursor-pointer"
+          className={`min-w-8 rounded-md px-2 py-1 underline cursor-pointer transition-colors ${
+            activeFormats.underline
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Underline"
           aria-label="Underline"
+          aria-pressed={activeFormats.underline}
         >
           U
         </button>
@@ -1379,9 +1578,12 @@ export default function Documents({
         <button
           type="button"
           onClick={() => applyFormat('background', '#fef08a')}
-          className="p-1.5 hover:bg-primary/10 rounded text-amber-500 font-bold cursor-pointer"
+          className={`p-1.5 rounded text-amber-500 font-bold cursor-pointer transition-colors ${
+            activeFormats.background ? 'bg-amber-100 ring-1 ring-amber-400' : 'hover:bg-primary/10'
+          }`}
           title="Highlight Yellow"
           aria-label="Highlight"
+          aria-pressed={Boolean(activeFormats.background)}
         >
           🖍️
         </button>
@@ -1405,27 +1607,42 @@ export default function Documents({
         <button
           type="button"
           onClick={() => applyFormat('align', '')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className={`rounded-md p-1.5 cursor-pointer transition-colors ${
+            !activeFormats.align
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Align left"
           aria-label="Align left"
+          aria-pressed={!activeFormats.align}
         >
           <AlignLeft className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={() => applyFormat('align', 'center')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className={`rounded-md p-1.5 cursor-pointer transition-colors ${
+            activeFormats.align === 'center'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Align center"
           aria-label="Align center"
+          aria-pressed={activeFormats.align === 'center'}
         >
           <AlignCenter className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={() => applyFormat('align', 'right')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className={`rounded-md p-1.5 cursor-pointer transition-colors ${
+            activeFormats.align === 'right'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Align right"
           aria-label="Align right"
+          aria-pressed={activeFormats.align === 'right'}
         >
           <AlignRight className="w-3.5 h-3.5" />
         </button>
@@ -1436,18 +1653,28 @@ export default function Documents({
         <button
           type="button"
           onClick={() => applyFormat('list', 'bullet')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className={`rounded-md p-1.5 cursor-pointer transition-colors ${
+            activeFormats.list === 'bullet'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Bullet list"
           aria-label="Bullet list"
+          aria-pressed={activeFormats.list === 'bullet'}
         >
           <List className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={() => applyFormat('list', 'ordered')}
-          className="p-1.5 hover:bg-primary/10 rounded text-muted hover:text-primary cursor-pointer"
+          className={`rounded-md p-1.5 cursor-pointer transition-colors ${
+            activeFormats.list === 'ordered'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-muted hover:bg-primary/10 hover:text-primary'
+          }`}
           title="Numbered list"
           aria-label="Numbered list"
+          aria-pressed={activeFormats.list === 'ordered'}
         >
           <ListOrdered className="w-3.5 h-3.5" />
         </button>
@@ -1488,7 +1715,7 @@ export default function Documents({
       <div className="flex-1 flex overflow-hidden">
         {/* Main Editor — paginated print layout */}
         <div
-          className="flex-1 overflow-y-auto overflow-x-auto flex justify-center bg-card-sunken p-6 shadow-inner"
+          className="flex-1 overflow-y-auto overflow-x-auto flex justify-center bg-slate-300/80 dark:bg-slate-900 p-8 md:p-12 shadow-inner"
           ref={scrollContainerRef}
           onClick={() => {
             setSelectedOverlayId(null)
@@ -1516,36 +1743,37 @@ export default function Documents({
             </div>
           )}
           <div
-            className="relative my-2 origin-top shrink-0"
+            className="relative my-4 origin-top shrink-0"
             style={{
               width: pageDims.w,
               transform: `scale(${zoom / 100})`,
-              marginBottom: `${Math.max(24, (zoom / 100) * pageDims.h * stats.pages - pageDims.h * stats.pages + 48)}px`
+              marginBottom: `${Math.max(48, (zoom / 100 - 1) * pageDims.h * Math.max(stats.pages, 1) + 64)}px`
             }}
           >
-            {/* Page boundary guides + fixed footers */}
+            {/* Discrete page cards — independent sheets, not a connected ribbon */}
             {printLayout &&
               Array.from({ length: stats.pages }).map((_, i) => (
                 <div
                   key={`page-guide-${i}`}
-                  className={`pointer-events-none absolute left-0 shadow-card ${
-                    outerPageBorder ? 'border-2 border-border' : 'border border-border/60'
+                  className={`pointer-events-none absolute left-0 shadow-xl ${
+                    outerPageBorder ? 'border border-slate-300' : 'border border-slate-200'
                   }`}
                   style={{
                     top: i * (pageDims.h + pageGap),
                     height: pageDims.h,
                     width: pageDims.w,
                     zIndex: 0,
+                    backgroundColor: pageColor || '#ffffff',
                     borderStyle: pageBorder === 'none' ? 'solid' : pageBorder
                   }}
                 >
                   <div
-                    className="absolute inset-0 border border-dashed border-primary/15"
+                    className="absolute inset-0 border border-dashed border-slate-300/70"
                     style={{ margin: marginPx }}
                   />
                   {showPageNumbers && (
                     <div className="absolute bottom-3 left-0 right-0 flex justify-center">
-                      <span className="select-none rounded-full bg-card/90 px-3 py-0.5 text-[10px] font-semibold text-muted shadow-sm">
+                      <span className="select-none rounded-full bg-white/90 px-3 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm">
                         {pageNumberFormat.replace(/\{n\}/g, String(i + 1)).replace(/\{total\}/g, String(stats.pages))}
                       </span>
                     </div>
@@ -1555,14 +1783,16 @@ export default function Documents({
 
             <div
               ref={pageShellRef}
-              className={`relative z-10 bg-card transition-shadow duration-300 ${isAiGenerating ? 'animate-ai-glow' : 'shadow-card'}`}
+              className={`relative z-10 transition-shadow duration-300 ${isAiGenerating ? 'animate-ai-glow' : ''}`}
               style={{
                 width: pageDims.w,
                 minHeight: Math.max(pageDims.h, stats.pages * pageDims.h + Math.max(0, stats.pages - 1) * pageGap),
-                backgroundColor: pageColor,
-                border: outerPageBorder
-                  ? `2px ${pageBorder === 'none' ? 'solid' : pageBorder} var(--tw-border-strong)`
-                  : '1px solid var(--tw-border)'
+                backgroundColor: printLayout ? 'transparent' : pageColor,
+                border: printLayout
+                  ? 'none'
+                  : outerPageBorder
+                    ? `2px ${pageBorder === 'none' ? 'solid' : pageBorder} var(--tw-border-strong)`
+                    : '1px solid var(--tw-border)'
               }}
             >
               <div
@@ -1595,7 +1825,13 @@ export default function Documents({
                 return (
                   <div
                     key={item.id}
-                    className={`absolute group ${selected ? 'ring-2 ring-primary' : ''}`}
+                    className={`absolute group ${
+                      selected
+                        ? 'ring-2 ring-primary/80 shadow-lg'
+                        : item.kind === 'textbox'
+                          ? 'shadow-sm ring-1 ring-slate-300/80'
+                          : ''
+                    }`}
                     style={{
                       left: item.x,
                       top: item.y,
@@ -1629,8 +1865,8 @@ export default function Documents({
                       onChange={(e) => updateOverlay(item.id, { text: e.target.value })}
                       onMouseDown={(e) => e.stopPropagation()}
                       onFocus={() => setSelectedOverlayId(item.id)}
-                      placeholder={item.kind === 'shape' ? 'Shape text…' : 'Type…'}
-                      className="h-full w-full resize-none border-none bg-transparent p-2 outline-none"
+                      placeholder={item.kind === 'shape' ? 'Add shape text…' : 'Type in this text box…'}
+                      className="h-full w-full resize-none border-none bg-transparent px-3 py-2.5 outline-none placeholder:text-slate-400"
                       style={{
                         fontFamily: fontCss,
                         fontSize: item.fontSize,
@@ -1643,59 +1879,59 @@ export default function Documents({
                     />
                     {selected && (
                       <>
-                        {/* Arrange / delete — same affordances as presentation */}
                         <div
                           data-overlay-chrome
-                          className="absolute -top-9 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1"
+                          className="absolute -top-11 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-1.5 py-1 shadow-lg"
                           onMouseDown={(e) => e.stopPropagation()}
                         >
                           <button
                             type="button"
-                            className="inline-flex items-center gap-0.5 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-text shadow-sm hover:bg-primary/10"
+                            className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
                             onClick={(e) => {
                               e.stopPropagation()
                               bringOverlayForward(item.id)
                             }}
                             title="Bring to front"
                           >
-                            <BringToFront className="h-3 w-3" /> Front
+                            <BringToFront className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
-                            className="inline-flex items-center gap-0.5 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-semibold text-text shadow-sm hover:bg-primary/10"
+                            className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
                             onClick={(e) => {
                               e.stopPropagation()
                               sendOverlayBackward(item.id)
                             }}
                             title="Send to back"
                           >
-                            <SendToBack className="h-3 w-3" /> Back
+                            <SendToBack className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
-                            className="flex h-5 w-5 items-center justify-center rounded border border-border bg-card text-primary shadow-sm hover:bg-primary/10"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
                             onClick={(e) => {
                               e.stopPropagation()
                               scaleOverlay(item.id, 1.25)
                             }}
                             title="Larger"
                           >
-                            <Maximize2 className="h-3 w-3" />
+                            <Maximize2 className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
-                            className="flex h-5 w-5 items-center justify-center rounded border border-border bg-card text-primary shadow-sm hover:bg-primary/10"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
                             onClick={(e) => {
                               e.stopPropagation()
                               scaleOverlay(item.id, 0.8)
                             }}
                             title="Smaller"
                           >
-                            <Minimize2 className="h-3 w-3" />
+                            <Minimize2 className="h-3.5 w-3.5" />
                           </button>
+                          <span className="mx-0.5 h-4 w-px bg-slate-200" />
                           <button
                             type="button"
-                            className="rounded bg-danger/90 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm hover:bg-danger"
+                            className="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-semibold text-red-600 hover:bg-red-50"
                             onClick={(e) => {
                               e.stopPropagation()
                               removeOverlay(item.id)
@@ -1705,7 +1941,6 @@ export default function Documents({
                           </button>
                         </div>
 
-                        {/* Four-corner resize + rotate (presentation-style) */}
                         <div
                           data-overlay-chrome
                           className={`${handleClass} -left-1.5 -top-1.5 cursor-nwse-resize`}
@@ -1732,15 +1967,14 @@ export default function Documents({
                         />
                         <div
                           data-overlay-chrome
-                          className="absolute -top-1.5 left-1/2 z-[70] h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border-2 border-primary bg-card shadow"
+                          className="absolute -top-1.5 left-1/2 z-[70] h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border-2 border-primary bg-white shadow"
                           onMouseDown={(e) => startOverlayDrag(e, item, 'rotate')}
                           title="Rotate"
                         />
 
-                        {/* Format strip — typography + appearance like presentation PropertiesPanel */}
                         <div
                           data-overlay-chrome
-                          className="absolute left-0 top-full z-[80] mt-2 flex max-w-[min(340px,calc(100vw-2rem))] flex-col gap-1.5 rounded-xl border border-border bg-card p-2 shadow-dropdown"
+                          className="absolute left-0 top-full z-[80] mt-2 flex w-max max-w-[min(380px,calc(100vw-2rem))] flex-col gap-1.5 rounded-lg border border-slate-200 bg-white p-2 shadow-xl"
                           onMouseDown={(e) => e.stopPropagation()}
                         >
                           <div className="flex flex-wrap items-center gap-1">
@@ -2021,6 +2255,7 @@ export default function Documents({
         onClose={() => setShowAiGenerateModal(false)}
         quillRef={quillRef}
         onGenerating={setIsAiGenerating}
+        hasSelection={hasEditorSelection}
       />
     </div>
   )

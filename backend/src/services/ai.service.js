@@ -64,52 +64,94 @@ Do not provide multiple options. Do not include quotes. ONLY reply with the exac
   },
 
   executeCommand: async function* (command, selectedText, fullDocumentText) {
-    const system = `You are an AI editor assistant. You perform actions on text selected by the user.
-Reply ONLY with the updated text. Do not wrap in quotes or add conversational filler.`;
+    const system = `You are a professional editor inside Teamora's document editor.
+Operate ONLY on the selected text. Reply with the replacement text only.
+Do not wrap the answer in quotes, markdown fences, or conversational filler such as "Here is".
+Preserve names, numbers, and facts unless the command requires changing them.
+If the command asks for a specific count (e.g. three advantages), produce exactly that count.
+Use Markdown headings, lists, or tables only when they make the result more usable in a document.`;
 
     const safeCommand = ALLOWED_COMMANDS.has(command) ? command : 'rewrite';
     let instruction = '';
     switch (safeCommand) {
       case 'rewrite':
-        instruction = 'Rewrite this text to flow better.';
+        instruction =
+          'Rewrite the selected text so it flows clearly and professionally. Keep the same meaning, length band, and point of view.';
         break;
       case 'professional':
-        instruction = 'Rewrite this text to be highly professional and formal.';
+        instruction =
+          'Rewrite the selected text in a formal workplace tone. Remove slang and filler. Keep the same facts.';
         break;
       case 'shorter':
-        instruction = 'Make this text more concise.';
+        instruction =
+          'Shorten the selected text by about 40% while keeping every essential fact. Do not add new ideas.';
         break;
       case 'expand':
-        instruction = 'Expand on this text with more detail.';
+        instruction =
+          'Expand the selected text with concrete detail, examples, or reasoning. If the surrounding context implies a count (e.g. three advantages), honor that count. Do not repeat the same idea.';
         break;
       case 'grammar':
-        instruction = 'Fix all grammar and spelling errors without changing the meaning.';
+        instruction = 'Fix grammar, spelling, and punctuation only. Do not change meaning, tone, or structure.';
         break;
       case 'ideas':
-        instruction = 'Generate 3 bulleted ideas expanding on this thought.';
+        instruction = 'Produce exactly 3 distinct, useful bullet ideas that extend the selected thought.';
         break;
       case 'summarize':
-        instruction = 'Provide a brief summary of this text.';
+        instruction = 'Summarize the selected text in 3–6 concise sentences. Do not introduce new claims.';
         break;
       default:
-        instruction = 'Rewrite this text to flow better.';
+        instruction = 'Rewrite the selected text so it flows clearly.';
     }
 
-    const maxFullText = clampText(fullDocumentText, 2000);
-    const maxSelected = clampText(selectedText, 4000);
-    const prompt = `Command: ${instruction}\n\nSelected Text:\n${maxSelected}\n\n(For context only, here is the document snippet:\n${maxFullText})`;
+    const maxFullText = clampText(fullDocumentText, 3000);
+    const maxSelected = clampText(selectedText, 6000);
+    const prompt = `COMMAND: ${instruction}
+
+SELECTED TEXT (replace this entire selection):
+${maxSelected}
+
+SURROUNDING DOCUMENT (context only — do not rewrite unless it appears in the selection):
+${maxFullText}`;
 
     yield* callAiStream(prompt, system);
   },
 
-  generateDocument: async function* (promptText) {
-    const system = `You are an AI document creator. The user will ask for a document. 
-Generate a well-structured document using markdown (headers, bullet points). 
-If the user asks to generate or include an image, output a markdown image using the Pollinations AI API format:
-![Alt Text](https://image.pollinations.ai/prompt/{URL_ENCODED_IMAGE_PROMPT}?width=800&height=400&nologo=true)
-Do not include conversational filler like "Here is your document". Just output the document itself.`;
+  generateDocument: async function* (promptText, options = {}) {
+    const selectedText = clampText(options.selectedText, 6000);
+    const documentContext = clampText(options.documentContext, 4000);
+    const mode = String(options.mode || '').toLowerCase();
 
-    const prompt = `Create a document based on this request:\n\n${clampText(promptText, 4000)}`;
+    const system = `You are a professional workplace document writer embedded in Teamora.
+
+Follow the user's instruction exactly:
+- Honor the requested topic, audience, tone, structure, length, and format.
+- If they ask for approximately N words, produce roughly that length (within about 15%).
+- If they ask for N sections, advantages, steps, or bullets, produce exactly that count.
+- Write logically structured, non-repetitive content. Avoid generic filler and clichés.
+- Output clean Markdown that can be pasted into a document: headings, paragraphs, lists, and tables when useful.
+- Do not include conversational wrapper text such as "Here is your document" or "Sure".
+- Do not invent a title unless the user asked for one or a full document.
+- If an image is requested, emit: ![Alt](https://image.pollinations.ai/prompt/{URL_ENCODED_PROMPT}?width=800&height=400&nologo=true)
+
+When selected text or document context is provided:
+- Treat the selected text as the primary source for rewrite / expand / shorten / summarize / continue / transform.
+- Change only what the instruction asks. Do not replace unrelated document content.
+- For "continue", pick up from the end without repeating.
+- Preserve formatting intent (lists stay lists, headings stay headings) unless asked to change it.`;
+
+    let prompt = `USER REQUEST:\n${clampText(promptText, 4000)}\n`;
+    if (mode) {
+      prompt += `\nREQUESTED OPERATION: ${mode}\n`;
+    }
+    if (selectedText) {
+      prompt += `\nSELECTED CONTENT (this is the material to operate on):\n${selectedText}\n`;
+    }
+    if (documentContext) {
+      prompt += `\nSURROUNDING DOCUMENT CONTEXT (for continuity only):\n${documentContext}\n`;
+    }
+    prompt += selectedText
+      ? `\nReturn only the resulting content for the selection / requested insertion.`
+      : `\nWrite the requested document content now.`;
 
     yield* callAiStream(prompt, system);
   },

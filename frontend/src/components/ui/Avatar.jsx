@@ -17,7 +17,7 @@ export default function Avatar({ label, src, className = '', size = 'md' }) {
         alt={label || 'User avatar'}
         referrerPolicy="no-referrer"
         className={clsx(
-          'flex shrink-0 rounded-avatar object-cover shadow-card transition duration-normal ease-standard',
+          'flex shrink-0 rounded-full object-cover shadow-card transition duration-normal ease-standard',
           'hover:scale-[1.03] hover:shadow-hover',
           sizeClass,
           className
@@ -30,7 +30,7 @@ export default function Avatar({ label, src, className = '', size = 'md' }) {
     <span
       aria-hidden={!label}
       className={clsx(
-        'flex shrink-0 items-center justify-center rounded-avatar bg-primary/10 font-semibold text-primary shadow-card',
+        'flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary shadow-card',
         'transition duration-normal ease-standard hover:scale-[1.03] hover:shadow-hover',
         sizeClass,
         className

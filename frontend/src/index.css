@@ -375,6 +375,48 @@ select:focus-visible {
   right: 0;
 }
 
+.quill-editor-wrapper .ql-editor .page-break,
+.quill-editor-wrapper .ql-editor [data-page-break='true'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  margin: 8px 0 0;
+  border: none;
+  border-top: 1px dashed #94a3b8;
+  color: #94a3b8;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.quill-editor-wrapper .ql-editor img {
+  max-width: 100%;
+  height: auto;
+}
+
+.teamora-sheet-grid[data-resizing] {
+  user-select: none;
+}
+.teamora-sheet-grid[data-resizing='col'] {
+  cursor: col-resize;
+}
+.teamora-sheet-grid[data-resizing='row'] {
+  cursor: row-resize;
+}
+
+/* Presentation slide surface — never inherit app / OS color-scheme */
+[data-slide-canvas] {
+  color-scheme: only light;
+}
+[data-slide-canvas][data-slide-dark='true'] {
+  color-scheme: only dark;
+}
+[data-presentation-editor] [data-slide-canvas] .text-muted {
+  color: #64748b;
+}
+
 body {
   margin: 0;
   padding: 0;

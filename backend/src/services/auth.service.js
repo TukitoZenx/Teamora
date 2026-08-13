@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const { comparePassword } = require('../utils/password');
 const { sendPasswordResetEmail } = require('./email.service');
@@ -140,7 +141,7 @@ const register = async ({ fullName, username, email, password, avatar }) => {
   const input = validateRegistrationInput({ fullName, username, email, password });
 
   const existingUser = await User.findOne({
-    $or: [{ email: input.email }, { username: input.username }]
+    $or: [{ email: input.email   }, { username: input.username }]
   });
 
   if (existingUser?.email === input.email) {
@@ -198,6 +199,7 @@ const login = async ({ email, password }) => {
 };
 
 const findById = async (id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) return null;
   const user = await User.findById(id);
   return user ? sanitizeUser(user) : null;
 };

@@ -48,3 +48,8 @@ backend/local_db.log
 
 # Orphaned ad-hoc test sandbox (not used by npm test)
 backend/tests/
+
+# Local session dumps / one-off CSRF probes (not part of the app)
+cookies.txt
+frontend/test-csrf.cjs
+frontend/test-csrf-2.cjs

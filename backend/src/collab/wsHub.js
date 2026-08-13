@@ -182,6 +182,7 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
       const host = req.headers.host || 'localhost';
       const url = new URL(req.url || '/', `http://${host}`);
       if (url.pathname !== '/collab') {
+        socket.destroy();
         return;
       }
 
@@ -297,6 +298,7 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
           const rk = roomKey(String(msg.workspaceId || ''), String(msg.key || ''));
           const set = rooms.get(rk);
           set?.delete(ws);
+          if (set && set.size === 0) rooms.delete(rk);
           ws.rooms?.delete(rk);
           broadcast(
             rk,

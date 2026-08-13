@@ -52,61 +52,60 @@ export default function WorkspaceSidebar({
   onToggleCollapse,
   className = ''
 }) {
-  const [showExpandButton, setShowExpandButton] = useState(false)
+  const [logoHovered, setLogoHovered] = useState(false)
 
   return (
     <aside
       data-workspace-sidebar="true"
       aria-label="Workspace navigation"
-      className={`flex h-full flex-col border-r border-border bg-card transition-[width] duration-slow ease-in-out ${collapsed ? 'w-sidebar-collapsed' : 'w-sidebar'} ${className}`}
+      className={`relative z-sidebar flex h-full flex-col overflow-visible border-r border-border bg-card transition-[width] duration-slow ease-in-out ${collapsed ? 'w-sidebar-collapsed' : 'w-sidebar'} ${className}`}
     >
-      <div className="flex h-16 items-center justify-between border-b border-border px-4">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div
-            className="relative flex h-9 w-9 items-center justify-center"
-            onMouseEnter={() => setShowExpandButton(true)}
-            onMouseLeave={() => setShowExpandButton(false)}
-            onFocus={() => setShowExpandButton(true)}
-            onBlur={() => setShowExpandButton(false)}
-          >
-            <div
-              className={`flex h-9 w-9 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 shadow-sm transition-all duration-normal ease-standard ${collapsed && showExpandButton ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}
-            >
-              <TeamoraLogo size="md" className="h-9 w-9" rounded="rounded-2xl" />
-            </div>
-
-            {collapsed && (
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                className={`absolute inset-0 flex min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary hover:text-on-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 ${showExpandButton ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'}`}
-                aria-label="Expand sidebar"
-                aria-expanded={false}
-              >
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </button>
-            )}
-          </div>
-          {!collapsed && <span className="text-[15px] font-semibold text-text">Teamora</span>}
-        </div>
-
-        {!collapsed && (
+      <div className={`flex h-16 shrink-0 items-center border-b border-border ${collapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
+        {collapsed ? (
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="flex min-h-[var(--tw-touch-min)] min-w-[var(--tw-touch-min)] items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:scale-105 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
-            aria-label="Collapse sidebar"
-            aria-expanded={true}
+            onMouseEnter={() => setLogoHovered(true)}
+            onMouseLeave={() => setLogoHovered(false)}
+            onFocus={() => setLogoHovered(true)}
+            onBlur={() => setLogoHovered(false)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:border-primary hover:bg-primary hover:text-on-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
+            aria-label="Expand sidebar"
+            aria-expanded={false}
+            title="Expand sidebar"
           >
-            <ChevronLeft className="h-4 w-4" aria-hidden />
+            {logoHovered ? (
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            ) : (
+              <TeamoraLogo size="md" className="h-9 w-9" rounded="rounded-2xl" />
+            )}
           </button>
+        ) : (
+          <>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/10 shadow-sm">
+                <TeamoraLogo size="md" className="h-9 w-9" rounded="rounded-2xl" />
+              </div>
+              <span className="truncate text-[15px] font-semibold text-text">Teamora</span>
+            </div>
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted shadow-sm transition-all duration-normal ease-standard hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
+              aria-label="Collapse sidebar"
+              aria-expanded={true}
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </button>
+          </>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 py-4">
-        <nav className="space-y-3" aria-label="Workspace sections">
+      <div className={`min-h-0 flex-1 overflow-y-auto overflow-x-visible py-4 ${collapsed ? 'px-1.5' : 'px-2'}`}>
+        <nav className="space-y-3 overflow-visible" aria-label="Workspace sections">
           {groups.map((group, groupIndex) => (
-            <div key={groupIndex} className="space-y-1">
+            <div key={groupIndex} className="space-y-1 overflow-visible">
               {groupIndex > 0 && !collapsed && <div className="my-3 h-px bg-border" />}
               {group.map((item) => (
                 <SidebarItem
@@ -123,15 +122,16 @@ export default function WorkspaceSidebar({
         </nav>
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-card p-2">
+      <div className={`shrink-0 overflow-visible border-t border-border bg-card ${collapsed ? 'p-1.5' : 'p-2'}`}>
         {isOwner ? (
-          <div className="space-y-1">
+          <div className="space-y-1 overflow-visible">
             {canLeave && (
               <SidebarItem
                 icon={DoorOpen}
                 label="Leave Workspace"
                 danger
                 collapsed={collapsed}
+                tooltipPlacement="right-start"
                 onClick={onLeaveWorkspace}
               />
             )}
@@ -140,6 +140,7 @@ export default function WorkspaceSidebar({
               label="Delete Workspace"
               danger
               collapsed={collapsed}
+              tooltipPlacement="right-start"
               onClick={onDeleteWorkspace}
             />
           </div>
@@ -149,6 +150,7 @@ export default function WorkspaceSidebar({
             label="Leave Workspace"
             danger
             collapsed={collapsed}
+            tooltipPlacement="right-start"
             onClick={onLeaveWorkspace}
           />
         )}

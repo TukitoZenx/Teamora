@@ -658,8 +658,10 @@ export default function WorkspaceHome({
       onBackToDashboard={onBack}
       onLeaveWorkspace={onLeaveWorkspace}
       onDeleteWorkspace={onDeleteWorkspace}
+      workspaceFiles={workspaceFiles}
+      onOpenFile={openWorkspaceFile}
     >
-      <div className="teamora-content-fade flex min-h-0 flex-1 h-full flex-col">
+      <div className="teamora-content-fade relative flex min-h-0 flex-1 h-full flex-col">
         <WorkspaceFileTabs
           files={workspaceFiles}
           tabs={openTabs}
@@ -697,7 +699,7 @@ export default function WorkspaceHome({
           }}
         />
         {activeMeeting && (!inMeeting || activeMeetingWorkspace?._id !== workspaceId) && (
-          <div className="bg-primary/10 border-b border-primary/20 px-6 py-3 flex items-center justify-between shrink-0">
+          <div className="absolute left-1/2 top-16 z-50 -translate-x-1/2 bg-card border border-primary/20 shadow-lg rounded-2xl px-5 py-3 flex items-center gap-6 animate-in fade-in slide-in-from-top-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary animate-pulse">
                 <Video className="w-4 h-4" />
@@ -709,7 +711,7 @@ export default function WorkspaceHome({
             </div>
             <button
               onClick={() => joinMeeting(workspace)}
-              className="px-4 py-2 bg-primary hover:bg-primary-hover text-on-primary text-sm font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+              className="px-4 py-2 bg-primary hover:bg-primary-hover text-on-primary text-sm font-bold rounded-xl transition-colors shadow-sm cursor-pointer"
             >
               Join Meeting
             </button>
