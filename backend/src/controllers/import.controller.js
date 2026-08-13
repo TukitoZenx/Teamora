@@ -62,6 +62,9 @@ const parsePptxFromBuffer = async (buffer) => {
           xml2js.parseString(xml, (err, result) => {
             if (err) {
               processed++;
+              if (processed === slideEntries.length) {
+                resolve({ slides: slides.filter(Boolean) });
+              }
               return;
             }
             let slideText = '';
@@ -86,6 +89,9 @@ const parsePptxFromBuffer = async (buffer) => {
           });
         } catch (e) {
           processed++;
+          if (processed === slideEntries.length) {
+            resolve({ slides: slides.filter(Boolean) });
+          }
         }
       });
     } catch (error) {

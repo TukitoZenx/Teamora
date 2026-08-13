@@ -5,7 +5,7 @@
 import { getCollabWebSocketUrl } from './apiBaseUrl'
 
 const log = (...args) => {
-  if (typeof console !== 'undefined') console.info('[meeting-signal]', ...args)
+  if (import.meta.env.DEV) console.info('[meeting-signal]', ...args)
 }
 
 /** Ensure RTCSessionDescription / RTCIceCandidate are plain JSON. */

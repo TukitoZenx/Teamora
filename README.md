@@ -186,22 +186,22 @@ Currently, these modules use standard state structures or `Y.Map`/`Y.Array` arch
 4. **Environment Variables:**
    - Create `backend/.env`:
      ```env
-     PORT=3000
-     MONGO_URI=mongodb://localhost:27017/collab-workspace
+     PORT=5000
+     MONGODB_URI=mongodb://localhost:27017/collab-workspace
      CLIENT_URL=http://localhost:5173
      SESSION_SECRET=your_super_secret_key
      ```
    - Create `frontend/.env`:
      ```env
-     VITE_API_URL=http://localhost:3000
+     VITE_API_URL=http://localhost:5000
      ```
 5. **Start Services:**
-   - Backend: `npm run dev` (starts on port 3000)
+   - Backend: `npm run dev` (starts on port 5000)
    - Frontend: `npm run dev` (starts on port 5173)
 
 ## API Overview
 
-**Auth Routes (`/api/v1/auth`)**
+**Auth Routes (`/api/auth`)**
 - `POST /register`, `POST /login`, `POST /logout`
 - `GET /me`, `PATCH /profile`
 - `POST /forgot-password`, `POST /reset-password`

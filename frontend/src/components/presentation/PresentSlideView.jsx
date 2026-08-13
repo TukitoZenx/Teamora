@@ -113,6 +113,8 @@ export default function PresentSlideView({ slide, theme, presentScale = 1, revis
     <div className="flex h-full w-full items-center justify-center overflow-hidden">
       <div
         key={`present-slide-${slide?.id || 'x'}-r${revision}`}
+        data-slide-canvas="true"
+        data-slide-dark={isDarkSlide ? 'true' : 'false'}
         className={`relative overflow-hidden rounded-lg bg-gradient-to-br ${gradient}`}
         style={{
           transform: `scale(${presentScale})`,

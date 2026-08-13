@@ -10,7 +10,7 @@ export const SLIDE_THEME_PRESETS = {
     label: 'Clean',
     // Fixed light slide design (does not flip with app theme)
     gradient: 'from-white to-slate-50',
-    accent: 'from-primary to-indigo-500',
+    accent: 'from-violet-600 to-indigo-500',
     isDark: false
   },
   ocean: {

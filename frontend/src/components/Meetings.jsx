@@ -17,7 +17,6 @@ import {
   Pin,
   Wifi,
   WifiOff,
-  Smile,
   Settings,
   PhoneOff,
   VolumeX
@@ -28,7 +27,23 @@ import { MeetingPeerManager } from '../services/meetingPeerManager'
 import { dismissMeetingNotifications } from './utils/notifications'
 import { useMeeting } from '../contexts/MeetingContext'
 
-const REACTIONS = ['👍', '👏', '❤️', '😂', '🎉', '👋']
+function rtcLog(...args) {
+  if (import.meta.env.DEV) console.info('[meeting-rtc]', ...args)
+}
+
+function pickRecorderMime() {
+  const candidates = [
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp8',
+    'video/webm;codecs=h264,opus',
+    'video/webm',
+    'video/mp4'
+  ]
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return ''
+  }
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || ''
+}
 
 function RemoteAudio({ stream, audioOutputDeviceId }) {
   const audioRef = useRef(null)
@@ -36,13 +51,13 @@ function RemoteAudio({ stream, audioOutputDeviceId }) {
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
-    console.log(
+    rtcLog(
       `[RTC-AUDIO-AUDIT] [RemoteAudio SinkId] deviceId=${audioOutputDeviceId} hasSetSinkId=${typeof audio.setSinkId === 'function'}`
     )
     if (audioOutputDeviceId && typeof audio.setSinkId === 'function') {
       audio
         .setSinkId(audioOutputDeviceId)
-        .then(() => console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio SinkId Success] deviceId=${audioOutputDeviceId}`))
+        .then(() => rtcLog(`[RTC-AUDIO-AUDIT] [RemoteAudio SinkId Success] deviceId=${audioOutputDeviceId}`))
         .catch((e) => console.error(`[RTC-AUDIO-AUDIT] [RemoteAudio SinkId Failure]`, e))
     }
   }, [audioOutputDeviceId])
@@ -52,9 +67,9 @@ function RemoteAudio({ stream, audioOutputDeviceId }) {
     if (!audio || !stream) return
 
     const audioTracks = stream.getAudioTracks()
-    console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio Attach] streamId=${stream.id} tracks=${audioTracks.length}`)
+    rtcLog(`[RTC-AUDIO-AUDIT] [RemoteAudio Attach] streamId=${stream.id} tracks=${audioTracks.length}`)
     audioTracks.forEach((t, i) => {
-      console.log(
+      rtcLog(
         `[RTC-AUDIO-AUDIT]   - Remote Audio Track #${i}: id=${t.id} enabled=${t.enabled} readyState=${t.readyState} muted=${t.muted}`
       )
     })
@@ -66,14 +81,14 @@ function RemoteAudio({ stream, audioOutputDeviceId }) {
     audio
       .play?.()
       .then(() => {
-        console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio Play Success] streamId=${stream.id}`)
+        rtcLog(`[RTC-AUDIO-AUDIT] [RemoteAudio Play Success] streamId=${stream.id}`)
       })
       .catch((err) => {
         console.error(`[RTC-AUDIO-AUDIT] [RemoteAudio Play Failed] streamId=${stream.id}:`, err)
       })
 
     return () => {
-      console.log(`[RTC-AUDIO-AUDIT] [RemoteAudio Cleanup] detaching streamId=${stream.id}`)
+      rtcLog(`[RTC-AUDIO-AUDIT] [RemoteAudio Cleanup] detaching streamId=${stream.id}`)
       if (audio) audio.srcObject = null
     }
   }, [stream])
@@ -105,7 +120,7 @@ function RemoteVideo({ stream, hidden }) {
       autoPlay
       playsInline
       muted
-      className={`h-full w-full object-cover ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
+      className={`h-full w-full bg-black object-contain object-center ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
     />
   )
 }
@@ -124,7 +139,7 @@ function MiniVideo({ stream, isMe }) {
       autoPlay
       playsInline
       muted={isMe}
-      className={`w-full h-full object-cover ${isMe ? 'scale-x-[-1]' : ''}`}
+      className={`h-full w-full bg-black object-contain object-center ${isMe ? 'scale-x-[-1]' : ''}`}
     />
   )
 }
@@ -169,7 +184,7 @@ function ParticipantTile({
               filter: 'none',
               display: camActive ? 'block' : 'none'
             }}
-            className="w-full h-full object-cover transition-all scale-x-[-1]"
+            className="h-full w-full bg-black object-contain object-center transition-all scale-x-[-1]"
           />
           {!camActive && (
             <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
@@ -390,8 +405,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const [layoutMode, setLayoutMode] = useState('grid') // grid | speaker
   const [pinnedId, setPinnedId] = useState(null)
   const [peerStates, setPeerStates] = useState({})
-  const [reactions, setReactions] = useState([])
-  const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [networkQuality, setNetworkQuality] = useState({}) // peerId -> 'good' | 'fair' | 'poor'
   const [devices, setDevices] = useState([])
   const [selectedMic, setSelectedMic] = useState('')
@@ -423,6 +436,11 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
   const socketId = socket?.id
   const isHost = hostInfo.hostSocketId === socketId
+  const meetingSignalRef = useRef({ socket: null, roomId: null, socketId: null })
+
+  useEffect(() => {
+    meetingSignalRef.current = { socket, roomId, socketId }
+  }, [socket, roomId, socketId])
 
   useEffect(() => {
     inMeetingRef.current = inMeeting
@@ -514,7 +532,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
       const data = new Uint8Array(analyser.frequencyBinCount)
       audioAnalysersRef.current[socketId] = { ctx, analyser, data }
-      console.log(`[RTC-AUDIO-AUDIT] Speaking monitor attached: socketId=${socketId}`)
+      rtcLog(`[RTC-AUDIO-AUDIT] Speaking monitor attached: socketId=${socketId}`)
     } catch (err) {
       console.warn('[RTC-AUDIO-AUDIT] Speaking monitor attachment failed:', err)
     }
@@ -533,7 +551,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
   const changeDevice = useCallback(
     async (kind, deviceId) => {
-      console.log(`[RTC-AUDIO-AUDIT] Changing device kind=${kind} to deviceId=${deviceId}`)
+      rtcLog(`[RTC-AUDIO-AUDIT] Changing device kind=${kind} to deviceId=${deviceId}`)
       if (kind === 'audioinput') {
         if (localStreamRef.current) {
           try {
@@ -880,14 +898,14 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   )
 
   const handleLeaveMeeting = useCallback(() => {
-    console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Starting cleanup. isRecording=${isRecording}`)
+    rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Starting cleanup. isRecording=${isRecording}`)
     setInMeeting(false)
     setAdmitted(false)
 
     if (localStreamRef.current) {
-      console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Stopping localStream tracks`)
+      rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Stopping localStream tracks`)
       localStreamRef.current.getTracks().forEach((track) => {
-        console.log(`[RTC-AUDIO-AUDIT]   - Stopping track id=${track.id} kind=${track.kind}`)
+        rtcLog(`[RTC-AUDIO-AUDIT]   - Stopping track id=${track.id} kind=${track.kind}`)
         track.stop()
       })
       localStreamRef.current = null
@@ -905,7 +923,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     setScreenSharingActive(false)
     if (localVideoRef.current) localVideoRef.current.srcObject = null
 
-    console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Destroying peer manager and remote streams`)
+    rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Destroying peer manager and remote streams`)
     destroyPeerManager()
     setRemoteStreams({})
     setPeerStates({})
@@ -934,7 +952,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     setHandRaised(false)
     setPinnedId(null)
     setActiveSidePanel(null)
-    setShowReactionPicker(false)
     toast('Left the call', { icon: '🛑' })
     try {
       sessionStorage.removeItem('teamora-in-call')
@@ -942,7 +959,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       // ignore
     }
     globalLeaveMeeting?.()
-    console.log(`[RTC-AUDIO-AUDIT] [Leave Meeting] Cleanup finished`)
+    rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Cleanup finished`)
   }, [socket, socketId, roomId, isRecording, destroyPeerManager, clearSpeakingMonitor, globalLeaveMeeting])
 
   useEffect(() => {
@@ -959,7 +976,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     try {
       let stream = null
       try {
-        console.log(`[RTC-AUDIO-AUDIT] [GetUserMedia] Requesting getUserMedia with video=true and full audio settings.`)
+        rtcLog(`[RTC-AUDIO-AUDIT] [GetUserMedia] Requesting getUserMedia with video=true and full audio settings.`)
         stream = await navigator.mediaDevices.getUserMedia({
           video: selectedCam ? { deviceId: { exact: selectedCam } } : true,
           audio: {
@@ -969,9 +986,9 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
             autoGainControl: true
           }
         })
-        console.log(`[RTC-AUDIO-AUDIT] [GetUserMedia Success] streamId=${stream.id}`)
+        rtcLog(`[RTC-AUDIO-AUDIT] [GetUserMedia Success] streamId=${stream.id}`)
         stream.getTracks().forEach((track, idx) => {
-          console.log(
+          rtcLog(
             `[RTC-AUDIO-AUDIT]   - Track #${idx}: id=${track.id} kind=${track.kind} enabled=${track.enabled} readyState=${track.readyState}`
           )
         })
@@ -987,7 +1004,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       setInMeeting(true)
       setAdmitted(true)
       const ice = describeIceSetup()
-      console.log(`[RTC-AUDIO-AUDIT] Joined call: hasTurn=${ice.hasTurn} turnCount=${ice.turnCount}`)
+      rtcLog(`[RTC-AUDIO-AUDIT] Joined call: hasTurn=${ice.hasTurn} turnCount=${ice.turnCount}`)
       toast.success(
         ice.hasTurn ? 'Joined meeting (TURN enabled)' : 'Joined — set VITE_TURN_* for multi-network reliability',
         { icon: '📹', duration: ice.hasTurn ? 3000 : 5000 }
@@ -1081,11 +1098,11 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
   const toggleMic = () => {
     const nextState = !micActive
-    console.log(`[RTC-AUDIO-AUDIT] [Toggle Mic] current=${micActive} next=${nextState}`)
+    rtcLog(`[RTC-AUDIO-AUDIT] [Toggle Mic] current=${micActive} next=${nextState}`)
     setMicActive(nextState)
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach((track) => {
-        console.log(`[RTC-AUDIO-AUDIT]   - Setting audio track enabled state: trackId=${track.id} enabled=${nextState}`)
+        rtcLog(`[RTC-AUDIO-AUDIT]   - Setting audio track enabled state: trackId=${track.id} enabled=${nextState}`)
         track.enabled = nextState
       })
     } else {
@@ -1103,7 +1120,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
   const toggleCam = () => {
     const nextState = !camActive
-    console.log(`[RTC-AUDIO-AUDIT] [Toggle Cam] current=${camActive} next=${nextState}`)
+    rtcLog(`[RTC-AUDIO-AUDIT] [Toggle Cam] current=${camActive} next=${nextState}`)
     setCamActive(nextState)
     if (localStreamRef.current) {
       localStreamRef.current.getVideoTracks().forEach((track) => {
@@ -1134,62 +1151,121 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     if (next) toast(`${userName} raised their hand!`, { icon: '✋' })
   }
 
-  const sendReaction = (emoji) => {
-    emitSignal(undefined, { type: 'reaction', emoji, from: socketId, user: userName })
-    spawnReaction(emoji, userName)
-    setShowReactionPicker(false)
+  const recordingCleanupRef = useRef(null)
+
+  const buildRecordingStream = () => {
+    const mixed = new MediaStream()
+    const local = localStreamRef.current
+    const remoteList = Object.values(remoteStreams || {})
+      .map((entry) => entry?.stream)
+      .filter(Boolean)
+
+    const videoTrack =
+      local?.getVideoTracks?.().find((t) => t.readyState === 'live') ||
+      remoteList.flatMap((stream) => stream.getVideoTracks()).find((t) => t.readyState === 'live')
+    if (videoTrack) mixed.addTrack(videoTrack)
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const dest = audioCtx.createMediaStreamDestination()
+    const connectAudio = (stream) => {
+      const tracks = stream?.getAudioTracks?.() || []
+      if (!tracks.length) return
+      try {
+        const src = audioCtx.createMediaStreamSource(new MediaStream(tracks))
+        src.connect(dest)
+      } catch {
+        // Some remote streams cannot be mixed if they have no frames yet.
+      }
+    }
+    if (local) connectAudio(local)
+    remoteList.forEach(connectAudio)
+    dest.stream.getAudioTracks().forEach((track) => mixed.addTrack(track))
+
+    if (!mixed.getTracks().length) {
+      audioCtx.close?.().catch(() => {})
+      return null
+    }
+
+    return {
+      stream: mixed,
+      cleanup: () => {
+        dest.stream.getTracks().forEach((t) => t.stop())
+        audioCtx.close?.().catch(() => {})
+      }
+    }
   }
 
-  const spawnReaction = useCallback((emoji, who) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-    setReactions((prev) => [...prev, { id, emoji, user: who }])
-    window.setTimeout(() => {
-      setReactions((prev) => prev.filter((r) => r.id !== id))
-    }, 2800)
-  }, [])
-
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (!isRecording) {
-      if (!localStreamRef.current) {
-        toast.error('No video stream available to record.')
+      const composed = buildRecordingStream()
+      if (!composed) {
+        toast.error('No audio or video is available to record.')
         return
       }
+      recordingCleanupRef.current = composed.cleanup
       setIsRecording(true)
       setRecordingSeconds(0)
       recordIntervalRef.current = setInterval(() => setRecordingSeconds((p) => p + 1), 1000)
       recordedChunksRef.current = []
+
+      const mimeType = pickRecorderMime()
       let mediaRecorder
       try {
-        mediaRecorder = new MediaRecorder(localStreamRef.current, {
-          mimeType: 'video/webm; codecs=vp9'
-        })
+        mediaRecorder = mimeType
+          ? new MediaRecorder(composed.stream, {
+              mimeType,
+              videoBitsPerSecond: 1_500_000,
+              audioBitsPerSecond: 128_000
+            })
+          : new MediaRecorder(composed.stream)
       } catch {
         try {
-          mediaRecorder = new MediaRecorder(localStreamRef.current, { mimeType: 'video/webm' })
+          mediaRecorder = new MediaRecorder(composed.stream, { mimeType: 'video/webm' })
         } catch {
-          mediaRecorder = new MediaRecorder(localStreamRef.current)
+          mediaRecorder = new MediaRecorder(composed.stream)
         }
+      }
+
+      mediaRecorder.onerror = (event) => {
+        console.error('[recording] MediaRecorder error', event)
+        toast.error('Recording failed. Try again.')
       }
       mediaRecorder.ondataavailable = (e) => {
         if (e.data?.size > 0) recordedChunksRef.current.push(e.data)
       }
       mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' })
+        recordingCleanupRef.current?.()
+        recordingCleanupRef.current = null
+        const chunks = recordedChunksRef.current
+        if (!chunks.length) {
+          toast.error('Recording produced no data.')
+          return
+        }
+        const type = mediaRecorder.mimeType || mimeType || 'video/webm'
+        const blob = new Blob(chunks, { type })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `meeting-recording-${Date.now()}.webm`
+        a.download = `meeting-recording-${Date.now()}.${type.includes('mp4') ? 'mp4' : 'webm'}`
         a.click()
-        URL.revokeObjectURL(url)
+        window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
       }
       mediaRecorderRef.current = mediaRecorder
       mediaRecorder.start(1000)
       toast.success('Meeting recording started!')
     } else {
-      if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current.stop()
+      const recorder = mediaRecorderRef.current
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.requestData?.()
+        } catch {
+          // ignore
+        }
+        recorder.stop()
+      }
       clearInterval(recordIntervalRef.current)
       setIsRecording(false)
-      toast.success('Meeting recording downloaded!')
+      toast.success('Meeting recording saved!')
     }
   }
 
@@ -1299,11 +1375,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       if (signal.type === 'control-response') {
         if (signal.allowed) toast.success('Remote control granted')
         else toast.error('Remote control request was denied')
-        return
-      }
-
-      if (signal.type === 'reaction' && signal.emoji) {
-        spawnReaction(signal.emoji, signal.user || 'Someone')
         return
       }
 
@@ -1429,8 +1500,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     pushDiag,
     startMockVideoStream,
     socketId,
-    respondScreenControl,
-    spawnReaction
+    respondScreenControl
   ])
 
   // Host election
@@ -1471,8 +1541,25 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach((t) => t.stop())
       }
+      if (inMeetingRef.current) {
+        const signal = meetingSignalRef.current
+        signal.socket?.emit?.('meeting-leave', { roomId: signal.roomId, socketId: signal.socketId })
+      }
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
       if (recordIntervalRef.current) clearInterval(recordIntervalRef.current)
+      const recorder = mediaRecorderRef.current
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.stop()
+        } catch (err) {
+          console.error('[meeting-rtc] failed to stop recorder on unmount', err)
+        }
+      }
+      try {
+        recordingCleanupRef.current?.()
+      } catch (err) {
+        console.error('[meeting-rtc] failed to release recording mix on unmount', err)
+      }
       Object.keys(analysers).forEach((id) => {
         try {
           analysers[id].ctx?.close?.()
@@ -1514,22 +1601,22 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
   const iceInfo = useMemo(() => describeIceSetup(), [])
 
-  const meetingContent = (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken text-text select-none lg:flex-row">
-      {/* Floating reactions */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center gap-2">
-        {reactions.map((r) => (
-          <div
-            key={r.id}
-            className="animate-bounce rounded-full bg-card/90 border border-border px-3 py-1.5 text-lg shadow-lg"
-            title={r.user}
-          >
-            {r.emoji}
-          </div>
-        ))}
-      </div>
+  const participantCount = participantsList.length || Object.keys(meetingParticipants).length || (inMeeting ? 1 : 0)
+  const gridColsClass =
+    participantCount <= 1
+      ? 'grid-cols-1'
+      : participantCount === 2
+        ? 'grid-cols-1 sm:grid-cols-2'
+        : participantCount <= 4
+          ? 'grid-cols-2'
+          : participantCount <= 9
+            ? 'grid-cols-2 lg:grid-cols-3'
+            : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
 
-      <div className="flex-1 flex flex-col justify-between p-6 overflow-hidden relative">
+  const meetingContent = (
+    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken text-text select-none">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
         {inMeeting && (
           <div className="absolute top-4 left-6 right-6 flex justify-between items-center z-25 pointer-events-none">
             {isRecording && (
@@ -1612,9 +1699,9 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
             )}
           </div>
         ) : (
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto max-h-[75vh] p-2 no-scrollbar">
+          <div className={`grid min-h-0 flex-1 gap-3 overflow-hidden ${gridColsClass}`}>
             {Object.entries(meetingParticipants).map(([id, part]) => (
-              <div key={id} className="h-48 md:h-56 relative rounded-2xl overflow-hidden border border-border">
+              <div key={id} className="relative min-h-0 h-full overflow-hidden rounded-2xl border border-border">
                 <ParticipantTile
                   participantId={id}
                   part={part}
@@ -1636,9 +1723,12 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
             ))}
           </div>
         )}
+      </div>
+      </div>
 
-        {inMeeting && admitted && (
-          <div className="h-16 bg-card/90 border border-border px-4 py-2.5 rounded-full flex items-center justify-between shrink-0 max-w-3xl mx-auto w-full shadow-card mt-4 select-none gap-1">
+      {inMeeting && admitted && (
+        <div className="z-20 flex h-[4.5rem] w-full shrink-0 items-center justify-center border-t border-border bg-card-sunken/95 px-3 py-2">
+          <div className="flex h-16 w-full max-w-3xl items-center justify-between gap-1 rounded-full border border-border bg-card/90 px-4 py-2.5 shadow-card">
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -1675,30 +1765,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               >
                 <Hand className="w-4 h-4" />
               </button>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowReactionPicker((v) => !v)}
-                  className={`p-2.5 rounded-xl cursor-pointer border ${showReactionPicker ? 'bg-primary text-on-primary border-primary' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
-                  title="Reactions"
-                >
-                  <Smile className="w-4 h-4" />
-                </button>
-                {showReactionPicker && (
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex gap-1 bg-card border border-border rounded-xl p-2 shadow-lg z-50">
-                    {REACTIONS.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        onClick={() => sendReaction(e)}
-                        className="text-lg hover:scale-125 transition-transform cursor-pointer px-1"
-                      >
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
 
               <button
                 type="button"
@@ -1878,11 +1944,11 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {inMeeting && activeSidePanel && (
-        <div className="w-80 border-l border-border bg-card flex flex-col shrink-0">
+        <div className="absolute top-0 right-0 bottom-[4.5rem] z-30 flex w-80 max-w-[90vw] flex-col border-l border-border bg-card shadow-xl">
           <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
             <span className="font-bold text-xs uppercase tracking-wider text-muted">
               {activeSidePanel === 'chat' ? 'Meeting Chat' : 'Participants & Host'}

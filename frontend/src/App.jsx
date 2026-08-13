@@ -6,7 +6,7 @@ import AppNavbar from './components/AppNavbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import InviteWorkspacePage from './components/InviteWorkspacePage'
 import WorkspaceRoute, { WorkspaceLoadingShell } from './components/WorkspaceRoute'
-import api from './services/api'
+import api from './services/api' 
 import { useAuth } from './hooks/useAuth'
 import { addWorkspaceNotification } from './components/utils/notifications'
 import GlobalMeetings from './components/GlobalMeetings'
@@ -28,7 +28,7 @@ import {
   writeJsonCache
 } from './utils/workspaceStorage'
 
-// Route-level code splitting: keep the auth/dashboard shell out of heavy editor chunks.
+// what below will does ? ans : The code snippet you provided is a React application that serves as the main entry point for a web application. It sets up routing, authentication, workspace management, and global UI components. Here's a breakdown of what the code does:
 const Dashboard = lazy(() => import('./components/Dashboard'))
 const WorkspaceHome = lazy(() => import('./components/WorkspaceHome'))
 const LandingPage = lazy(() => import('./components/LandingPage'))
@@ -208,7 +208,12 @@ export default function App() {
   }, [user, profileComplete, loadWorkspaces, replaceRecentWorkspaces, replaceWorkspaces])
 
   const createWorkspace = async (payload) => {
-    if (workspaces.length >= 6) {
+    const userId = String(user?._id || user?.id || '')
+    const ownedCount = workspaces.filter((workspace) => {
+      const ownerId = workspace?.owner?._id || workspace?.owner
+      return userId && String(ownerId) === userId
+    }).length
+    if (ownedCount >= 6) {
       toast.error('Maximum 6 workspaces can be created.')
       return
     }
@@ -410,7 +415,7 @@ export default function App() {
   )
 
   const goToDashboard = useCallback(() => {
-    setActiveWorkspace(null)
+    setActiveWorkspace(null)// 
     clearLastWorkspaceId()
     navigate('/dashboard', { replace: true })
   }, [navigate])

@@ -127,7 +127,7 @@ export default function PropertiesPanel({ selectedElems = [], selectedElem, onFo
                   key={a}
                   type="button"
                   onClick={() => handleAlign(a)}
-                  className="rounded border border-border bg-card-sunken p-1 text-xs capitalize hover:bg-slate-200 dark:hover:bg-slate-700"
+                  className="rounded border border-border bg-card-sunken p-1 text-xs capitalize hover:bg-slate-200"
                 >
                   {a}
                 </button>

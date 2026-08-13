@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Workspace = require('../models/Workspace');
+const logger = require('../utils/logger');
 
 const USER_SELECT = 'fullName username email avatar';
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -214,8 +215,8 @@ const markLegacyRoomArchived = async (workspaceId, userId, archivedAt) => {
         }
       }
     );
-  } catch {
-    // Workspace metadata is authoritative; room data may live in a separate legacy service.
+  } catch (err) {
+    logger.warn(`Legacy rooms archive skipped: ${err.message}`)
   }
 };
 
@@ -858,15 +859,45 @@ const markNotificationRead = async (userId, notificationId) => {
   return { success: true };
 };
 
+const getTaskEndDate = (task) => {
+  if (!task?.date) return null;
+  const rawTime = task.endTime || '';
+  if (rawTime && /^\d{1,2}:\d{2}/.test(rawTime)) {
+    const normalized = rawTime.length === 5 ? `${rawTime}:00` : rawTime;
+    const dated = new Date(`${task.date}T${normalized}`);
+    if (!Number.isNaN(dated.getTime())) return dated;
+  }
+  const endOfDay = new Date(`${task.date}T23:59:59`);
+  return Number.isNaN(endOfDay.getTime()) ? null : endOfDay;
+};
+
+const completeOverdueTasksInWorkspace = async (workspace) => {
+  if (!workspace?.tasks?.length) return false;
+  const now = Date.now();
+  let changed = false;
+  for (const task of workspace.tasks) {
+    if (task.completed || task.status === 'completed') continue;
+    const end = getTaskEndDate(task);
+    if (!end || end.getTime() > now) continue;
+    task.completed = true;
+    task.status = 'completed';
+    changed = true;
+  }
+  if (changed) await workspace.save();
+  return changed;
+};
+
 const listTasks = async (userId, workspaceId) => {
   validateObjectId(workspaceId);
-  const workspace = await populateWorkspace(Workspace.findById(workspaceId));
+  const workspace = await Workspace.findById(workspaceId);
 
   if (!workspace || workspace.archivedAt || !isWorkspaceMember(workspace, userId)) {
     throw createError('Workspace not found', 404);
   }
 
-  return cleanWorkspace(workspace, userId).tasks || [];
+  await completeOverdueTasksInWorkspace(workspace);
+  const populated = await populateWorkspace(Workspace.findById(workspaceId));
+  return cleanWorkspace(populated, userId).tasks || [];
 };
 
 const createTask = async (userId, workspaceId, payload) => {

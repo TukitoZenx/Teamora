@@ -1,15 +1,40 @@
-import { useState, useRef, useEffect } from 'react'
-import { Menu, Search, Users, Calendar, X, UserPlus, Sun, Moon, ChevronLeft } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import {
+  Menu,
+  Search,
+  Users,
+  Calendar,
+  X,
+  UserPlus,
+  Sun,
+  Moon,
+  ChevronLeft,
+  FileText,
+  TableProperties,
+  Presentation,
+  Paintbrush,
+  Folder
+} from 'lucide-react'
 import toast from 'react-hot-toast'
+import api from '../../../services/api'
 import NotificationButton from './NotificationButton'
 import ProfileDropdown from './ProfileDropdown'
+
+const FILE_KIND_META = {
+  document: { icon: FileText, section: 'documents', label: 'Document' },
+  spreadsheet: { icon: TableProperties, section: 'spreadsheet', label: 'Spreadsheet' },
+  presentation: { icon: Presentation, section: 'presentation', label: 'Presentation' },
+  whiteboard: { icon: Paintbrush, section: 'whiteboard', label: 'Whiteboard' }
+}
 
 export default function WorkspaceNavbar({
   workspace,
   onOpenSidebar,
   onWorkspaceSettings,
   onLeaveWorkspace,
-  onSelectSection
+  onSelectSection,
+  workspaceFiles = [],
+  onOpenFile
 }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -58,26 +83,59 @@ export default function WorkspaceNavbar({
   const isDarkMode =
     theme === 'Dark' || (theme === 'System' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
+  const [fetchedTasks, setFetchedTasks] = useState([])
+
+  useEffect(() => {
+    const workspaceId = workspace?._id
+    if (!workspaceId) return undefined
+    let cancelled = false
+    api
+      .get(`/api/v1/workspaces/${workspaceId}/tasks`)
+      .then(({ data }) => {
+        if (!cancelled && Array.isArray(data?.tasks)) setFetchedTasks(data.tasks)
+      })
+      .catch(() => {
+        // Keep whatever we already have — search remains workspace-scoped.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [workspace?._id])
+
   const cleanQuery = searchQuery.trim().toLowerCase()
 
-  const matchedMembers = cleanQuery
-    ? (workspace?.members || []).filter((m) => {
-        const name = (m.fullName || m.username || '').toLowerCase()
-        const email = (m.email || '').toLowerCase()
-        return name.includes(cleanQuery) || email.includes(cleanQuery)
-      })
-    : []
+  const matchedMembers = useMemo(() => {
+    if (!cleanQuery) return []
+    return (workspace?.members || []).filter((m) => {
+      const name = (m.fullName || m.username || '').toLowerCase()
+      const email = (m.email || '').toLowerCase()
+      return name.includes(cleanQuery) || email.includes(cleanQuery)
+    })
+  }, [cleanQuery, workspace?.members])
 
-  const matchedTasks = cleanQuery
-    ? (workspace?.tasks || []).filter((t) => {
-        const title = (t.title || '').toLowerCase()
-        const desc = (t.description || '').toLowerCase()
-        const assignee = (t.assignee || '').toLowerCase()
-        return title.includes(cleanQuery) || desc.includes(cleanQuery) || assignee.includes(cleanQuery)
-      })
-    : []
+  const taskIndex = Array.isArray(workspace?.tasks) && workspace.tasks.length > 0 ? workspace.tasks : fetchedTasks
 
-  const hasResults = matchedMembers.length > 0 || matchedTasks.length > 0
+  const matchedTasks = useMemo(() => {
+    if (!cleanQuery) return []
+    return (taskIndex || []).filter((t) => {
+      const title = (t.title || '').toLowerCase()
+      const desc = (t.description || '').toLowerCase()
+      const assignee = (t.assignee || '').toLowerCase()
+      return title.includes(cleanQuery) || desc.includes(cleanQuery) || assignee.includes(cleanQuery)
+    })
+  }, [cleanQuery, taskIndex])
+
+  const matchedFiles = useMemo(() => {
+    if (!cleanQuery) return []
+    return (workspaceFiles || []).filter((file) => {
+      if (!file || file.type === 'folder') return false
+      const name = String(file.name || '').toLowerCase()
+      const kind = String(file.kind || '').toLowerCase()
+      return name.includes(cleanQuery) || kind.includes(cleanQuery)
+    })
+  }, [cleanQuery, workspaceFiles])
+
+  const hasResults = matchedMembers.length > 0 || matchedTasks.length > 0 || matchedFiles.length > 0
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -117,15 +175,58 @@ export default function WorkspaceNavbar({
     setIsOpen(false)
     setSearchQuery('')
     setMobileSearchOpen(false)
-    onSelectSection?.('calendar')
+    onSelectSection?.('tasks')
+  }
+
+  const handleSelectFile = (file) => {
+    setIsOpen(false)
+    setSearchQuery('')
+    setMobileSearchOpen(false)
+    if (onOpenFile) {
+      onOpenFile(file)
+      return
+    }
+    const section = FILE_KIND_META[file?.kind]?.section
+    if (section) onSelectSection?.(section)
   }
 
   const searchDropdown = isOpen && cleanQuery && (
     <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-border bg-card-elevated p-3 shadow-modal z-50 max-h-80 overflow-y-auto space-y-3">
       {!hasResults ? (
-        <p className="text-xs text-muted italic py-3 text-center">No matching members or tasks found.</p>
+        <p className="text-xs text-muted italic py-3 text-center">
+          No matching documents, files, members, or tasks.
+        </p>
       ) : (
         <>
+          {matchedFiles.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 px-2 mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">
+                <FileText className="w-3 h-3 text-primary" />
+                <span>Files ({matchedFiles.length})</span>
+              </div>
+              <div className="space-y-1">
+                {matchedFiles.map((file) => {
+                  const meta = FILE_KIND_META[file.kind] || { icon: Folder, label: 'File' }
+                  const Icon = meta.icon
+                  return (
+                    <button
+                      key={file.id}
+                      type="button"
+                      onClick={() => handleSelectFile(file)}
+                      className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-primary/10 text-left transition-colors cursor-pointer"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span className="text-xs font-semibold text-text truncate">{file.name}</span>
+                      </span>
+                      <span className="text-[10px] text-muted uppercase">{meta.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {matchedMembers.length > 0 && (
             <div>
               <div className="flex items-center gap-1.5 px-2 mb-1.5 text-[10px] font-bold text-muted uppercase tracking-wider">
@@ -209,7 +310,7 @@ export default function WorkspaceNavbar({
                 }}
                 onFocus={() => setIsOpen(true)}
                 className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm text-text outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-muted/50"
-                placeholder="Search members or tasks..."
+                placeholder="Search documents, files, members, tasks..."
                 aria-label={`Search inside ${workspace?.name || 'current workspace'}`}
               />
               {searchQuery && (
@@ -270,7 +371,7 @@ export default function WorkspaceNavbar({
                 }}
                 onFocus={() => setIsOpen(true)}
                 className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-text outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 placeholder:text-muted/50"
-                placeholder="Search members or tasks... Ctrl+K"
+                placeholder="Search documents, files, members, tasks... Ctrl+K"
                 aria-label={`Search inside ${workspace?.name || 'current workspace'}`}
               />
               {searchQuery && (

@@ -10,9 +10,10 @@ import Documents from '../Documents'
 import { getWorkspaceContent, putWorkspaceContent } from '../../services/workspaceContent'
 import { connectRestYjsProvider } from '../../services/restYjsProvider'
 import { pickPresenceColor } from '../../services/collabSocket'
+import { stripPaginationFromHtml } from '../editor/pageFlow'
 
 const FONT_WHITELIST = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
-const SIZE_WHITELIST = ['12px', '14px', '16px', '18px', '24px', '32px']
+const SIZE_WHITELIST = ['12px', '14px', '16px', '18px', '24px', '32px', '48px', '64px', '72px']
 
 let formatsRegistered = false
 const registerQuillFormats = () => {
@@ -338,7 +339,7 @@ export default function DocumentsSection({
     try {
       await providerRef.current?.flush?.()
       const quill = quillRef.current
-      const html = quill?.root?.innerHTML || ''
+      const html = stripPaginationFromHtml(quill?.root?.innerHTML || '')
       const name = window.prompt(
         'Save As — file name',
         `${activeFile?.name?.replace(/\.[^.]+$/, '') || 'Document'} (Copy).doc`

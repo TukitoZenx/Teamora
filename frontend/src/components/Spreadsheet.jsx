@@ -123,10 +123,105 @@ export default function Spreadsheet({
 
   const [rowCount, setRowCount] = useState(100)
   const [columnCount, setColumnCount] = useState(26)
+  const DEFAULT_COL_W = 112
+  const DEFAULT_ROW_H = 28
+  const [colWidths, setColWidths] = useState(() => roomSettings.colWidths || {})
+  const [rowHeights, setRowHeights] = useState(() => roomSettings.rowHeights || {})
+  const [collapsedCols, setCollapsedCols] = useState(() => roomSettings.collapsedCols || {})
+  const [collapsedRows, setCollapsedRows] = useState(() => roomSettings.collapsedRows || {})
+  const resizingRef = useRef(null)
 
   const cellRefs = useRef({})
   const gridContainerRef = useRef(null)
   const fillDragRef = useRef(null)
+
+  const persistSheetLayout = (patch) => {
+    const updatedSettings = {
+      ...roomSettings,
+      ...patch
+    }
+    setRoomSettings?.(updatedSettings)
+    socket?.emit?.('update-room-settings', { roomId, settings: updatedSettings })
+  }
+
+  const colWidth = (cIdx) => {
+    if (collapsedCols[cIdx]) return 18
+    const w = Number(colWidths[cIdx])
+    return Number.isFinite(w) ? Math.max(24, w) : DEFAULT_COL_W
+  }
+
+  const rowHeight = (rIdx) => {
+    if (collapsedRows[rIdx]) return 10
+    const h = Number(rowHeights[rIdx])
+    return Number.isFinite(h) ? Math.max(16, h) : DEFAULT_ROW_H
+  }
+
+  const startAxisResize = (event, axis, index) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const start = axis === 'col' ? event.clientX : event.clientY
+    const origin = axis === 'col' ? colWidth(index) : rowHeight(index)
+    resizingRef.current = { axis, index, start, origin }
+    const root = gridContainerRef.current
+    if (root) {
+      root.dataset.resizing = axis
+      root.style.cursor = axis === 'col' ? 'col-resize' : 'row-resize'
+    }
+
+    const onMove = (moveEvent) => {
+      const drag = resizingRef.current
+      if (!drag) return
+      const delta = (drag.axis === 'col' ? moveEvent.clientX : moveEvent.clientY) - drag.start
+      const next = Math.max(drag.axis === 'col' ? 24 : 16, Math.round(drag.origin + delta))
+      if (drag.axis === 'col') {
+        setColWidths((current) => {
+          const updated = { ...current, [drag.index]: next }
+          drag.latest = updated
+          return updated
+        })
+      } else {
+        setRowHeights((current) => {
+          const updated = { ...current, [drag.index]: next }
+          drag.latest = updated
+          return updated
+        })
+      }
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      if (root) {
+        delete root.dataset.resizing
+        root.style.cursor = ''
+      }
+      const drag = resizingRef.current
+      resizingRef.current = null
+      if (!drag) return
+      if (drag.axis === 'col') {
+        persistSheetLayout({ colWidths: drag.latest || colWidths })
+      } else {
+        persistSheetLayout({ rowHeights: drag.latest || rowHeights })
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  const toggleColCollapse = (cIdx) => {
+    setCollapsedCols((current) => {
+      const next = { ...current, [cIdx]: !current[cIdx] }
+      persistSheetLayout({ collapsedCols: next })
+      return next
+    })
+  }
+
+  const toggleRowCollapse = (rIdx) => {
+    setCollapsedRows((current) => {
+      const next = { ...current, [rIdx]: !current[rIdx] }
+      persistSheetLayout({ collapsedRows: next })
+      return next
+    })
+  }
 
   /** Excel-style autofill: numbers/dates sequences, formula relative adjust, copy otherwise. */
   const autofillValue = (sourceValue, offset, axis = 'row') => {
@@ -664,16 +759,29 @@ export default function Spreadsheet({
           ref={gridContainerRef}
           onScroll={handleGridScroll}
         >
-          <table className="w-max min-w-full border-collapse">
+          <table className="w-max min-w-full border-collapse table-fixed">
             <thead>
               <tr className="select-none bg-card-sunken/80">
                 <th className="sticky left-0 top-0 z-30 h-7 w-10 border border-border bg-card-sunken" />
                 {visibleGridRows[0]?.map((_, cIdx) => (
                   <th
                     key={cIdx}
-                    className="sticky top-0 z-20 w-28 border border-border bg-card-sunken/90 text-center text-[10px] font-bold uppercase tracking-wider text-muted"
+                    className="relative sticky top-0 z-20 border border-border bg-card-sunken/90 text-center text-[10px] font-bold uppercase tracking-wider text-muted"
+                    style={{ width: colWidth(cIdx), minWidth: colWidth(cIdx), maxWidth: colWidth(cIdx) }}
+                    onDoubleClick={(e) => {
+                      e.preventDefault()
+                      toggleColCollapse(cIdx)
+                    }}
+                    title="Drag edge to resize · double-click to collapse"
                   >
-                    <span>{getColumnHeaderLabel(cIdx)}</span>
+                    <span className={collapsedCols[cIdx] ? 'sr-only' : ''}>{getColumnHeaderLabel(cIdx)}</span>
+                    <div
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Resize column ${getColumnHeaderLabel(cIdx)}`}
+                      className="absolute right-0 top-0 z-30 h-full w-1.5 cursor-col-resize hover:bg-primary/50"
+                      onMouseDown={(e) => startAxisResize(e, 'col', cIdx)}
+                    />
                   </th>
                 ))}
               </tr>
@@ -687,8 +795,23 @@ export default function Spreadsheet({
                     key={rIdx}
                     className={isFrozenRow ? 'sticky top-7 z-20 bg-primary/10 shadow-sm' : 'hover:bg-primary/5'}
                   >
-                    <td className="sticky left-0 z-20 h-7 w-10 select-none border border-border bg-card-sunken text-center text-[10px] font-bold text-muted">
-                      {rIdx + 1}
+                    <td
+                      className="relative sticky left-0 z-20 w-10 select-none border border-border bg-card-sunken text-center text-[10px] font-bold text-muted"
+                      style={{ height: rowHeight(rIdx) }}
+                      onDoubleClick={(e) => {
+                        e.preventDefault()
+                        toggleRowCollapse(rIdx)
+                      }}
+                      title="Drag edge to resize · double-click to collapse"
+                    >
+                      <span className={collapsedRows[rIdx] ? 'sr-only' : ''}>{rIdx + 1}</span>
+                      <div
+                        role="separator"
+                        aria-orientation="horizontal"
+                        aria-label={`Resize row ${rIdx + 1}`}
+                        className="absolute bottom-0 left-0 z-30 h-1.5 w-full cursor-row-resize hover:bg-primary/50"
+                        onMouseDown={(e) => startAxisResize(e, 'row', rIdx)}
+                      />
                     </td>
                     {row.map((cell, cIdx) => {
                       const isActive = activeCell?.r === rIdx && activeCell?.c === cIdx
@@ -703,8 +826,14 @@ export default function Spreadsheet({
                       return (
                         <td
                           key={cIdx}
-                          style={formatStyle}
-                          className={`relative h-7 w-28 border border-border p-0 ${
+                          style={{
+                            ...formatStyle,
+                            width: colWidth(cIdx),
+                            minWidth: colWidth(cIdx),
+                            maxWidth: colWidth(cIdx),
+                            height: rowHeight(rIdx)
+                          }}
+                          className={`relative border border-border p-0 ${
                             isActive
                               ? 'z-10 bg-primary/5 ring-2 ring-inset ring-primary'
                               : isFrozenCol
@@ -712,6 +841,7 @@ export default function Spreadsheet({
                                 : ''
                           }`}
                           onMouseDown={(e) => {
+                            if (resizingRef.current) return
                             // Activate cell without mounting an input on every cell.
                             if (!isActive && e.button === 0) {
                               setActiveCell({ r: rIdx, c: cIdx })

@@ -24,20 +24,30 @@ const initTransporter = () => {
   });
 };
 
+const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
 const sendReminderEmail = async (email, taskTitle, workspaceName, reminderNumber, totalReminders) => {
   if (!transporter) return;
+  if (!/^\S+@\S+\.\S+$/.test(String(email || ''))) return;
 
   const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || '"Teamora Collab" <noreply@example.com>';
+  const safeTitle = escapeHtml(taskTitle);
+  const safeWorkspace = escapeHtml(workspaceName);
 
   const mailOptions = {
     from,
     to: email,
-    subject: `Task Reminder: ${taskTitle}`,
+    subject: `Task Reminder: ${String(taskTitle || '').replace(/[\r\n]+/g, ' ')}`,
     text: `You have a reminder for the task: "${taskTitle}" in workspace "${workspaceName}".\n\nThis is reminder ${reminderNumber} of ${totalReminders}.\n\nPlease check your workspace for more details.`,
     html: `
       <div style="font-family: sans-serif; padding: 20px;">
         <h2 style="color: #4f46e5;">Task Reminder</h2>
-        <p>You have a reminder for the task: <strong>${taskTitle}</strong> in workspace <strong>${workspaceName}</strong>.</p>
+        <p>You have a reminder for the task: <strong>${safeTitle}</strong> in workspace <strong>${safeWorkspace}</strong>.</p>
         <p style="color: #6b7280; font-size: 14px;">This is reminder ${reminderNumber} of ${totalReminders}.</p>
         <p>Please log in to your Teamora Collab workspace to view more details.</p>
       </div>
@@ -60,9 +70,16 @@ const processReminders = async () => {
 
     // Find workspaces that have tasks with active reminders
     const workspaces = await Workspace.find({
-      'tasks.reminderEnabled': true,
-      'tasks.nextReminderTime': { $lte: now },
-      $expr: { $lt: ['$tasks.remindersSent', '$tasks.reminderLimit'] }
+      archivedAt: null,
+      tasks: {
+        $elemMatch: {
+          reminderEnabled: true,
+          reminderEmail: { $gt: '' },
+          nextReminderTime: { $lte: now },
+          completed: { $ne: true },
+          status: { $ne: 'completed' }
+        }
+      }
     });
 
     for (const workspace of workspaces) {
@@ -74,7 +91,9 @@ const processReminders = async () => {
           task.nextReminderTime &&
           task.nextReminderTime <= now &&
           task.remindersSent < task.reminderLimit &&
-          task.reminderEmail
+          task.reminderEmail &&
+          !task.completed &&
+          task.status !== 'completed'
         ) {
           // Send the email
           await sendReminderEmail(
@@ -109,15 +128,62 @@ const processReminders = async () => {
   }
 };
 
+const getTaskEndDate = (task) => {
+  if (!task?.date) return null;
+  const rawTime = task.endTime || '';
+  if (rawTime && /^\d{1,2}:\d{2}/.test(rawTime)) {
+    const normalized = rawTime.length === 5 ? `${rawTime}:00` : rawTime;
+    const dated = new Date(`${task.date}T${normalized}`);
+    if (!Number.isNaN(dated.getTime())) return dated;
+  }
+  const endOfDay = new Date(`${task.date}T23:59:59`);
+  return Number.isNaN(endOfDay.getTime()) ? null : endOfDay;
+};
+
+const processOverdueTasks = async () => {
+  try {
+    const now = Date.now();
+    const workspaces = await Workspace.find({
+      archivedAt: null,
+      tasks: {
+        $elemMatch: {
+          completed: { $ne: true },
+          status: { $ne: 'completed' },
+          date: { $exists: true, $ne: '' }
+        }
+      }
+    }).select('tasks');
+
+    for (const workspace of workspaces) {
+      let changed = false;
+      for (const task of workspace.tasks) {
+        if (task.completed || task.status === 'completed') continue;
+        const end = getTaskEndDate(task);
+        if (!end || end.getTime() > now) continue;
+        task.completed = true;
+        task.status = 'completed';
+        task.reminderEnabled = false;
+        changed = true;
+      }
+      if (changed) await workspace.save();
+    }
+  } catch (error) {
+    logger.error('Error auto-completing overdue tasks', error);
+  }
+};
+
 const startReminderService = () => {
   initTransporter();
 
+  cron.schedule('* * * * *', async () => {
+    await processOverdueTasks();
+    if (transporter) await processReminders();
+  });
+
   if (transporter) {
-    logger.info('Starting email reminder cron service');
-    // Run every minute
-    cron.schedule('* * * * *', processReminders);
+    logger.info('Starting email reminder + task completion cron service');
   } else {
-    logger.info('Skipping email reminder cron service (SMTP missing)');
+    logger.info('Starting task completion cron service (SMTP missing — email reminders skipped)');
   }
 };
 

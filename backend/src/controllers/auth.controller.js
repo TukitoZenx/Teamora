@@ -131,7 +131,8 @@ const google = (req, res, next) => {
 
   return passport.authenticate('google', {
     scope: ['profile', 'email'],
-    session: true
+    session: true,
+    state: true
   })(req, res, next);
 };
 

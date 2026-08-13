@@ -17,6 +17,14 @@ const isExempt = (req) => {
 
 const generateToken = () => crypto.randomBytes(32).toString('hex');
 
+const tokensEqual = (left, right) => {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+};
+
 const cookieOptions = () => ({
   // Readable by the SPA so it can copy the value into X-XSRF-TOKEN.
   // Cross-origin SPAs also fetch the token from GET /api/auth/csrf.
@@ -56,8 +64,9 @@ const verifyCsrf = (req, res, next) => {
   const sessionToken = req.session?.csrfToken;
   const headerToken =
     req.get('X-XSRF-TOKEN') || req.get('x-xsrf-token') || req.get('X-CSRF-TOKEN') || req.get('x-csrf-token');
+  const cookieToken = req.cookies?.['XSRF-TOKEN'];
 
-  if (!sessionToken || !headerToken || headerToken !== sessionToken) {
+  if (!sessionToken || !headerToken || !tokensEqual(headerToken, sessionToken)) {
     return res.status(403).json({
       success: false,
       message: 'Invalid CSRF token'
@@ -65,8 +74,7 @@ const verifyCsrf = (req, res, next) => {
   }
 
   // Optional double-submit: if the cookie is present, it must also match.
-  const cookieToken = req.cookies?.['XSRF-TOKEN'];
-  if (cookieToken && cookieToken !== sessionToken) {
+  if (cookieToken && !tokensEqual(cookieToken, sessionToken)) {
     return res.status(403).json({
       success: false,
       message: 'Invalid CSRF token'

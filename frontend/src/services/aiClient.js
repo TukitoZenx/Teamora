@@ -112,8 +112,13 @@ export const getCommandStream = (command, selectedText, fullText) => {
   return fetchAiStream('/api/v1/ai/command', { command, selectedText, fullText })
 }
 
-export const getGenerateStream = (prompt) => {
-  return fetchAiStream('/api/v1/ai/generate', { prompt })
+export const getGenerateStream = (prompt, extras = {}) => {
+  return fetchAiStream('/api/v1/ai/generate', {
+    prompt,
+    selectedText: extras.selectedText || '',
+    documentContext: extras.documentContext || '',
+    mode: extras.mode || ''
+  })
 }
 
 export const generateSlides = async (prompt) => {

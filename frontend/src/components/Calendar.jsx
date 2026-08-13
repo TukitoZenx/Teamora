@@ -91,6 +91,18 @@ const getReminderMinutes = (reminder) => {
   return null
 }
 
+const getTaskDeadline = (task) => {
+  if (!task?.date) return null
+  const rawTime = task.endTime || ''
+  if (rawTime && /^\d{1,2}:\d{2}/.test(rawTime)) {
+    const normalized = rawTime.length === 5 ? `${rawTime}:00` : rawTime
+    const dated = new Date(`${task.date}T${normalized}`)
+    if (!Number.isNaN(dated.getTime())) return dated
+  }
+  const endOfDay = new Date(`${task.date}T23:59:59`)
+  return Number.isNaN(endOfDay.getTime()) ? null : endOfDay
+}
+
 const getReminderTriggerTime = (task) => {
   const minutes = getReminderMinutes(task?.reminder)
   if (minutes === null || !task?.date) return null
@@ -157,6 +169,7 @@ export default function Calendar({
 
   const canEdit = currentUserRole !== 'viewer' && currentUserRole !== 'commenter'
   const todayKey = toDateKey(new Date())
+  const completingIdsRef = useRef(new Set())
 
   const monthLabel = useMemo(
     () => currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
@@ -220,12 +233,53 @@ export default function Calendar({
     return () => tasksChannel.off('tasks-updated', handleTasksUpdate)
   }, [tasksChannel, fetchTasks])
 
+  const autoCompleteOverdueTasks = useCallback(async () => {
+    if (!canEdit || !workspaceId) return
+    const now = Date.now()
+    const overdue = tasks.filter((task) => {
+      const id = getTaskId(task)
+      if (!id || task.completed || task.status === 'completed') return false
+      if (completingIdsRef.current.has(id)) return false
+      const deadline = getTaskDeadline(task)
+      return Boolean(deadline && deadline.getTime() <= now)
+    })
+    if (overdue.length === 0) return
+
+    let completedAny = false
+    for (const task of overdue) {
+      const taskId = getTaskId(task)
+      completingIdsRef.current.add(taskId)
+      try {
+        const { data } = await api.patch(`/api/v1/workspaces/${workspaceId}/tasks/${taskId}`, {
+          completed: true,
+          status: 'completed'
+        })
+        setTasks((current) => current.map((item) => (getTaskId(item) === taskId ? data.task : item)))
+        completedAny = true
+      } catch {
+        // Keep trying on the next tick; do not loop a single failure immediately.
+      } finally {
+        completingIdsRef.current.delete(taskId)
+      }
+    }
+    if (completedAny) {
+      tasksChannel.emit('tasks-updated', {})
+    }
+  }, [canEdit, workspaceId, tasks, tasksChannel])
+
+  useEffect(() => {
+    autoCompleteOverdueTasks()
+    const timer = window.setInterval(autoCompleteOverdueTasks, 30000)
+    return () => window.clearInterval(timer)
+  }, [autoCompleteOverdueTasks])
+
   useEffect(() => {
     const timers = tasks
       .map((task) => {
         const trigger = getReminderTriggerTime(task)
         if (!trigger || trigger.getTime() <= Date.now() || task.completed || task.status === 'completed') return null
         const delay = trigger.getTime() - Date.now()
+        if (delay > 2147483647) return null
         return window.setTimeout(() => {
           const message = `${task.title} is due ${task.startTime ? `at ${task.startTime}` : `on ${formatDate(task.date)}`}`
           toast(message, { icon: '⏰', duration: 8000 })
