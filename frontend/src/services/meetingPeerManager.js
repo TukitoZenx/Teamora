@@ -186,6 +186,16 @@ export class MeetingPeerManager {
 
   connect(peerId) {
     if (this.destroyed || !peerId || peerId === this.selfId) return
+    const existing = this.pcs.get(peerId)
+    if (
+      existing &&
+      (existing.connectionState === 'failed' ||
+        existing.connectionState === 'closed' ||
+        existing.connectionState === 'disconnected' ||
+        existing.signalingState === 'closed')
+    ) {
+      this.removePeer(peerId)
+    }
     this._ensurePc(peerId)
     if (this.shouldOffer(peerId)) {
       this._createOffer(peerId)

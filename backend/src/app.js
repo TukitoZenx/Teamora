@@ -19,16 +19,22 @@ const app = express();
 const { normalizeUrl, isAllowedDevelopmentLanOrigin } = require('./utils/origin.util');
 
 const clientUrl = normalizeUrl(process.env.CLIENT_URL || 'http://localhost:5173');
+const extraClientUrls = String(process.env.CLIENT_URLS || '')
+  .split(',')
+  .map((value) => normalizeUrl(value.trim()))
+  .filter(Boolean);
 const productionClientUrl = 'https://teamora-ruby.vercel.app';
 const allowedOrigins = new Set([
   clientUrl,
   productionClientUrl,
+  'https://teamora.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000'
+  'http://127.0.0.1:3000',
+  ...extraClientUrls
 ]);
-const isAllowedVercelPreview = (origin = '') => /^https:\/\/teamora-[a-z0-9-]+\.vercel\.app$/i.test(origin);
+const isAllowedVercelPreview = (origin = '') => /^https:\/\/teamora(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
 
 const isAllowedOrigin = (origin = '') =>
   !origin || allowedOrigins.has(origin) || isAllowedVercelPreview(origin) || isAllowedDevelopmentLanOrigin(origin);

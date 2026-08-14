@@ -1,10 +1,27 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
+import { clearStableMeetingClientId } from '../services/meetingSocket'
 
 const MeetingContext = createContext(null)
 
 export function useMeeting() {
   return useContext(MeetingContext)
+}
+
+const clearMeetingSession = (workspaceId) => {
+  try {
+    sessionStorage.removeItem('teamora-global-active-meeting')
+    sessionStorage.removeItem('teamora-in-call')
+    if (workspaceId) {
+      sessionStorage.removeItem(`teamora-auto-join-meeting`)
+      if (sessionStorage.getItem('teamora-auto-join-meeting') === workspaceId) {
+        sessionStorage.removeItem('teamora-auto-join-meeting')
+      }
+      clearStableMeetingClientId(workspaceId)
+    }
+  } catch {
+    // ignore
+  }
 }
 
 export function MeetingProvider({ children }) {
@@ -14,6 +31,7 @@ export function MeetingProvider({ children }) {
   const [activeMeetingWorkspace, setActiveMeetingWorkspace] = useState(null)
   const [isMinimized, setIsMinimized] = useState(false)
   const [portalTarget, setPortalTarget] = useState(null)
+  const [meetingEpoch, setMeetingEpoch] = useState(0)
 
   // --- RESTORING THE MEETING AFTER A PAGE REFRESH ---
   // Try to restore from sessionStorage on mount.
@@ -51,12 +69,19 @@ export function MeetingProvider({ children }) {
 
   // --- LEAVING A MEETING ---
   // Cleans up all the state and removes the meeting from browser memory.
-  // If we forgot to remove it from sessionStorage, the next time you log in, it would auto-join an empty ghost call!
+  // Meetings.jsx watches meetingEpoch / inMeeting and tears down media + signaling.
   const leaveMeeting = () => {
+    const workspaceId = activeMeetingWorkspace?._id || activeMeetingWorkspace?.workspaceId
     setInMeeting(false)
     setActiveMeetingWorkspace(null)
     setIsMinimized(false)
-    sessionStorage.removeItem('teamora-global-active-meeting')
+    setMeetingEpoch((n) => n + 1)
+    clearMeetingSession(workspaceId)
+    try {
+      window.dispatchEvent(new CustomEvent('teamora-leave-meeting', { detail: { workspaceId } }))
+    } catch {
+      // ignore
+    }
   }
 
   const toggleMinimize = () => setIsMinimized((prev) => !prev)
@@ -68,6 +93,7 @@ export function MeetingProvider({ children }) {
         activeMeetingWorkspace,
         isMinimized,
         portalTarget,
+        meetingEpoch,
         setPortalTarget,
         joinMeeting,
         leaveMeeting,

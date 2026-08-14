@@ -373,7 +373,15 @@ function ParticipantThumbnailList({
  */
 export default function Meetings({ socket, roomId, userName, isMaximized = true }) {
   const navigate = useNavigate()
-  const { isMinimized, toggleMinimize, leaveMeeting: globalLeaveMeeting, joinMeeting: globalJoinMeeting } = useMeeting()
+  const {
+    isMinimized,
+    toggleMinimize,
+    inMeeting: contextInMeeting,
+    activeMeetingWorkspace,
+    meetingEpoch,
+    leaveMeeting: globalLeaveMeeting,
+    joinMeeting: globalJoinMeeting
+  } = useMeeting()
   const [activeSpeakerId, setActiveSpeakerId] = useState(null)
   // Ref mirror avoids re-subscribing the speaking-interval effect on every speaker change.
   const activeSpeakerIdRef = useRef(null)
@@ -897,94 +905,114 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     [emitSignal, socketId]
   )
 
-  const handleLeaveMeeting = useCallback(() => {
-    rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Starting cleanup. isRecording=${isRecording}`)
-    setInMeeting(false)
-    setAdmitted(false)
+  const handleLeaveMeeting = useCallback(
+    (opts = {}) => {
+      rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Starting cleanup. isRecording=${isRecording}`)
+      inMeetingRef.current = false
+      setInMeeting(false)
+      setAdmitted(false)
 
-    if (localStreamRef.current) {
-      rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Stopping localStream tracks`)
-      localStreamRef.current.getTracks().forEach((track) => {
-        rtcLog(`[RTC-AUDIO-AUDIT]   - Stopping track id=${track.id} kind=${track.kind}`)
-        track.stop()
-      })
-      localStreamRef.current = null
-      setLocalStream(null)
-    }
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
-    if (canvasStreamRef.current) {
-      canvasStreamRef.current.getTracks().forEach((track) => track.stop())
-      canvasStreamRef.current = null
-    }
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach((track) => track.stop())
-      screenStreamRef.current = null
-    }
-    setScreenSharingActive(false)
-    if (localVideoRef.current) localVideoRef.current.srcObject = null
+      if (localStreamRef.current) {
+        rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Stopping localStream tracks`)
+        localStreamRef.current.getTracks().forEach((track) => {
+          rtcLog(`[RTC-AUDIO-AUDIT]   - Stopping track id=${track.id} kind=${track.kind}`)
+          track.stop()
+        })
+        localStreamRef.current = null
+        setLocalStream(null)
+      }
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
+      if (canvasStreamRef.current) {
+        canvasStreamRef.current.getTracks().forEach((track) => track.stop())
+        canvasStreamRef.current = null
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((track) => track.stop())
+        screenStreamRef.current = null
+      }
+      setScreenSharingActive(false)
+      if (localVideoRef.current) localVideoRef.current.srcObject = null
 
-    rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Destroying peer manager and remote streams`)
-    destroyPeerManager()
-    setRemoteStreams({})
-    setPeerStates({})
-    Object.keys(audioAnalysersRef.current).forEach(clearSpeakingMonitor)
+      rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Destroying peer manager and remote streams`)
+      destroyPeerManager()
+      setRemoteStreams({})
+      setPeerStates({})
+      Object.keys(audioAnalysersRef.current).forEach(clearSpeakingMonitor)
 
-    if (isRecording) {
-      clearInterval(recordIntervalRef.current)
-      setIsRecording(false)
-      setRecordingSeconds(0)
-    }
-    if (mediaRecorderRef.current?.state === 'recording') {
+      if (isRecording) {
+        clearInterval(recordIntervalRef.current)
+        setIsRecording(false)
+        setRecordingSeconds(0)
+      }
+      if (mediaRecorderRef.current?.state === 'recording') {
+        try {
+          mediaRecorderRef.current.stop()
+        } catch {
+          // ignore
+        }
+      }
+
+      socket?.emit?.('meeting-leave', { roomId, socketId, type: 'meeting-leave' })
+      const remaining = Object.keys(participantsRef.current).filter((id) => id !== socketId)
+      if (remaining.length === 0) {
+        socket?.emit?.('meeting-ended', { workspaceId: roomId, meetingId: `meet-${roomId}` })
+        dismissMeetingNotifications(roomId)
+      }
+      setMeetingParticipants({})
+      setHandRaised(false)
+      setPinnedId(null)
+      setActiveSidePanel(null)
+      if (!opts.silent) toast('Left the call', { icon: '🛑' })
       try {
-        mediaRecorderRef.current.stop()
+        sessionStorage.removeItem('teamora-in-call')
       } catch {
         // ignore
       }
-    }
-
-    socket?.emit?.('meeting-leave', { roomId, socketId })
-    const remaining = Object.keys(participantsRef.current).filter((id) => id !== socketId)
-    if (remaining.length === 0) {
-      socket?.emit?.('meeting-ended', { workspaceId: roomId, meetingId: `meet-${roomId}` })
-      dismissMeetingNotifications(roomId)
-    }
-    setMeetingParticipants({})
-    setHandRaised(false)
-    setPinnedId(null)
-    setActiveSidePanel(null)
-    toast('Left the call', { icon: '🛑' })
-    try {
-      sessionStorage.removeItem('teamora-in-call')
-    } catch {
-      // ignore
-    }
-    globalLeaveMeeting?.()
-    rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Cleanup finished`)
-  }, [socket, socketId, roomId, isRecording, destroyPeerManager, clearSpeakingMonitor, globalLeaveMeeting])
+      if (!opts.fromContext) {
+        globalLeaveMeeting?.()
+      }
+      rtcLog(`[RTC-AUDIO-AUDIT] [Leave Meeting] Cleanup finished`)
+    },
+    [socket, socketId, roomId, isRecording, destroyPeerManager, clearSpeakingMonitor, globalLeaveMeeting]
+  )
 
   useEffect(() => {
     handleLeaveRef.current = handleLeaveMeeting
   }, [handleLeaveMeeting])
 
+  useEffect(() => {
+    if (!contextInMeeting && inMeetingRef.current) {
+      handleLeaveRef.current({ fromContext: true, silent: true })
+    }
+  }, [contextInMeeting, meetingEpoch])
+
   const handleJoinMeeting = async () => {
     if (inMeeting || isJoining) return
-    if (!socketId || !socket?.connected) {
+    if (!socketId) {
+      toast.error('Connecting to server... please wait.')
+      return
+    }
+    if (typeof socket.whenReady === 'function') {
+      await socket.whenReady(4000)
+    }
+    if (!socket?.connected) {
       toast.error('Connecting to server... please wait.')
       return
     }
     setIsJoining(true)
     try {
       let stream = null
+      const audioConstraints = {
+        deviceId: selectedMic ? { exact: selectedMic } : undefined,
+        echoCancellation: true,
+        noiseSuppression,
+        autoGainControl: true
+      }
       try {
         rtcLog(`[RTC-AUDIO-AUDIT] [GetUserMedia] Requesting getUserMedia with video=true and full audio settings.`)
         stream = await navigator.mediaDevices.getUserMedia({
           video: selectedCam ? { deviceId: { exact: selectedCam } } : true,
-          audio: {
-            deviceId: selectedMic ? { exact: selectedMic } : undefined,
-            echoCancellation: true,
-            noiseSuppression,
-            autoGainControl: true
-          }
+          audio: audioConstraints
         })
         rtcLog(`[RTC-AUDIO-AUDIT] [GetUserMedia Success] streamId=${stream.id}`)
         stream.getTracks().forEach((track, idx) => {
@@ -995,10 +1023,17 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
         localStreamRef.current = stream
         setLocalStream(stream)
       } catch (err) {
-        console.error('[RTC-AUDIO-AUDIT] [GetUserMedia Failure] Real media devices fail, using fallback:', err)
-        stream = startMockVideoStream()
-        localStreamRef.current = stream
-        setLocalStream(stream)
+        console.error('[RTC-AUDIO-AUDIT] [GetUserMedia Failure] Trying audio-only before mock fallback:', err)
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: audioConstraints })
+          localStreamRef.current = stream
+          setLocalStream(stream)
+        } catch (audioErr) {
+          console.error('[RTC-AUDIO-AUDIT] [GetUserMedia Failure] Audio-only failed, using fallback:', audioErr)
+          stream = startMockVideoStream()
+          localStreamRef.current = stream
+          setLocalStream(stream)
+        }
       }
 
       setInMeeting(true)
@@ -1070,7 +1105,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       })
       try {
         sessionStorage.setItem('teamora-in-call', roomId)
-        globalJoinMeeting?.({ _id: roomId })
+        const workspace = activeMeetingWorkspace?._id === roomId ? activeMeetingWorkspace : { _id: roomId }
+        globalJoinMeeting?.(workspace)
       } catch {
         // ignore
       }
@@ -1083,18 +1119,18 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   }
 
   useEffect(() => {
-    if (
-      sessionStorage.getItem('teamora-in-call') === roomId &&
-      !inMeeting &&
-      !isJoining &&
-      socketId &&
-      socket?.connected
-    ) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      handleJoinMeeting()
+    const restoredCall = sessionStorage.getItem('teamora-in-call') === roomId
+    const restoredContext = Boolean(
+      contextInMeeting && (activeMeetingWorkspace?._id === roomId || !activeMeetingWorkspace)
+    )
+    if (restoredCall || restoredContext) {
+      if (!inMeeting && !isJoining && socketId && socket?.connected) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        handleJoinMeeting()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, inMeeting, isJoining, socketId])
+  }, [roomId, inMeeting, isJoining, socketId, socket?.connected, contextInMeeting])
 
   const toggleMic = () => {
     const nextState = !micActive
@@ -1306,7 +1342,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   useEffect(() => {
     if (!socket?.on || !socketId) return undefined
 
-    const onJoin = (p) => {
+    const onJoin = (raw) => {
+      const p = raw?.participant && typeof raw.participant === 'object' ? { ...raw, ...raw.participant } : raw
       if (!p?.socketId) return
 
       setMeetingParticipants((prev) => {
@@ -1318,12 +1355,22 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
       if (inMeetingRef.current && admittedRef.current && p.socketId !== socketId) {
         pushDiag(`peer join → connect ${p.socketId}`)
+        const existingPc = peerManagerRef.current?.pcs?.get(p.socketId)
+        if (
+          existingPc &&
+          (existingPc.connectionState === 'failed' ||
+            existingPc.connectionState === 'closed' ||
+            existingPc.connectionState === 'disconnected')
+        ) {
+          peerManagerRef.current.removePeer(p.socketId)
+        }
         connectToPeer(p.socketId)
       }
     }
 
-    const onLeave = (peerId) => {
-      if (!peerId) return
+    const onLeave = (raw) => {
+      const peerId = typeof raw === 'string' ? raw : raw?.socketId || raw?.clientId
+      if (!peerId || peerId === socketId) return
       pushDiag(`peer leave ${peerId}`)
       setMeetingParticipants((prev) => {
         const next = { ...prev }
@@ -1333,6 +1380,42 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
       peerManagerRef.current?.removePeer(peerId)
       setPinnedId((cur) => (cur === peerId ? null : cur))
+    }
+
+    const hydrateRoster = (payload) => {
+      const roster = payload?.participants
+      if (!roster || typeof roster !== 'object') return
+      setMeetingParticipants((prev) => {
+        const next = { ...prev }
+        Object.entries(roster).forEach(([id, part]) => {
+          const participant = part?.socketId ? part : { ...part, socketId: id }
+          next[participant.socketId || id] = { ...next[participant.socketId || id], ...participant }
+        })
+        return next
+      })
+      if (payload.hostSocketId) {
+        setHostInfo((cur) =>
+          cur.hostSocketId ? cur : { hostSocketId: payload.hostSocketId, hostName: payload.hostName || '' }
+        )
+      }
+      if (inMeetingRef.current && admittedRef.current) {
+        Object.keys(roster).forEach((id) => {
+          if (id !== socketId) connectToPeer(id)
+        })
+      }
+    }
+
+    const onWsJoined = () => {
+      if (!inMeetingRef.current || !admittedRef.current || !socketId) return
+      const { micActive: m, camActive: c, handRaised: h } = micCamHandRef.current
+      socket.emit('meeting-join', {
+        roomId,
+        participant: { socketId, user: userName, micActive: m, camActive: c, handRaised: h }
+      })
+      emitSignal(undefined, { type: 'sync-request', from: socketId })
+      Object.keys(participantsRef.current).forEach((id) => {
+        if (id !== socketId) connectToPeer(id)
+      })
     }
 
     const onStateChange = ({ socketId: peerSocketId, state }) => {
@@ -1481,6 +1564,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     socket.on('receive-meeting-signal', onSignal)
     socket.on('receive-meeting-host', onHostUpdate)
     socket.on('receive-message', onMessage)
+    socket.on('meeting-active-session', hydrateRoster)
+    socket.on('ws-joined', onWsJoined)
 
     return () => {
       socket.off?.('receive-meeting-join', onJoin)
@@ -1489,6 +1574,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       socket.off?.('receive-meeting-signal', onSignal)
       socket.off?.('receive-meeting-host', onHostUpdate)
       socket.off?.('receive-message', onMessage)
+      socket.off?.('meeting-active-session', hydrateRoster)
+      socket.off?.('ws-joined', onWsJoined)
     }
   }, [
     socket,
@@ -1525,25 +1612,17 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     video.playsInline = true
     video.play?.().catch(() => {})
   }, [inMeeting, admitted, meetingParticipants, camActive])
-  // Cleanup unmount
+  // Cleanup unmount — do not emit leave or clear teamora-in-call here.
+  // Refresh must reconnect to the same meeting; only explicit leave removes the user.
   useEffect(() => {
     const analysers = audioAnalysersRef.current
     return () => {
       destroyPeerManager()
-      try {
-        sessionStorage.removeItem('teamora-in-call')
-      } catch {
-        // ignore
-      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop())
       }
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach((t) => t.stop())
-      }
-      if (inMeetingRef.current) {
-        const signal = meetingSignalRef.current
-        signal.socket?.emit?.('meeting-leave', { roomId: signal.roomId, socketId: signal.socketId })
       }
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
       if (recordIntervalRef.current) clearInterval(recordIntervalRef.current)

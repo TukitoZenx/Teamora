@@ -5,8 +5,8 @@ import { addWorkspaceNotification, dismissMeetingNotifications } from '../compon
 /**
  * Always-on meeting start/end notifications (shares signaling socket with Meetings UI).
  */
-export default function useMeetingNotifications(workspaceId, currentUserName) {
-  const socket = useMeetingSignaling(workspaceId, currentUserName || 'Member')
+export default function useMeetingNotifications(workspaceId, currentUserName, currentUserId) {
+  const socket = useMeetingSignaling(workspaceId, currentUserName || 'Member', currentUserId)
   const [activeMeeting, setActiveMeeting] = useState(null)
 
   useEffect(() => {

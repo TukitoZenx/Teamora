@@ -308,6 +308,20 @@ export default function App() {
 
   const leaveWorkspace = useCallback(
     async (workspaceId, payload = {}) => {
+      // Leave the meetings URL first so the Call Lobby cannot remount on this page
+      // while the API is in flight. Tear down media/signaling immediately after.
+      setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
+      removeWorkspaceCache(workspaceId)
+      clearLastWorkspaceId(workspaceId)
+      try {
+        sessionStorage.removeItem('teamora-in-call')
+        sessionStorage.removeItem('teamora-auto-join-meeting')
+      } catch {
+        // ignore
+      }
+      leaveMeeting()
+      navigate('/dashboard', { replace: true })
+
       try {
         const { data } = await api.post(`/api/v1/workspaces/${workspaceId}/leave`, payload)
 
@@ -345,15 +359,8 @@ export default function App() {
             ]
           })
         }
-        setActiveWorkspace((current) => (current?._id === workspaceId ? null : current))
-        if (activeMeetingWorkspace?._id === workspaceId) {
-          leaveMeeting()
-        }
-        removeWorkspaceCache(workspaceId)
-        clearLastWorkspaceId(workspaceId)
 
         await loadWorkspaces()
-        navigate('/dashboard', { replace: true })
         if (data.workspaceDeleted) {
           toast.success('Workspace deleted because no members remained.')
         } else {
@@ -365,7 +372,7 @@ export default function App() {
         throw error
       }
     },
-    [activeMeetingWorkspace, leaveMeeting, loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
+    [leaveMeeting, loadWorkspaces, navigate, replaceRecentWorkspaces, replaceWorkspaces]
   )
 
   const fetchWorkspace = useCallback(
