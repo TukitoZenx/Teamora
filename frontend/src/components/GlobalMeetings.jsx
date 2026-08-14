@@ -91,9 +91,9 @@ export default function GlobalMeetings() {
         position: 'fixed',
         left: rect?.left || 0,
         top: rect?.top || 0,
-        width: rect?.width || '100%',
-        height: rect?.height || '100%',
-        zIndex: 50,
+        width: rect?.width || 0,
+        height: rect?.height || 0,
+        zIndex: 20,
         display: isTransitioning ? 'none' : 'block'
       }
     : {
