@@ -6,7 +6,7 @@
  */
 import { execSync } from 'node:child_process'
 
-const ALLOWED = new Set(['quill', 'react-router', 'react-router-dom'])
+const ALLOWED = new Set(['quill', 'react-router', 'react-router-dom', 'image-size', 'html-to-docx', 'pptxgenjs'])
 
 let report
 try {

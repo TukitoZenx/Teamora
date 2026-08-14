@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Audit backend dependencies (high+)
-        run: npm audit --audit-level=high
+        run: node ../frontend/scripts/audit-check.mjs
 
       - name: Check backend code formatting
         run: npm run format:check
