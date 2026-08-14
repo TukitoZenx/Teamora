@@ -1040,10 +1040,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
       setAdmitted(true)
       const ice = describeIceSetup()
       rtcLog(`[RTC-AUDIO-AUDIT] Joined call: hasTurn=${ice.hasTurn} turnCount=${ice.turnCount}`)
-      toast.success(
-        ice.hasTurn ? 'Joined meeting (TURN enabled)' : 'Joined — set VITE_TURN_* for multi-network reliability',
-        { icon: '📹', duration: ice.hasTurn ? 3000 : 5000 }
-      )
+      toast.success('Joined the meeting', { icon: '📹' })
       pushDiag(`joined ice hasTurn=${ice.hasTurn} self=${socketId}`)
 
       // First joiner claims host so waiting-room / host signals always have a target.
@@ -1678,8 +1675,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     return participantsList.filter((p) => p.id !== speakerId)
   }, [participantsList, speakerId])
 
-  const iceInfo = useMemo(() => describeIceSetup(), [])
-
   const participantCount = participantsList.length || Object.keys(meetingParticipants).length || (inMeeting ? 1 : 0)
   const gridColsClass =
     participantCount <= 1
@@ -1708,7 +1703,6 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                 <div className="flex items-center gap-1.5 bg-card/90 text-muted text-[10px] font-bold px-3 py-1.5 rounded-full shadow border border-border">
                   <Users className="w-3.5 h-3.5" />
                   <span>{Object.keys(meetingParticipants).length || 0}</span>
-                  {!iceInfo.hasTurn && <span className="text-warning">· No TURN</span>}
                 </div>
               </div>
             </div>
@@ -1721,8 +1715,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               </div>
               <h2 className="text-xl font-bold text-text mb-2">Teamora Call Lobby</h2>
               <p className="text-sm text-muted mb-4 font-medium">
-                Verify camera and microphone before joining. Mesh A/V works across tabs and devices via hybrid signaling
-                {iceInfo.hasTurn ? ' with TURN' : ''}.
+                Verify camera and microphone before joining. Audio and video work across tabs and devices.
               </p>
               <button
                 type="button"
