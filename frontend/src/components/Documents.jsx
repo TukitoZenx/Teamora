@@ -44,7 +44,7 @@ import {
   toColorInputValue
 } from './utils/canvasOverlays'
 import { reflowDocumentPages, stripPaginationFromHtml } from './editor/pageFlow'
-import { buildPrintHtml } from './editor/printDocument'
+import { buildPrintHtml, exportDocumentToPdf } from './editor/printDocument'
 
 const FONTS = ['Sans-Serif', 'Serif', 'Monospace', 'Georgia', 'Courier New', 'Trebuchet MS']
 // Match presentation font size choices for overlay text boxes / shapes.
@@ -253,34 +253,43 @@ export default function Documents({
     return () => el?.removeEventListener('scroll', handleScroll)
   }, [zoom, pageStride, stats.pages])
 
-  const syncActiveFormats = useCallback((range) => {
-    const quill = quillRef?.current
-    if (!quill) return
-    try {
-      const selection = range || quill.getSelection()
-      if (!selection) return
-      setHasEditorSelection(Boolean(selection.length > 0))
-      const fmt = quill.getFormat(selection) || {}
-      setActiveFormats({
-        bold: Boolean(fmt.bold),
-        italic: Boolean(fmt.italic),
-        underline: Boolean(fmt.underline),
-        strike: Boolean(fmt.strike),
-        align: fmt.align || '',
-        list: fmt.list || false,
-        background: Boolean(fmt.background)
-      })
-      if (fmt.font) {
-        const mapped =
-          fmt.font === 'sans-serif' ? 'Sans-Serif' : fmt.font === 'serif' ? 'Serif' : fmt.font === 'monospace' ? 'Monospace' : fmt.font
-        if (FONTS.includes(mapped)) setFontFamily(mapped)
+  const syncActiveFormats = useCallback(
+    (range) => {
+      const quill = quillRef?.current
+      if (!quill) return
+      try {
+        const selection = range || quill.getSelection()
+        if (!selection) return
+        setHasEditorSelection(Boolean(selection.length > 0))
+        const fmt = quill.getFormat(selection) || {}
+        setActiveFormats({
+          bold: Boolean(fmt.bold),
+          italic: Boolean(fmt.italic),
+          underline: Boolean(fmt.underline),
+          strike: Boolean(fmt.strike),
+          align: fmt.align || '',
+          list: fmt.list || false,
+          background: Boolean(fmt.background)
+        })
+        if (fmt.font) {
+          const mapped =
+            fmt.font === 'sans-serif'
+              ? 'Sans-Serif'
+              : fmt.font === 'serif'
+                ? 'Serif'
+                : fmt.font === 'monospace'
+                  ? 'Monospace'
+                  : fmt.font
+          if (FONTS.includes(mapped)) setFontFamily(mapped)
+        }
+        if (fmt.size && SIZES.includes(fmt.size)) setFontSize(fmt.size)
+        if (typeof fmt.color === 'string' && fmt.color.startsWith('#')) setTextColor(fmt.color)
+      } catch (err) {
+        console.warn('Could not read editor formats', err)
       }
-      if (fmt.size && SIZES.includes(fmt.size)) setFontSize(fmt.size)
-      if (typeof fmt.color === 'string' && fmt.color.startsWith('#')) setTextColor(fmt.color)
-    } catch (err) {
-      console.warn('Could not read editor formats', err)
-    }
-  }, [quillRef])
+    },
+    [quillRef]
+  )
 
   // Keep toolbar toggle state in sync with the actual caret/selection formats.
   useEffect(() => {
@@ -331,15 +340,13 @@ export default function Documents({
 
     const schedule = () => {
       if (paginateTimerRef.current) window.clearTimeout(paginateTimerRef.current)
-      paginateTimerRef.current = window.setTimeout(runPagination, 80)
+      paginateTimerRef.current = window.setTimeout(runPagination, 160)
     }
 
     runPagination()
     quill.on('text-change', schedule)
-    const interval = window.setInterval(runPagination, 1200)
     return () => {
       quill.off('text-change', schedule)
-      window.clearInterval(interval)
       if (paginateTimerRef.current) window.clearTimeout(paginateTimerRef.current)
     }
   }, [quillRef, editorReady, runPagination])
@@ -373,7 +380,7 @@ export default function Documents({
         'border:none',
         `background:${printLayout ? 'transparent' : sheetBg}`,
         `width:${pageW}px`,
-        `min-height:${pageDims.h}px`,
+        printLayout ? '' : `min-height:${pageDims.h}px`,
         'box-sizing:border-box',
         'outline:none'
       ].join(';')
@@ -612,22 +619,24 @@ export default function Documents({
         break
       }
       case 'exportPdf': {
-        const format = paperSize === 'Legal' ? 'legal' : paperSize === 'A4' ? 'a4' : 'letter'
-        const opt = {
-          margin: marginIn,
-          filename: `${docTitle}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: pageColor || '#ffffff' },
-          jsPDF: { unit: 'in', format, orientation: orientation === 'landscape' ? 'landscape' : 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'], after: '.page-break' }
-        }
-        const exportRoot = document.createElement('div')
-        exportRoot.innerHTML = DOMPurify.sanitize(stripPaginationFromHtml(quill.root.innerHTML))
-        // Dynamic import keeps html2pdf out of the initial documents chunk until export.
         toast.promise(
-          import('html2pdf.js').then((mod) => {
-            const html2pdf = mod.default || mod
-            return html2pdf().set(opt).from(exportRoot).save()
+          exportDocumentToPdf({
+            quill,
+            title: docTitle || 'Document',
+            bodyHtml: quill.root.innerHTML,
+            paperSize,
+            orientation,
+            marginIn,
+            pageColor,
+            textColor,
+            fontFamily,
+            fontSize,
+            lineSpacing,
+            columnsCount,
+            pageBorder,
+            overlays,
+            pageWidthPx: pageDims.w,
+            pageHeightPx: pageDims.h
           }),
           {
             loading: 'Preparing PDF export...',
@@ -635,35 +644,6 @@ export default function Documents({
             error: 'Failed to export PDF.'
           }
         )
-        break
-      }
-      case 'exportHtml': {
-        const htmlContent = buildPrintHtml({
-          title: docTitle || 'Document',
-          bodyHtml: DOMPurify.sanitize(quill.root.innerHTML),
-          paperSize,
-          orientation,
-          marginIn,
-          pageColor,
-          fontFamily,
-          fontSize,
-          lineSpacing,
-          columnsCount,
-          pageBorder,
-          overlays,
-          pageNumberFormat,
-          showPageNumbers
-        })
-        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `${docTitle || 'document'}.html`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-        toast.success('Exported as HTML.')
         break
       }
       case 'printDoc': {
@@ -680,6 +660,7 @@ export default function Documents({
             orientation,
             marginIn,
             pageColor,
+            textColor,
             fontFamily,
             fontSize,
             lineSpacing,
@@ -738,22 +719,17 @@ export default function Documents({
         break
       }
       case 'insertTable': {
-        const rows = prompt('Rows count:', '3')
-        const cols = prompt('Columns count:', '3')
-        if (rows && cols) {
-          let tableHTML = '<table class="w-full border-collapse border border-border my-4">'
-          for (let r = 0; r < parseInt(rows); r++) {
-            tableHTML += '<tr>'
-            for (let c = 0; c < parseInt(cols); c++) {
-              tableHTML += '<td class="border border-border p-2 min-w-[50px] text-xs">Cell</td>'
-            }
-            tableHTML += '</tr>'
-          }
-          tableHTML += '</table>'
+        const rows = parseInt(prompt('Rows count:', '3'), 10)
+        const cols = parseInt(prompt('Columns count:', '3'), 10)
+        if (rows && cols && !isNaN(rows) && !isNaN(cols)) {
           quill.focus()
-          const range = quill.getSelection() || { index: quill.getLength() }
-          pasteSafeHtml(quill, tableHTML, range.index)
-          toast.success('Table inserted!')
+          const tableModule = quill.getModule('table')
+          if (tableModule) {
+            tableModule.insertTable(rows, cols)
+            toast.success('Table inserted!')
+          } else {
+            toast.error('Table module not initialized.')
+          }
         }
         break
       }
@@ -832,6 +808,13 @@ export default function Documents({
         quill.focus()
         const rangeI = quill.getSelection() || { index: quill.getLength() }
         quill.insertText(rangeI.index, ' ⭐ ')
+        break
+      }
+      case 'insertCodeBlock': {
+        quill.focus()
+        const range = quill.getSelection() || { index: quill.getLength() }
+        quill.formatLine(range.index, 1, 'code-block', true)
+        toast.success('Code block inserted')
         break
       }
       case 'insertEquation': {
@@ -1177,20 +1160,12 @@ export default function Documents({
               <button
                 type="button"
                 role="menuitem"
+                data-doc-export="pdf"
                 onClick={() => handleMenuAction('exportPdf')}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
               >
                 <Download className="w-3.5 h-3.5" />
                 Export PDF
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => handleMenuAction('exportHtml')}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-primary/10 text-text hover:text-primary"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Export as HTML
               </button>
               <button
                 type="button"
@@ -1780,6 +1755,20 @@ export default function Documents({
                   )}
                 </div>
               ))}
+            {printLayout &&
+              Array.from({ length: Math.max(0, stats.pages - 1) }).map((_, i) => (
+                <div
+                  key={`page-gutter-${i}`}
+                  aria-hidden
+                  className="pointer-events-none absolute z-20 bg-slate-300 dark:bg-slate-900"
+                  style={{
+                    top: (i + 1) * pageDims.h + i * pageGap,
+                    height: pageGap,
+                    left: -96,
+                    width: pageDims.w + 192
+                  }}
+                />
+              ))}
 
             <div
               ref={pageShellRef}
@@ -2079,29 +2068,31 @@ export default function Documents({
                                 className="h-5 w-5 cursor-pointer rounded border border-border"
                               />
                             </label>
-                            <label className="flex items-center gap-0.5 text-[9px] text-muted" title="Border width (px)">
+                            <label
+                              className="flex items-center gap-0.5 text-[9px] text-muted"
+                              title="Border width (px)"
+                            >
                               W
                               <input
                                 type="number"
                                 min={0}
                                 max={24}
                                 value={item.borderWidth ?? 1}
-                                onChange={(e) =>
-                                  updateOverlay(item.id, { borderWidth: Number(e.target.value) || 0 })
-                                }
+                                onChange={(e) => updateOverlay(item.id, { borderWidth: Number(e.target.value) || 0 })}
                                 className="w-10 rounded border border-border bg-card-sunken px-1 py-0.5 text-[10px]"
                               />
                             </label>
-                            <label className="flex items-center gap-0.5 text-[9px] text-muted" title="Corner radius (px)">
+                            <label
+                              className="flex items-center gap-0.5 text-[9px] text-muted"
+                              title="Corner radius (px)"
+                            >
                               R
                               <input
                                 type="number"
                                 min={0}
                                 max={48}
                                 value={item.borderRadius ?? 4}
-                                onChange={(e) =>
-                                  updateOverlay(item.id, { borderRadius: Number(e.target.value) || 0 })
-                                }
+                                onChange={(e) => updateOverlay(item.id, { borderRadius: Number(e.target.value) || 0 })}
                                 className="w-10 rounded border border-border bg-card-sunken px-1 py-0.5 text-[10px]"
                               />
                             </label>

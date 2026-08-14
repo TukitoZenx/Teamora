@@ -767,9 +767,7 @@ export default function WorkspaceHome({
               onEdit={(messageId, text) => {
                 setChatMessages((current) => {
                   const next = current.map((msg) =>
-                    msg.id === messageId
-                      ? { ...msg, text, updatedAt: new Date().toISOString(), edited: true }
-                      : msg
+                    msg.id === messageId ? { ...msg, text, updatedAt: new Date().toISOString(), edited: true } : msg
                   )
                   persistChatMessages(next)
                   return next
@@ -1563,9 +1561,7 @@ function WorkspaceChat({ messages, userName, onSend, onEdit, onDelete }) {
                     </div>
                   ) : (
                     <>
-                      {message.text ? (
-                        <p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p>
-                      ) : null}
+                      {message.text ? <p className="whitespace-pre-wrap text-sm leading-6">{message.text}</p> : null}
                       {attachments.length > 0 && (
                         <div className="mt-2 space-y-2">
                           {attachments.map((att) => {

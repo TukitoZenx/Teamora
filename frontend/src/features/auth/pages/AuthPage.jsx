@@ -44,7 +44,8 @@ function StepIndicator({ step }) {
   )
 }
 
-export default function AuthPage({ mode }) {// what is the purpose of this function ? ans : it is used to render the authentication page, it takes a mode prop which can be either signin or signup and based on that it renders the appropriate form and also it uses the useAuthForm hook to handle the form state and submission . this function is used in the App.jsx file to render the authentication page when the user navigates to /signin or /signup route.
+export default function AuthPage({ mode }) {
+  // what is the purpose of this function ? ans : it is used to render the authentication page, it takes a mode prop which can be either signin or signup and based on that it renders the appropriate form and also it uses the useAuthForm hook to handle the form state and submission . this function is used in the App.jsx file to render the authentication page when the user navigates to /signin or /signup route.
   const {
     error,
     form,

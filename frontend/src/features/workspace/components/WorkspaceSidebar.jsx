@@ -58,9 +58,11 @@ export default function WorkspaceSidebar({
     <aside
       data-workspace-sidebar="true"
       aria-label="Workspace navigation"
-      className={`relative z-sidebar flex h-full flex-col overflow-visible border-r border-border bg-card transition-[width] duration-slow ease-in-out ${collapsed ? 'w-sidebar-collapsed' : 'w-sidebar'} ${className}`}
+      className={`z-sidebar flex h-full shrink-0 flex-col overflow-visible border-r border-border bg-card transition-[width] duration-slow ease-in-out ${collapsed ? 'w-sidebar-collapsed' : 'w-sidebar'} ${className}`}
     >
-      <div className={`flex h-16 shrink-0 items-center border-b border-border ${collapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
+      <div
+        className={`flex h-16 shrink-0 items-center border-b border-border ${collapsed ? 'justify-center px-2' : 'justify-between px-3'}`}
+      >
         {collapsed ? (
           <button
             type="button"

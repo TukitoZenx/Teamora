@@ -1,14 +1,19 @@
 /**
  * Print-layout pagination for the Quill document editor.
  *
- * Quill is a single continuous editor. Visual pages are created by injecting a
- * stylesheet that adds margin after blocks that would otherwise sit in the
- * inter-page gutter. No extra nodes are written into the editor, so Yjs / save
- * / export stay clean.
+ * Quill stays a single continuous editor. Visual page cards and gutter overlays
+ * are painted around it. This module only:
+ *   1. Counts how many page sheets the content needs
+ *   2. Adds CSS margin when a whole block would start in the gutter
+ *   3. Honors explicit user page-breaks
+ *
+ * No spacer nodes are written into the editor (they were being adopted by
+ * Quill as real blocks and exploding the page count while typing).
  */
 
 const MAX_DOCUMENT_PAGES = 80
 const STYLE_ID = 'teamora-page-flow-style'
+const SPACER_ATTR = 'data-page-flow-spacer'
 
 export const stripPaginationFromHtml = (html) => {
   if (!html || typeof html !== 'string') return html || ''
@@ -22,7 +27,26 @@ const isManualPageBreak = (el) => {
   if (!el || el.nodeType !== 1) return false
   if (el.classList?.contains('page-break')) return true
   if (el.getAttribute?.('data-page-break') === 'true') return true
-  return Boolean(el.querySelector?.('.page-break, [data-page-break="true"]'))
+  return false
+}
+
+const isSpacer = (el) => {
+  if (!(el instanceof HTMLElement)) return false
+  if (el.hasAttribute(SPACER_ATTR)) return true
+  if (el.getAttribute('aria-hidden') === 'true' && el.getAttribute('contenteditable') === 'false') {
+    const style = el.getAttribute('style') || ''
+    if (/float:\s*left/i.test(style) && /clear:\s*both/i.test(style)) return true
+  }
+  return false
+}
+
+const contentBlocks = (root) => [...root.children].filter((el) => el.nodeType === 1 && !isSpacer(el))
+
+const removeSpacers = (root) => {
+  ;[...root.children].forEach((node) => {
+    if (isSpacer(node)) node.remove()
+  })
+  root.querySelectorAll(`[${SPACER_ATTR}]`).forEach((node) => node.remove())
 }
 
 const constrainOversizedMedia = (root, maxContentH) => {
@@ -30,8 +54,8 @@ const constrainOversizedMedia = (root, maxContentH) => {
   root.querySelectorAll('img, video, iframe, table, .ql-video').forEach((node) => {
     if (!(node instanceof HTMLElement)) return
     node.style.maxWidth = '100%'
-    node.style.maxHeight = `${limit}px`
     node.style.height = 'auto'
+    node.style.maxHeight = `${limit}px`
     node.style.objectFit = 'contain'
   })
 }
@@ -47,15 +71,22 @@ const ensureStyleTag = () => {
 }
 
 const clearFlowStyle = (root) => {
-  if (root) {
-    delete root.dataset.pageFlowKey
-    root.style.minHeight = ''
-  }
+  if (!root) return
+  delete root.dataset.pageFlowKey
+  root.style.minHeight = ''
+}
+
+const clearBlockPads = (blocks) => {
+  blocks.forEach((block) => {
+    if (block.dataset.pageFlowPad) {
+      block.style.marginBottom = ''
+      delete block.dataset.pageFlowPad
+    }
+  })
 }
 
 /**
- * Reflow the Quill editor so block content never occupies the visual gutter
- * between pages. Returns the number of pages required.
+ * Reflow print layout. Returns the number of visual page sheets required.
  */
 export function reflowDocumentPages(root, { pageH, pageGap, marginPx, enabled }) {
   if (!(root instanceof HTMLElement)) return 1
@@ -64,9 +95,14 @@ export function reflowDocumentPages(root, { pageH, pageGap, marginPx, enabled })
   const styleTag = ensureStyleTag()
   const editorKey = root.dataset.pageFlowId || `pf-${Math.random().toString(36).slice(2, 8)}`
   root.dataset.pageFlowId = editorKey
-
   root.dataset.paginating = '1'
+
   try {
+    removeSpacers(root)
+
+    const blocks = contentBlocks(root)
+    clearBlockPads(blocks)
+
     if (!enabled) {
       styleTag.textContent = ''
       clearFlowStyle(root)
@@ -77,86 +113,66 @@ export function reflowDocumentPages(root, { pageH, pageGap, marginPx, enabled })
 
     const footerReserve = 28
     const usable = Math.max(120, pageH - marginPx * 2 - footerReserve)
+    const stride = pageH + pageGap
     constrainOversizedMedia(root, usable)
 
-    // Clear previous flow margins so measurements are against raw content.
     styleTag.textContent = `[data-page-flow-id="${editorKey}"] { min-height: ${pageH}px; }`
     void root.offsetHeight
 
-    const blocks = [...root.children].filter(
-      (el) => el.nodeType === 1 && !el.hasAttribute?.('data-page-flow-spacer')
-    )
     if (blocks.length === 0) {
-      styleTag.textContent = `[data-page-flow-id="${editorKey}"] { min-height: ${pageH}px; }`
+      root.style.minHeight = `${pageH}px`
       root.dataset.pageCount = '1'
       return 1
     }
 
-    const rules = []
-    let pageIndex = 0
-    // offsetTop is relative to the padded editor; usable is the content band.
     let pageContentEnd = usable
+    let extraPagesFromBreaks = 0
 
-    blocks.forEach((block, i) => {
+    blocks.forEach((block) => {
       const top = block.offsetTop
       const height = Math.max(0, block.offsetHeight)
       const bottom = top + height
-      const selector = `[data-page-flow-id="${editorKey}"] > *:nth-child(${i + 1})`
 
       if (isManualPageBreak(block)) {
         const remain = Math.max(0, pageContentEnd - bottom)
-        const extra = remain + pageGap + marginPx
-        if (extra > 1 && pageIndex < MAX_DOCUMENT_PAGES - 1) {
-          rules.push(`${selector} { margin-bottom: ${Math.round(extra)}px !important; }`)
-          pageIndex += 1
-          pageContentEnd = bottom + extra + usable
+        if (remain > 1 && extraPagesFromBreaks < MAX_DOCUMENT_PAGES - 1) {
+          block.style.marginBottom = `${Math.round(remain + pageGap + marginPx)}px`
+          block.dataset.pageFlowPad = '1'
+          extraPagesFromBreaks += 1
+          pageContentEnd = bottom + remain + pageGap + marginPx + usable
         }
         return
       }
 
-      if (top >= pageContentEnd - 1 && pageIndex < MAX_DOCUMENT_PAGES - 1) {
-        // Previous sibling should have pushed us; if not, pad the previous block.
-        const prevSelector = i > 0 ? `[data-page-flow-id="${editorKey}"] > *:nth-child(${i})` : selector
-        const remain = Math.max(0, pageContentEnd - (i > 0 ? blocks[i - 1].offsetTop + blocks[i - 1].offsetHeight : top))
+      // Whole block starts in the gutter / bottom margin: push it onto the next sheet.
+      if (top < pageContentEnd && bottom > pageContentEnd + 2 && height <= usable - 4) {
+        const remain = Math.max(0, pageContentEnd - top)
         const extra = remain + pageGap + marginPx
         if (extra > 1) {
-          rules.push(`${prevSelector} { margin-bottom: ${Math.round(extra)}px !important; }`)
-          pageIndex += 1
-          pageContentEnd += extra + (pageContentEnd - top < 0 ? 0 : 0)
+          const prev = block.previousElementSibling
+          const target = prev && !isManualPageBreak(prev) && !isSpacer(prev) ? prev : block
+          target.style.marginBottom = `${Math.round((parseFloat(target.style.marginBottom) || 0) + extra)}px`
+          target.dataset.pageFlowPad = '1'
           pageContentEnd = top + extra + usable
         }
         return
       }
 
-      if (bottom > pageContentEnd + 2 && top < pageContentEnd && pageIndex < MAX_DOCUMENT_PAGES - 1) {
-        if (height > usable - 4) {
-          const remain = Math.max(0, pageContentEnd - bottom)
-          const extra = remain + pageGap + marginPx
-          if (extra > 1) {
-            rules.push(`${selector} { margin-bottom: ${Math.round(extra)}px !important; }`)
-            pageIndex += 1
-            pageContentEnd = bottom + extra + usable
-          }
-        } else {
-          // Move this whole block to the next page by padding the previous sibling.
-          const prevSelector = i > 0 ? `[data-page-flow-id="${editorKey}"] > *:nth-child(${i})` : selector
-          const remain = Math.max(0, pageContentEnd - top)
-          const extra = remain + pageGap + marginPx
-          if (extra > 1) {
-            rules.push(`${prevSelector} { margin-bottom: ${Math.round(extra)}px !important; }`)
-            pageIndex += 1
-            pageContentEnd = top + extra + usable
-          }
-        }
+      while (bottom > pageContentEnd + 2 && extraPagesFromBreaks < MAX_DOCUMENT_PAGES - 1) {
+        pageContentEnd += usable + pageGap + marginPx
       }
     })
 
-    const pages = Math.min(MAX_DOCUMENT_PAGES, pageIndex + 1)
+    const measured = blocks.reduce((max, block) => Math.max(max, block.offsetTop + block.offsetHeight), 0)
+    // offsetTop is inside the padded editor; add top padding so the last line maps onto a sheet.
+    const visualBottom = measured + marginPx
+    const pagesFromHeight = Math.max(1, Math.ceil(visualBottom / stride))
+    const pages = Math.min(MAX_DOCUMENT_PAGES, Math.max(pagesFromHeight, extraPagesFromBreaks + 1))
     const minH = pages * pageH + Math.max(0, pages - 1) * pageGap
+
     styleTag.textContent = [
       `[data-page-flow-id="${editorKey}"] { min-height: ${minH}px; }`,
-      `[data-page-flow-id="${editorKey}"] img, [data-page-flow-id="${editorKey}"] table, [data-page-flow-id="${editorKey}"] video { max-width: 100%; }`,
-      ...rules
+      `[data-page-flow-id="${editorKey}"] img, [data-page-flow-id="${editorKey}"] table, [data-page-flow-id="${editorKey}"] video { max-width: 100%; }`
     ].join('\n')
 
     root.style.minHeight = `${minH}px`

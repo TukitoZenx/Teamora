@@ -29,7 +29,6 @@ const cacheUser = (user) => {
   }
 }
 
-
 const getInitialUser = () => {
   if (!initialUserRequest) {
     initialUserRequest = authService.getCurrentUser()
@@ -43,11 +42,12 @@ export const __resetAuthBootstrapForTests = () => {
   initialUserRequest = null
 }
 
-export function AuthProvider({ children }) { // children contains ? ans : 
+export function AuthProvider({ children }) {
+  // children contains ? ans :
   const [user, setUser] = useState(() => readCachedUser()) // readcacheduser() gets the current user from localstorage using the auth key called teamora-auth-user and then sets it as the initial state of the user so the usestate is used ? ans : it is used to store the user data in the localstorage and also in the react state , the main purpose to use the usestate at here ? ans : it is used to store the user data in the localstorage and also in the react state so that the user data can be accessed from anywhere in the application without making a request to the server every time.
   const [loading, setLoading] = useState(true) // if loading is true, it means the authentication state is being checked and the app is waiting for the response from the server
   /** True only after the first `/me` completes successfully with a user. */
-  const [sessionValidated, setSessionValidated] = useState(false)// initially
+  const [sessionValidated, setSessionValidated] = useState(false) // initially
   const cachedUserRef = useRef(null) // what is does ? ans : it stores the cached user data
   const sessionCheckedRef = useRef(false) // what is does ? ans : it tracks whether the session has been checked
   const sessionValidatedRef = useRef(false) // what is does ? ans : it tracks whether the session is validated
@@ -76,7 +76,7 @@ export function AuthProvider({ children }) { // children contains ? ans :
 
       const generation = authGenerationRef.current
       try {
-        const currentUser = useInitialCache ? await getInitialUser() : await authService.getCurrentUser()  // getinitialuser is locallyy and authservice.getcurrentuser is from the server, it gets the current user data from the server and sets it as the current user in the state and also in the localstorage
+        const currentUser = useInitialCache ? await getInitialUser() : await authService.getCurrentUser() // getinitialuser is locallyy and authservice.getcurrentuser is from the server, it gets the current user data from the server and sets it as the current user in the state and also in the localstorage
         if (generation !== authGenerationRef.current) return null
         setUser(currentUser)
         cachedUserRef.current = currentUser
@@ -136,7 +136,7 @@ export function AuthProvider({ children }) { // children contains ? ans :
     setSessionValidated(true)
     sessionCheckedRef.current = true
     setLoading(false)
-    return authenticatedUser// example how it returns form : 
+    return authenticatedUser // example how it returns form :
   }, [])
 
   const register = useCallback(async (payload) => {
@@ -177,7 +177,7 @@ export function AuthProvider({ children }) { // children contains ? ans :
       authenticated: Boolean(user) && (sessionValidated || loading),
       isAuthenticated: Boolean(user) && (sessionValidated || loading),
       profileComplete: user ? user.profileComplete !== false : false,
-      login,// what does login passing 
+      login, // what does login passing
       logout,
       register,
       refreshUser,

@@ -239,9 +239,7 @@ export class MeetingPeerManager {
         // Audit the incoming SDP
         const hasAudio = desc.sdp.includes('m=audio')
         const audioDirMatch = desc.sdp.match(/a=(sendrecv|sendonly|recvonly|inactive)/g)
-        log(
-          `[RTC-AUDIO-AUDIT] Incoming Offer SDP: hasAudio=${hasAudio} directions=${JSON.stringify(audioDirMatch)}`
-        )
+        log(`[RTC-AUDIO-AUDIT] Incoming Offer SDP: hasAudio=${hasAudio} directions=${JSON.stringify(audioDirMatch)}`)
 
         log(`[RTC-AUDIO-AUDIT] Applying remote offer description for peer=${fromId}`)
         await pc.setRemoteDescription(desc)
@@ -384,9 +382,7 @@ export class MeetingPeerManager {
     if (pc) return pc
 
     // Audit active PeerConnections
-    log(
-      `[RTC-AUDIO-AUDIT] Active PeerConnections count: ${this.pcs.size + 1} (creating new PC for peer=${peerId})`
-    )
+    log(`[RTC-AUDIO-AUDIT] Active PeerConnections count: ${this.pcs.size + 1} (creating new PC for peer=${peerId})`)
     log(`[RTC-AUDIO-AUDIT] Current peer IDs: ${Array.from(this.pcs.keys()).join(', ') || 'none'}`)
 
     this.diag(`create PC ${this.selfId} ↔ ${peerId}`)

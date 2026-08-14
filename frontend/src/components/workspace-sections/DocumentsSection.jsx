@@ -163,6 +163,7 @@ export default function DocumentsSection({
       theme: 'snow',
       modules: {
         toolbar: false,
+        table: true,
         cursors: {
           transformOnTextChange: true
         },
