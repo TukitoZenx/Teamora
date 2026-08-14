@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 
 const FOCUSABLE_SELECTOR = [
@@ -111,7 +112,7 @@ export default function Modal({
         transition: { duration: 0.18, ease: 'easeOut' }
       }
 
-  return (
+  return createPortal(
     <motion.div
       role="presentation"
       {...motionProps}
@@ -141,6 +142,7 @@ export default function Modal({
         ) : null}
         {children}
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   )
 }
