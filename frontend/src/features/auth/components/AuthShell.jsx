@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import teamoraLogo from '../../../assets/hero.png'
 import AuthBrandPanel from './AuthBrandPanel'
+import { ensureCsrfToken } from '../../../services/api'
 
 /**
  * Auth layout: left brand panel 60%, form column the remaining ~40%
@@ -9,6 +11,10 @@ import AuthBrandPanel from './AuthBrandPanel'
  * Scales with viewport via percentage grid columns. Mobile: form full-width.
  */
 export default function AuthShell({ children, mode = 'signin' }) {
+  useEffect(() => {
+    ensureCsrfToken().catch(() => {})
+  }, [])
+
   return (
     <main
       id="main-content"

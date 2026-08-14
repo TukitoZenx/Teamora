@@ -26,20 +26,27 @@ export const setCsrfToken = (token) => {
   }
 }
 
+export const clearCsrfToken = () => {
+  csrfTokenMemory = null
+}
+
 export const getCsrfToken = () => csrfTokenMemory || readCookie('XSRF-TOKEN') || null
 
 /** Fetch CSRF token when cookie is not readable (cross-origin API). */
 let csrfBootstrap = null
-export const ensureCsrfToken = async () => {
-  const existing = getCsrfToken()
-  if (existing) return existing
+const fetchCsrfToken = () =>
+  api.get('/api/auth/csrf').then(({ data }) => {
+    if (data?.csrfToken) setCsrfToken(data.csrfToken)
+    return getCsrfToken()
+  })
+
+export const ensureCsrfToken = async ({ force = false } = {}) => {
+  if (!force) {
+    const existing = getCsrfToken()
+    if (existing) return existing
+  }
   if (!csrfBootstrap) {
-    csrfBootstrap = api
-      .get('/api/auth/csrf')
-      .then(({ data }) => {
-        if (data?.csrfToken) setCsrfToken(data.csrfToken)
-        return getCsrfToken()
-      })
+    csrfBootstrap = fetchCsrfToken()
       .catch(() => null)
       .finally(() => {
         csrfBootstrap = null
@@ -136,6 +143,10 @@ api.interceptors.response.use(
     }
 
     const status = error.response.status
+    if (error.response.data?.csrfToken) {
+      setCsrfToken(error.response.data.csrfToken)
+    }
+
     if (status === 401) {
       const url = String(error.config?.url || '')
       // Don't thrash session clear during login/register/me bootstrap.
@@ -143,6 +154,24 @@ api.interceptors.response.use(
       if (!isAuthBootstrap) {
         emitUnauthorized()
       }
+    }
+
+    const csrfFailed =
+      status === 403 && /csrf/i.test(String(error.response.data?.message || error.response.data?.error || ''))
+    if (csrfFailed && error.config && !error.config.__csrfRetry) {
+      clearCsrfToken()
+      return ensureCsrfToken({ force: true }).then((token) => {
+        if (!token) {
+          const csrfError = new Error(error.response.data?.message || 'Invalid CSRF token')
+          csrfError.status = 403
+          csrfError.response = error.response
+          csrfError.requestId = requestId
+          return Promise.reject(csrfError)
+        }
+        const retryConfig = { ...error.config, __csrfRetry: true }
+        retryConfig.headers = { ...(error.config.headers || {}), 'X-XSRF-TOKEN': token }
+        return api.request(retryConfig)
+      })
     }
 
     const message =

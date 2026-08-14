@@ -1,6 +1,6 @@
 const passport = require('passport');
 const authService = require('../services/auth.service');
-const { rotateCsrfToken } = require('../middleware/csrf.middleware');
+const { rotateCsrfToken, ensureCsrfToken, saveSession } = require('../middleware/csrf.middleware');
 
 const sessionCookieName = () => process.env.SESSION_COOKIE_NAME || 'teamora.sid';
 const { resolveClientUrl } = require('../utils/urlResolver');
@@ -64,10 +64,15 @@ const login = async (req, res, next) => {
   }
 };
 
-/** Issue / refresh CSRF token for the SPA (cross-origin readable response). */
-const csrfToken = (req, res) => {
-  const token = rotateCsrfToken(req, res) || req.session?.csrfToken || null;
-  res.status(200).json({ success: true, csrfToken: token });
+/** Issue CSRF token for the SPA (cross-origin readable). Does not rotate. */
+const csrfToken = async (req, res, next) => {
+  try {
+    const token = ensureCsrfToken(req, res);
+    await saveSession(req);
+    res.status(200).json({ success: true, csrfToken: token });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const forgotPassword = async (req, res, next) => {

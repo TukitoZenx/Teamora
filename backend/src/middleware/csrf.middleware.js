@@ -17,6 +17,28 @@ const isExempt = (req) => {
 
 const generateToken = () => crypto.randomBytes(32).toString('hex');
 
+const saveSession = (req) =>
+  new Promise((resolve, reject) => {
+    if (!req.session) {
+      resolve();
+      return;
+    }
+    req.session.save((err) => (err ? reject(err) : resolve()));
+  });
+
+/**
+ * Create a CSRF token if the session does not have one. Does not rotate an
+ * existing token — rotating on GET /csrf races with login / forgot-password.
+ */
+const ensureCsrfToken = (req, res) => {
+  if (!req.session) return null;
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = generateToken();
+  }
+  res.cookie('XSRF-TOKEN', req.session.csrfToken, cookieOptions());
+  return req.session.csrfToken;
+};
+
 const tokensEqual = (left, right) => {
   if (typeof left !== 'string' || typeof right !== 'string') return false;
   const a = Buffer.from(left);
@@ -43,11 +65,7 @@ const ensureCsrfCookie = (req, res, next) => {
   try {
     if (!req.session) return next();
 
-    if (!req.session.csrfToken) {
-      req.session.csrfToken = generateToken();
-    }
-
-    res.cookie('XSRF-TOKEN', req.session.csrfToken, cookieOptions());
+    ensureCsrfToken(req, res);
     return next();
   } catch (error) {
     return next(error);
@@ -94,6 +112,8 @@ const rotateCsrfToken = (req, res) => {
 
 module.exports = {
   ensureCsrfCookie,
+  ensureCsrfToken,
+  saveSession,
   verifyCsrf,
   rotateCsrfToken,
   generateToken,
