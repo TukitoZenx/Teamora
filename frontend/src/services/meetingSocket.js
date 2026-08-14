@@ -3,9 +3,33 @@
  * Emits plain JSON-serializable payloads only (SDP/ICE as plain objects).
  */
 import { getCollabWebSocketUrl } from './apiBaseUrl'
+import { applyRemoteIceServers } from './webrtcIce'
 
 const log = (...args) => {
   if (import.meta.env.DEV) console.info('[meeting-signal]', ...args)
+}
+
+const clientIdKey = (workspaceId) => `teamora-meeting-client:${workspaceId || 'unknown'}`
+
+export const getStableMeetingClientId = (workspaceId) => {
+  const key = clientIdKey(workspaceId)
+  try {
+    const existing = sessionStorage.getItem(key)
+    if (existing) return existing
+    const next = `meet-${Math.random().toString(36).slice(2, 10)}`
+    sessionStorage.setItem(key, next)
+    return next
+  } catch {
+    return `meet-${Math.random().toString(36).slice(2, 10)}`
+  }
+}
+
+export const clearStableMeetingClientId = (workspaceId) => {
+  try {
+    sessionStorage.removeItem(clientIdKey(workspaceId))
+  } catch {
+    // ignore
+  }
 }
 
 /** Ensure RTCSessionDescription / RTCIceCandidate are plain JSON. */
@@ -37,17 +61,19 @@ export const serializeSignal = (signal) => {
 
 /**
  * @param {object} localChannel
- * @param {{ workspaceId: string, userName?: string }} opts
+ * @param {{ workspaceId: string, userName?: string, userId?: string }} opts
  */
-export function createMeetingSocket(localChannel, { workspaceId, userName }) {
+export function createMeetingSocket(localChannel, { workspaceId, userName, userId }) {
   const listeners = new Map()
-  const clientId = localChannel?.id || `meet-${Math.random().toString(36).slice(2, 10)}`
+  const clientId =
+    getStableMeetingClientId(workspaceId) || localChannel?.id || `meet-${Math.random().toString(36).slice(2, 10)}`
   const localHandlers = new Map()
   let meetingWs = null
   let destroyed = false
   let reconnectTimer = null
   let joined = false
   const pendingEvents = []
+  const readyWaiters = new Set()
 
   const deliver = (event, value) => {
     listeners.get(event)?.forEach((handler) => {
@@ -57,6 +83,11 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
         console.error('[meetingSocket] listener error', event, err)
       }
     })
+  }
+
+  const resolveReady = () => {
+    readyWaiters.forEach((resolve) => resolve(true))
+    readyWaiters.clear()
   }
 
   const bindLocal = (event) => {
@@ -99,6 +130,7 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
     const url = getCollabWebSocketUrl()
     if (!url) {
       log('WS unavailable — local channel only')
+      resolveReady()
       return
     }
     try {
@@ -116,6 +148,9 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
           type: 'join',
           workspaceId,
           key: 'meetings',
+          clientId,
+          socketId: clientId,
+          userId: userId || undefined,
           user: { name: userName || 'User', clientId }
         })
       )
@@ -131,7 +166,12 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
       if (msg.type === 'joined') {
         joined = true
         log('WS joined meetings room')
+        if (Array.isArray(msg.iceServers)) {
+          applyRemoteIceServers(msg.iceServers)
+        }
         flushPendingEvents()
+        resolveReady()
+        deliver('ws-joined', msg)
         return
       }
       if (msg.type === 'workspace-deleted' && msg.workspaceId === workspaceId) {
@@ -185,10 +225,9 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
         log('WS←', msg.event, msg.payload?.signal?.type || msg.payload?.socketId || '')
         deliver(msg.event, msg.payload)
       }
-      if (msg.type === 'peer-leave' && msg.clientId && msg.clientId !== clientId) {
-        log('WS peer-leave', msg.clientId)
-        deliver('receive-meeting-leave', msg.clientId)
-      }
+      // peer-leave is transport-only. Meeting roster is server-authoritative
+      // (receive-meeting-leave / meeting-active-session) so a refresh does not
+      // wipe other participants before the rejoiner comes back.
     }
 
     meetingWs.onclose = () => {
@@ -216,6 +255,7 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
       workspaceId,
       key: 'meetings',
       clientId,
+      socketId: clientId,
       event,
       payload
     }
@@ -233,7 +273,22 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
     pendingEvents.length = 0
   }
 
-  const closeMeetingWs = () => {
+  const closeMeetingWs = ({ sendLeave = false } = {}) => {
+    if (sendLeave && meetingWs && meetingWs.readyState === WebSocket.OPEN) {
+      try {
+        meetingWs.send(
+          JSON.stringify({
+            type: 'leave',
+            workspaceId,
+            key: 'meetings',
+            clientId,
+            socketId: clientId
+          })
+        )
+      } catch {
+        // ignore
+      }
+    }
     clearPendingEvents()
     try {
       meetingWs?.close()
@@ -252,6 +307,20 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
       return meetingWs?.readyState
     },
     isWsJoined: () => joined,
+    whenReady(timeoutMs = 4000) {
+      if (joined || !getCollabWebSocketUrl()) return Promise.resolve(joined || Boolean(localChannel?.emit))
+      return new Promise((resolve) => {
+        const timer = window.setTimeout(() => {
+          readyWaiters.delete(finish)
+          resolve(joined || Boolean(localChannel?.emit))
+        }, timeoutMs)
+        const finish = (value) => {
+          window.clearTimeout(timer)
+          resolve(value)
+        }
+        readyWaiters.add(finish)
+      })
+    },
     emit(event, value) {
       // Local same-browser path
       try {
@@ -265,29 +334,37 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
 
       if (event === 'meeting-join') {
         receiveEvent = 'receive-meeting-join'
-        payload = value?.participant || value
+        payload = {
+          type: 'meeting-join',
+          participant: value?.participant || value,
+          socketId: value?.participant?.socketId || value?.socketId || clientId
+        }
       } else if (event === 'meeting-leave') {
         receiveEvent = 'receive-meeting-leave'
-        payload = value?.socketId || clientId
+        payload = {
+          type: 'meeting-leave',
+          socketId: value?.socketId || clientId
+        }
       } else if (event === 'meeting-state-change') {
         receiveEvent = 'receive-meeting-state-change'
-        payload = { socketId: clientId, state: value?.state || value }
+        payload = { type: 'meeting-state-change', socketId: clientId, state: value?.state || value }
       } else if (event === 'meeting-signal') {
         receiveEvent = 'receive-meeting-signal'
         payload = {
+          type: 'meeting-signal',
           senderSocketId: clientId,
           targetSocketId: value?.targetSocketId,
           signal: serializeSignal(value?.signal)
         }
       } else if (event === 'meeting-claim-host') {
         receiveEvent = 'receive-meeting-host'
-        payload = value
+        payload = { type: 'meeting-claim-host', ...value }
       } else if (event === 'meeting-started') {
         receiveEvent = 'receive-meeting-started'
-        payload = { ...value, organizerId: clientId }
+        payload = { type: 'meeting-started', ...value, organizerId: clientId }
       } else if (event === 'meeting-ended') {
         receiveEvent = 'receive-meeting-ended'
-        payload = value
+        payload = { type: 'meeting-ended', ...value }
       } else if (event === 'send-message') {
         receiveEvent = 'receive-message'
         payload = { ...value, senderSocketId: clientId }
@@ -308,14 +385,16 @@ export function createMeetingSocket(localChannel, { workspaceId, userName }) {
       }
       listeners.get(event)?.delete(handler)
     },
-    destroy() {
+    destroy({ sendLeave = false } = {}) {
       destroyed = true
       if (reconnectTimer) window.clearTimeout(reconnectTimer)
       for (const [event, handler] of localHandlers) {
         localChannel?.off?.(event, handler)
       }
       localHandlers.clear()
-      closeMeetingWs()
+      readyWaiters.forEach((resolve) => resolve(false))
+      readyWaiters.clear()
+      closeMeetingWs({ sendLeave })
     }
   }
 }

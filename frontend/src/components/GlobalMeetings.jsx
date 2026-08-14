@@ -14,11 +14,12 @@ export default function GlobalMeetings() {
   const currentWorkspaceId = match ? match[1] : null
   const workspaceId = activeMeetingWorkspace?._id || activeMeetingWorkspace?.workspaceId || currentWorkspaceId
   const userName = user?.fullName || user?.username || user?.email || 'User'
+  const userId = user?._id || user?.id || ''
 
-  const isMaximized = location.pathname === `/workspace/${workspaceId}/meetings`
+  const isMaximized = Boolean(workspaceId) && location.pathname === `/workspace/${workspaceId}/meetings`
   // Never keep meeting media/signaling up when logged out.
   const shouldConnect = authenticated && (inMeeting || isMaximized) && workspaceId
-  const socket = useMeetingSignaling(shouldConnect ? workspaceId : null, userName)
+  const socket = useMeetingSignaling(shouldConnect ? workspaceId : null, userName, userId)
 
   useEffect(() => {
     if (!authenticated && inMeeting) {

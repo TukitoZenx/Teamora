@@ -121,7 +121,8 @@ Teamora is deployed as a frontend SPA (Vercel) communicating with a single backe
 
 #### Frontend (`frontend/.env`)
 * `VITE_API_URL` (Points to the backend host)
-* `VITE_TURN_USER`, `VITE_TURN_SECRET` (Optional, TURN config for WebRTC across firewalls)
+* `VITE_TURN_URLS`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL` (Optional frontend TURN; aliases: `VITE_TURN_USER`, `VITE_TURN_SECRET`)
+* Backend `TURN_URLS` / `TURN_USERNAME` / `TURN_CREDENTIAL` / `STUN_URLS` (preferred in production — pushed over `/collab`)
 
 ### Operations Critical Considerations
 > [!IMPORTANT]

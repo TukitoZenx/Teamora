@@ -156,7 +156,7 @@ export default function WorkspaceHome({
   const isOwner = getOwnerId(workspace)?.toString() === getUserId(user)?.toString()
   const workspaceId = workspace?._id || workspace?.workspaceId
   // Real-time meeting start notifications for all workspace members
-  useMeetingNotifications(workspaceId, getDisplayName(user))
+  useMeetingNotifications(workspaceId, getDisplayName(user), user?._id || user?.id)
 
   // Detect owner delete while this member is still editing (API heartbeat).
   useEffect(() => {
