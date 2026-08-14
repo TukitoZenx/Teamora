@@ -120,7 +120,7 @@ function RemoteVideo({ stream, hidden }) {
       autoPlay
       playsInline
       muted
-      className={`h-full w-full bg-black object-contain object-center ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
+      className={`h-full w-full bg-black object-cover object-center ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
     />
   )
 }
@@ -139,9 +139,23 @@ function MiniVideo({ stream, isMe }) {
       autoPlay
       playsInline
       muted={isMe}
-      className={`h-full w-full bg-black object-contain object-center ${isMe ? 'scale-x-[-1]' : ''}`}
+      className={`h-full w-full bg-black object-cover object-center ${isMe ? 'scale-x-[-1]' : ''}`}
     />
   )
+}
+
+function initialsFor(name) {
+  return String(name || 'U')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+}
+
+function hasLiveVideoTrack(stream) {
+  return Boolean(stream?.getVideoTracks?.().some((track) => track.readyState === 'live' && track.enabled !== false))
 }
 
 function ParticipantTile({
@@ -161,10 +175,14 @@ function ParticipantTile({
   peerState,
   userName
 }) {
+  const showLocalVideo = isMe && camActive && hasLiveVideoTrack(localStream)
+  const showRemoteVideo = !isMe && part.camActive !== false && hasLiveVideoTrack(remoteStream)
+  const label = isMe ? userName : part.user
+
   return (
     <div
       id={`participant-tile-${participantId}`}
-      className="bg-card rounded-2xl border border-border overflow-hidden relative w-full h-full group flex items-center justify-center shadow-card transition-all duration-300"
+      className="bg-card rounded-2xl border border-border overflow-hidden relative w-full h-full min-h-0 group flex items-center justify-center shadow-card transition-all duration-300"
     >
       {isMe ? (
         <>
@@ -182,29 +200,29 @@ function ParticipantTile({
             muted
             style={{
               filter: 'none',
-              display: camActive ? 'block' : 'none'
+              display: showLocalVideo ? 'block' : 'none'
             }}
-            className="h-full w-full bg-black object-contain object-center transition-all scale-x-[-1]"
+            className="h-full w-full bg-black object-cover object-center transition-all scale-x-[-1]"
           />
-          {!camActive && (
+          {!showLocalVideo && (
             <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
-              <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-lg font-bold text-primary shadow-md">
-                {(userName || 'U').substring(0, 2).toUpperCase()}
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
+                {initialsFor(label)}
               </div>
             </div>
           )}
         </>
       ) : (
         <>
-          <RemoteVideo stream={remoteStream} hidden={!remoteStream || part.camActive === false} />
+          <RemoteVideo stream={remoteStream} hidden={!showRemoteVideo} />
           {remoteStream && <RemoteAudio stream={remoteStream} audioOutputDeviceId={selectedSpeaker} />}
-          {(!remoteStream || part.camActive === false) && (
+          {!showRemoteVideo && (
             <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-lg font-bold text-primary shadow-md">
-                {(part.user || 'U').substring(0, 2).toUpperCase()}
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
+                {initialsFor(label)}
               </div>
               {!remoteStream && (
-                <span className="absolute bottom-12 text-[10px] font-semibold text-muted">
+                <span className="absolute bottom-14 text-[10px] font-semibold text-muted">
                   {peerState === 'connecting' ? 'Connecting…' : 'Waiting for media…'}
                 </span>
               )}
@@ -425,6 +443,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const localStreamRef = useRef(null)
   /** Mirror of localStreamRef for render (react-hooks/refs forbids reading refs in JSX). */
   const [localStream, setLocalStream] = useState(null)
+  const [lobbyPreview, setLobbyPreview] = useState(null)
+  const lobbyVideoRef = useRef(null)
   const canvasStreamRef = useRef(null)
   const animationFrameRef = useRef(null)
   const recordIntervalRef = useRef(null)
@@ -981,6 +1001,40 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   }, [handleLeaveMeeting])
 
   useEffect(() => {
+    if (!isMaximized || inMeeting) return undefined
+    let cancelled = false
+    let stream = null
+    const startPreview = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: selectedCam ? { deviceId: { exact: selectedCam } } : true,
+          audio: false
+        })
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop())
+          return
+        }
+        setLobbyPreview(stream)
+      } catch {
+        if (!cancelled) setLobbyPreview(null)
+      }
+    }
+    startPreview()
+    return () => {
+      cancelled = true
+      stream?.getTracks().forEach((track) => track.stop())
+      setLobbyPreview(null)
+    }
+  }, [isMaximized, inMeeting, selectedCam])
+
+  useEffect(() => {
+    const video = lobbyVideoRef.current
+    if (!video || !lobbyPreview) return
+    if (video.srcObject !== lobbyPreview) video.srcObject = lobbyPreview
+    video.play?.().catch(() => {})
+  }, [lobbyPreview])
+
+  useEffect(() => {
     if (!contextInMeeting && inMeetingRef.current) {
       handleLeaveRef.current({ fromContext: true, silent: true })
     }
@@ -1001,6 +1055,10 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
     }
     setIsJoining(true)
     try {
+      if (lobbyPreview) {
+        lobbyPreview.getTracks().forEach((track) => track.stop())
+        setLobbyPreview(null)
+      }
       let stream = null
       const audioConstraints = {
         deviceId: selectedMic ? { exact: selectedMic } : undefined,
@@ -1710,12 +1768,29 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
 
           {!inMeeting ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
-              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 border border-primary/20">
-                <Video className="w-8 h-8" />
+              <div className="relative mb-5 h-48 w-full overflow-hidden rounded-2xl border border-border bg-card-sunken">
+                {lobbyPreview ? (
+                  <video
+                    ref={lobbyVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="h-full w-full object-cover scale-x-[-1] bg-black"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-lg font-bold text-primary">
+                      {initialsFor(userName)}
+                    </div>
+                  </div>
+                )}
+                <div className="absolute bottom-3 left-3 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[10px] font-bold text-text">
+                  {userName} (You)
+                </div>
               </div>
               <h2 className="text-xl font-bold text-text mb-2">Teamora Call Lobby</h2>
               <p className="text-sm text-muted mb-4 font-medium">
-                Verify camera and microphone before joining. Audio and video work across tabs and devices.
+                Check your camera, then join. Others in this workspace will see and hear you.
               </p>
               <button
                 type="button"
@@ -1771,7 +1846,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               )}
             </div>
           ) : (
-            <div className={`grid min-h-0 flex-1 gap-3 overflow-hidden ${gridColsClass}`}>
+            <div className={`grid min-h-0 h-full flex-1 gap-3 overflow-hidden ${gridColsClass}`}>
               {Object.entries(meetingParticipants).map(([id, part]) => (
                 <div key={id} className="relative min-h-0 h-full overflow-hidden rounded-2xl border border-border">
                   <ParticipantTile
@@ -2242,8 +2317,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   )
 
   return (
-    <div className={isMaximized ? 'w-full h-full relative' : 'relative pointer-events-none'}>
-      <div className={isMaximized ? 'w-full h-full' : 'hidden'} aria-hidden={!isMaximized}>
+    <div className={isMaximized ? 'relative flex h-full min-h-0 w-full flex-col' : 'relative pointer-events-none'}>
+      <div className={isMaximized ? 'flex h-full min-h-0 w-full flex-col' : 'hidden'} aria-hidden={!isMaximized}>
         {meetingContent}
       </div>
       {!isMaximized && miniView}
