@@ -3,7 +3,7 @@ const authService = require('../services/auth.service');
 const { rotateCsrfToken } = require('../middleware/csrf.middleware');
 
 const sessionCookieName = () => process.env.SESSION_COOKIE_NAME || 'teamora.sid';
-const clientUrl = () => (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
+const { resolveClientUrl } = require('../utils/urlResolver');
 const usesHttps = () =>
   process.env.NODE_ENV === 'production' || Boolean(process.env.TLS_KEY_PATH && process.env.TLS_CERT_PATH);
 const sessionCookieOptions = () => ({
@@ -72,7 +72,7 @@ const csrfToken = (req, res) => {
 
 const forgotPassword = async (req, res, next) => {
   try {
-    const result = await authService.forgotPassword(req.body);
+    const result = await authService.forgotPassword(req.body, resolveClientUrl(req));
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     next(error);
@@ -150,7 +150,7 @@ const googleCallback = (req, res, next) => {
       await setSessionUser(req, user);
       rotateCsrfToken(req, res);
       const targetPath = user.profileComplete === false ? '/complete-profile' : '/dashboard';
-      return res.redirect(`${clientUrl()}${targetPath}`);
+      return res.redirect(`${resolveClientUrl(req)}${targetPath}`);
     } catch (sessionError) {
       return next(sessionError);
     }

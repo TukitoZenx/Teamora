@@ -396,6 +396,14 @@ select:focus-visible {
   height: auto;
 }
 
+.quill-editor-wrapper .ql-editor [data-page-flow-spacer] {
+  float: left;
+  clear: both;
+  width: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
 .teamora-sheet-grid[data-resizing] {
   user-select: none;
 }

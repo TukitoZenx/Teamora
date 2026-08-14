@@ -61,7 +61,9 @@ export default function SidebarItem({
               : 'text-muted hover:bg-primary/10 hover:text-primary'
         }`}
       >
-        {active && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-primary" aria-hidden />}
+        {active && (
+          <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-primary" aria-hidden />
+        )}
         <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-primary' : ''}`} aria-hidden />
         {!collapsed && <span className="truncate">{label}</span>}
       </button>

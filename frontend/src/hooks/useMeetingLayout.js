@@ -17,21 +17,21 @@ export function calculateLayout(containerWidth, containerHeight, count, gap = 16
 
   for (let cols = 1; cols <= count; cols++) {
     const rows = Math.ceil(count / cols)
-    
+
     // Subtract total gap space to find available space for tiles
     const totalGapWidth = (cols - 1) * gap
     const totalGapHeight = (rows - 1) * gap
-    
+
     const availableWidth = Math.max(0, containerWidth - totalGapWidth)
     const availableHeight = Math.max(0, containerHeight - totalGapHeight)
-    
+
     const maxTileWidth = availableWidth / cols
     const maxTileHeight = availableHeight / rows
-    
+
     // Constrain by aspect ratio (only if more than 1 participant)
     let tileWidth = maxTileWidth
     let tileHeight = maxTileHeight
-    
+
     if (count > 1) {
       tileHeight = tileWidth / aspectRatio
       // If the height exceeds available height, constrain by height instead
@@ -40,9 +40,9 @@ export function calculateLayout(containerWidth, containerHeight, count, gap = 16
         tileWidth = tileHeight * aspectRatio
       }
     }
-    
+
     const area = tileWidth * tileHeight
-    
+
     if (area > bestArea) {
       bestArea = area
       bestCols = cols
@@ -82,7 +82,7 @@ export default function useMeetingLayout(participantCount, gap = 16, aspectRatio
       // Use requestAnimationFrame to avoid ResizeObserver loop limit exceeded error
       window.requestAnimationFrame(updateDimensions)
     })
-    
+
     observer.observe(container)
     return () => observer.disconnect()
   }, [])

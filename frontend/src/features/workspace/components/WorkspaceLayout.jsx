@@ -89,7 +89,7 @@ export default function WorkspaceLayout({
   const isFillHeight = fillHeightSections.has(activeItem)
 
   return (
-    <div className="h-screen overflow-hidden bg-background text-text">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-background text-text">
       <WorkspaceNavbar
         workspace={workspace}
         onOpenSidebar={() => setSidebarOpen(true)}
@@ -101,29 +101,8 @@ export default function WorkspaceLayout({
         onOpenFile={onOpenFile}
       />
 
-      <div className="hidden lg:block">
-        <WorkspaceSidebar
-          activeItem={activeItem}
-          onSelect={selectItem}
-          onBackToDashboard={onBackToDashboard}
-          onLeaveWorkspace={requestLeaveWorkspace}
-          onDeleteWorkspace={requestDeleteWorkspace}
-          isOwner={isOwner}
-          canLeave={canLeave}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebarCollapsed}
-          className="fixed bottom-0 left-0 top-navbar"
-        />
-      </div>
-
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-sidebar lg:hidden" data-workspace-sidebar="true">
-          <button
-            type="button"
-            className="absolute inset-0 teamora-scrim"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close workspace navigation"
-          />
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="hidden h-full shrink-0 lg:flex">
           <WorkspaceSidebar
             activeItem={activeItem}
             onSelect={selectItem}
@@ -134,28 +113,49 @@ export default function WorkspaceLayout({
             canLeave={canLeave}
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleSidebarCollapsed}
-            className="absolute bottom-0 left-0 top-0 shadow-md"
+            className="h-full"
           />
         </div>
-      )}
 
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className={`h-full pt-navbar outline-none transition-[padding-left] duration-slow ease-in-out ${
-          isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'
-        } ${sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar'}`}
-      >
-        <div
-          className={
-            isFillHeight
-              ? 'flex h-full min-h-0 max-w-none flex-col px-3 py-3 md:px-4'
-              : `mx-auto px-5 py-6 ${activeItem === 'calendar' ? 'max-w-none' : 'max-w-7xl'}`
-          }
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-sidebar lg:hidden" data-workspace-sidebar="true">
+            <button
+              type="button"
+              className="absolute inset-0 teamora-scrim"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close workspace navigation"
+            />
+            <WorkspaceSidebar
+              activeItem={activeItem}
+              onSelect={selectItem}
+              onBackToDashboard={onBackToDashboard}
+              onLeaveWorkspace={requestLeaveWorkspace}
+              onDeleteWorkspace={requestDeleteWorkspace}
+              isOwner={isOwner}
+              canLeave={canLeave}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebarCollapsed}
+              className="absolute bottom-0 left-0 top-0 shadow-md"
+            />
+          </div>
+        )}
+
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className={`min-h-0 min-w-0 flex-1 outline-none ${isFillHeight ? 'overflow-hidden' : 'overflow-y-auto'}`}
         >
-          {children}
-        </div>
-      </main>
+          <div
+            className={
+              isFillHeight
+                ? 'flex h-full min-h-0 max-w-none flex-col px-3 py-3 md:px-4'
+                : `mx-auto px-5 py-6 ${activeItem === 'calendar' ? 'max-w-none' : 'max-w-7xl'}`
+            }
+          >
+            {children}
+          </div>
+        </main>
+      </div>
 
       {showLeaveConfirm && (
         <WorkspaceLeaveDialog

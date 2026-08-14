@@ -119,14 +119,19 @@ const verifyPasswordResetEmailConfiguration = () => {
   return true;
 };
 
-const getClientLogoUrl = () =>
-  `${(process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '')}/teamora-favicon.png`;
+const getClientLogoUrl = (resetUrl) => {
+  try {
+    return `${new URL(resetUrl).origin}/teamora-favicon.png`;
+  } catch {
+    return `${(process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '')}/teamora-favicon.png`;
+  }
+};
 
 const buildResetEmail = ({ resetUrl }) => `
   <div style="margin:0;padding:32px;background:#f8fafc;font-family:Inter,Arial,sans-serif;color:#111111;">
     <div style="max-width:560px;margin:0 auto;border:1px solid #E5E7EB;border-radius:20px;padding:32px;background:#ffffff;box-shadow:0 12px 35px rgba(15,23,42,0.06);">
       <div style="margin-bottom:24px;">
-        <img src="${getClientLogoUrl()}" alt="Teamora" width="144" style="display:block;max-width:144px;height:auto;" />
+        <img src="${getClientLogoUrl(resetUrl)}" alt="Teamora" width="144" style="display:block;max-width:144px;height:auto;" />
       </div>
       <h1 style="font-size:24px;line-height:1.3;margin:0 0 12px;">Reset Password</h1>
       <p style="font-size:15px;line-height:1.7;color:#6B7280;margin:0 0 24px;">

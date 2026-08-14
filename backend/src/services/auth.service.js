@@ -141,7 +141,7 @@ const register = async ({ fullName, username, email, password, avatar }) => {
   const input = validateRegistrationInput({ fullName, username, email, password });
 
   const existingUser = await User.findOne({
-    $or: [{ email: input.email   }, { username: input.username }]
+    $or: [{ email: input.email }, { username: input.username }]
   });
 
   if (existingUser?.email === input.email) {
@@ -243,7 +243,8 @@ const updateProfile = async (userId, { fullName, username, avatar }) => {
   return sanitizeUser(user);
 };
 
-const forgotPassword = async ({ email }) => {
+const forgotPassword = async ({ email }, clientUrl) => {
+  clientUrl = (clientUrl || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/$/, '');
   const cleanEmail = typeof email === 'string' ? normalizeEmail(email) : '';
 
   if (!EMAIL_PATTERN.test(cleanEmail)) {
@@ -261,7 +262,7 @@ const forgotPassword = async ({ email }) => {
   user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
   await user.save({ validateBeforeSave: false });
 
-  const resetUrl = `${getClientUrl()}/reset-password/${resetToken}`;
+  const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
   try {
     await sendPasswordResetEmail({ to: user.email, resetUrl });
   } catch (error) {

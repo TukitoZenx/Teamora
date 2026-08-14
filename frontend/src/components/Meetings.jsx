@@ -1616,114 +1616,114 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const meetingContent = (
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-border bg-card-sunken text-text select-none">
       <div className="flex min-h-0 flex-1 overflow-hidden">
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
-        {inMeeting && (
-          <div className="absolute top-4 left-6 right-6 flex justify-between items-center z-25 pointer-events-none">
-            {isRecording && (
-              <div className="flex items-center gap-1.5 bg-danger/90 text-on-primary text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto border border-danger animate-pulse">
-                <Disc className="w-3.5 h-3.5 fill-current" />
-                <span>REC {formatTimer(recordingSeconds)}</span>
-              </div>
-            )}
-            <div className="ml-auto flex items-center gap-2 pointer-events-auto">
-              <div className="flex items-center gap-1.5 bg-card/90 text-muted text-[10px] font-bold px-3 py-1.5 rounded-full shadow border border-border">
-                <Users className="w-3.5 h-3.5" />
-                <span>{Object.keys(meetingParticipants).length || 0}</span>
-                {!iceInfo.hasTurn && <span className="text-warning">· No TURN</span>}
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-3 sm:p-4">
+          {inMeeting && (
+            <div className="absolute top-4 left-6 right-6 flex justify-between items-center z-25 pointer-events-none">
+              {isRecording && (
+                <div className="flex items-center gap-1.5 bg-danger/90 text-on-primary text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg pointer-events-auto border border-danger animate-pulse">
+                  <Disc className="w-3.5 h-3.5 fill-current" />
+                  <span>REC {formatTimer(recordingSeconds)}</span>
+                </div>
+              )}
+              <div className="ml-auto flex items-center gap-2 pointer-events-auto">
+                <div className="flex items-center gap-1.5 bg-card/90 text-muted text-[10px] font-bold px-3 py-1.5 rounded-full shadow border border-border">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>{Object.keys(meetingParticipants).length || 0}</span>
+                  {!iceInfo.hasTurn && <span className="text-warning">· No TURN</span>}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {!inMeeting ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
-            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 border border-primary/20">
-              <Video className="w-8 h-8" />
+          {!inMeeting ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 border border-primary/20">
+                <Video className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-text mb-2">Teamora Call Lobby</h2>
+              <p className="text-sm text-muted mb-4 font-medium">
+                Verify camera and microphone before joining. Mesh A/V works across tabs and devices via hybrid signaling
+                {iceInfo.hasTurn ? ' with TURN' : ''}.
+              </p>
+              <button
+                type="button"
+                onClick={handleJoinMeeting}
+                disabled={isJoining || !socketId || !socket?.connected}
+                className="w-full py-4 bg-primary hover:bg-primary-hover disabled:cursor-wait disabled:opacity-70 text-on-primary font-semibold rounded-2xl shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2"
+              >
+                <Video className="w-5 h-5" />
+                <span>
+                  {!socketId || !socket?.connected ? 'Connecting to Server…' : isJoining ? 'Joining…' : 'Join Meeting'}
+                </span>
+              </button>
             </div>
-            <h2 className="text-xl font-bold text-text mb-2">Teamora Call Lobby</h2>
-            <p className="text-sm text-muted mb-4 font-medium">
-              Verify camera and microphone before joining. Mesh A/V works across tabs and devices via hybrid signaling
-              {iceInfo.hasTurn ? ' with TURN' : ''}.
-            </p>
-            <button
-              type="button"
-              onClick={handleJoinMeeting}
-              disabled={isJoining || !socketId || !socket?.connected}
-              className="w-full py-4 bg-primary hover:bg-primary-hover disabled:cursor-wait disabled:opacity-70 text-on-primary font-semibold rounded-2xl shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2"
-            >
-              <Video className="w-5 h-5" />
-              <span>
-                {!socketId || !socket?.connected ? 'Connecting to Server…' : isJoining ? 'Joining…' : 'Join Meeting'}
-              </span>
-            </button>
-          </div>
-        ) : layoutMode === 'speaker' ? (
-          <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden min-h-0 w-full h-full">
-            {/* Active Speaker Container */}
-            <div className="flex-grow flex-1 min-h-0 relative flex items-center justify-center bg-black/20 rounded-2xl overflow-hidden h-[65vh] md:h-full">
-              <ActiveSpeakerVideo
-                participant={activeParticipant}
-                isMe={activeParticipant?.id === socketId}
-                localVideoRef={localVideoRef}
-                localStream={localStream}
-                remoteStream={activeParticipant ? remoteStreams[activeParticipant.id]?.stream : null}
-                selectedSpeaker={selectedSpeaker}
-                speaking={activeParticipant ? speakingMap[activeParticipant.id] : false}
-                networkQualityValue={activeParticipant ? networkQuality[activeParticipant.id] : null}
-                pinnedId={pinnedId}
-                setPinnedId={setPinnedId}
-                toggleFullscreen={toggleFullscreen}
-                camActive={camActive}
-                peerState={activeParticipant ? peerStates[activeParticipant.id] : null}
-                userName={userName}
-              />
-            </div>
-            {/* Participant Sidebar */}
-            {otherParticipants.length > 0 && (
-              <ParticipantThumbnailList
-                participants={otherParticipants}
-                socketId={socketId}
-                localVideoRef={localVideoRef}
-                localStream={localStream}
-                remoteStreams={remoteStreams}
-                selectedSpeaker={selectedSpeaker}
-                speakingMap={speakingMap}
-                networkQuality={networkQuality}
-                pinnedId={pinnedId}
-                setPinnedId={setPinnedId}
-                toggleFullscreen={toggleFullscreen}
-                camActive={camActive}
-                peerStates={peerStates}
-                userName={userName}
-              />
-            )}
-          </div>
-        ) : (
-          <div className={`grid min-h-0 flex-1 gap-3 overflow-hidden ${gridColsClass}`}>
-            {Object.entries(meetingParticipants).map(([id, part]) => (
-              <div key={id} className="relative min-h-0 h-full overflow-hidden rounded-2xl border border-border">
-                <ParticipantTile
-                  participantId={id}
-                  part={part}
-                  isMe={id === socketId}
+          ) : layoutMode === 'speaker' ? (
+            <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden min-h-0 w-full h-full">
+              {/* Active Speaker Container */}
+              <div className="flex-grow flex-1 min-h-0 relative flex items-center justify-center bg-black/20 rounded-2xl overflow-hidden h-[65vh] md:h-full">
+                <ActiveSpeakerVideo
+                  participant={activeParticipant}
+                  isMe={activeParticipant?.id === socketId}
                   localVideoRef={localVideoRef}
                   localStream={localStream}
-                  remoteStream={remoteStreams[id]?.stream}
+                  remoteStream={activeParticipant ? remoteStreams[activeParticipant.id]?.stream : null}
                   selectedSpeaker={selectedSpeaker}
-                  speaking={speakingMap[id]}
-                  networkQualityValue={networkQuality[id]}
+                  speaking={activeParticipant ? speakingMap[activeParticipant.id] : false}
+                  networkQualityValue={activeParticipant ? networkQuality[activeParticipant.id] : null}
                   pinnedId={pinnedId}
                   setPinnedId={setPinnedId}
                   toggleFullscreen={toggleFullscreen}
                   camActive={camActive}
-                  peerState={peerStates[id]}
+                  peerState={activeParticipant ? peerStates[activeParticipant.id] : null}
                   userName={userName}
                 />
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              {/* Participant Sidebar */}
+              {otherParticipants.length > 0 && (
+                <ParticipantThumbnailList
+                  participants={otherParticipants}
+                  socketId={socketId}
+                  localVideoRef={localVideoRef}
+                  localStream={localStream}
+                  remoteStreams={remoteStreams}
+                  selectedSpeaker={selectedSpeaker}
+                  speakingMap={speakingMap}
+                  networkQuality={networkQuality}
+                  pinnedId={pinnedId}
+                  setPinnedId={setPinnedId}
+                  toggleFullscreen={toggleFullscreen}
+                  camActive={camActive}
+                  peerStates={peerStates}
+                  userName={userName}
+                />
+              )}
+            </div>
+          ) : (
+            <div className={`grid min-h-0 flex-1 gap-3 overflow-hidden ${gridColsClass}`}>
+              {Object.entries(meetingParticipants).map(([id, part]) => (
+                <div key={id} className="relative min-h-0 h-full overflow-hidden rounded-2xl border border-border">
+                  <ParticipantTile
+                    participantId={id}
+                    part={part}
+                    isMe={id === socketId}
+                    localVideoRef={localVideoRef}
+                    localStream={localStream}
+                    remoteStream={remoteStreams[id]?.stream}
+                    selectedSpeaker={selectedSpeaker}
+                    speaking={speakingMap[id]}
+                    networkQualityValue={networkQuality[id]}
+                    pinnedId={pinnedId}
+                    setPinnedId={setPinnedId}
+                    toggleFullscreen={toggleFullscreen}
+                    camActive={camActive}
+                    peerState={peerStates[id]}
+                    userName={userName}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {inMeeting && admitted && (

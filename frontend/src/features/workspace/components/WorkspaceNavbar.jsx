@@ -193,9 +193,7 @@ export default function WorkspaceNavbar({
   const searchDropdown = isOpen && cleanQuery && (
     <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-border bg-card-elevated p-3 shadow-modal z-50 max-h-80 overflow-y-auto space-y-3">
       {!hasResults ? (
-        <p className="text-xs text-muted italic py-3 text-center">
-          No matching documents, files, members, or tasks.
-        </p>
+        <p className="text-xs text-muted italic py-3 text-center">No matching documents, files, members, or tasks.</p>
       ) : (
         <>
           {matchedFiles.length > 0 && (
@@ -282,7 +280,7 @@ export default function WorkspaceNavbar({
     return (
       <header
         data-app-navbar="true"
-        className="fixed inset-x-0 top-0 z-navbar h-navbar border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6"
+        className="z-navbar h-navbar shrink-0 border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6"
       >
         <div className="flex h-full w-full items-center gap-3">
           <button
@@ -336,7 +334,7 @@ export default function WorkspaceNavbar({
   return (
     <header
       data-app-navbar="true"
-      className="fixed inset-x-0 top-0 z-navbar h-navbar border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6"
+      className="z-navbar h-navbar shrink-0 border-b border-border bg-card/88 px-4 shadow-sm backdrop-blur-xl sm:px-6"
     >
       <div className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
         <div className="flex min-w-0 items-center gap-3">

@@ -1,7 +1,7 @@
 // it is the entry point of the application
-// when the web is refreshed then the main.jsx is called ? ans : yes it is called. at every refreshed time main.jsx is called and all the 
-// files are reimported and all the states and variables are reset. and this is the correct behaviour of a react application, don't change it ok ? 
-// from which import the authprovider is called in this file ? ans : it is called from the ./contexts/AuthContext.jsx file. yeah strictMode ? ans : it is used to check for potential problems in the application and it is only used in development mode , okey which line it is imported ? ans : 
+// when the web is refreshed then the main.jsx is called ? ans : yes it is called. at every refreshed time main.jsx is called and all the
+// files are reimported and all the states and variables are reset. and this is the correct behaviour of a react application, don't change it ok ?
+// from which import the authprovider is called in this file ? ans : it is called from the ./contexts/AuthContext.jsx file. yeah strictMode ? ans : it is used to check for potential problems in the application and it is only used in development mode , okey which line it is imported ? ans :
 import React from 'react' // used to create the react components
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'

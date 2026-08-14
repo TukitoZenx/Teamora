@@ -6,7 +6,7 @@ import AppNavbar from './components/AppNavbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import InviteWorkspacePage from './components/InviteWorkspacePage'
 import WorkspaceRoute, { WorkspaceLoadingShell } from './components/WorkspaceRoute'
-import api from './services/api' 
+import api from './services/api'
 import { useAuth } from './hooks/useAuth'
 import { addWorkspaceNotification } from './components/utils/notifications'
 import GlobalMeetings from './components/GlobalMeetings'
@@ -415,7 +415,7 @@ export default function App() {
   )
 
   const goToDashboard = useCallback(() => {
-    setActiveWorkspace(null)// 
+    setActiveWorkspace(null) //
     clearLastWorkspaceId()
     navigate('/dashboard', { replace: true })
   }, [navigate])
@@ -456,7 +456,8 @@ export default function App() {
       )
     }
 
-    if (forceWorkspace) {// 
+    if (forceWorkspace) {
+      //
       return (
         <ProtectedRoute>
           <WorkspaceLoadingShell activeItem={workspacePage} onBack={goToDashboard} />

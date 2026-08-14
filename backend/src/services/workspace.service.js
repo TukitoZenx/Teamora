@@ -5,7 +5,6 @@ const Workspace = require('../models/Workspace');
 const logger = require('../utils/logger');
 
 const USER_SELECT = 'fullName username email avatar';
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 const createError = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -19,7 +18,6 @@ const cleanWorkspace = (workspace, currentUserId) => {
   const data = workspace.toObject ? workspace.toObject() : workspace;
   delete data.__v;
   data.workspaceId = data._id?.toString();
-  data.inviteLink = `${CLIENT_URL}/invite/${data.inviteCode}`;
 
   const isOwner = currentUserId && getEntityId(data.owner)?.toString() === currentUserId.toString();
 
@@ -216,7 +214,7 @@ const markLegacyRoomArchived = async (workspaceId, userId, archivedAt) => {
       }
     );
   } catch (err) {
-    logger.warn(`Legacy rooms archive skipped: ${err.message}`)
+    logger.warn(`Legacy rooms archive skipped: ${err.message}`);
   }
 };
 
@@ -338,7 +336,7 @@ const cleanRecentWorkspace = (entry, userId, activeWorkspaceIds = new Set()) => 
     owner: workspace?.owner || entry.owner,
     ownerName: workspace?.owner ? getDisplayName(workspace.owner) : entry.ownerName,
     inviteCode: workspace?.inviteCode || null,
-    inviteLink: workspace?.inviteCode ? `${CLIENT_URL}/invite/${workspace.inviteCode}` : null,
+
     visibility: workspace?.visibility || 'invite_only',
     status,
     statusLabel,
@@ -445,7 +443,7 @@ const getWorkspaces = async (userId) => {
       owner: workspace.owner,
       ownerName: getDisplayName(workspace.owner),
       inviteCode: workspace.inviteCode,
-      inviteLink: `${CLIENT_URL}/invite/${workspace.inviteCode}`,
+      inviteLink: '',
       status: 'active',
       statusLabel: 'Active',
       canOpen: true,
@@ -610,7 +608,7 @@ const getInvitePreview = async (userId, inviteCode) => {
     owner: workspace.owner,
     memberCount: workspace.members.length,
     inviteCode: allowsJoin || isMember ? workspace.inviteCode : null,
-    inviteLink: allowsJoin || isMember ? `${CLIENT_URL}/invite/${workspace.inviteCode}` : null,
+
     visibility,
     allowsJoin,
     joinApproval: Boolean(workspace.joinApproval),
