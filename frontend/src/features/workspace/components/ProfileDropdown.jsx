@@ -80,10 +80,7 @@ export default function ProfileDropdown({ onWorkspaceSettings, onLeaveWorkspace 
 
   const menu = open
     ? createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 1300 }}
-        >
+        <div ref={menuRef} style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 1300 }}>
           <DropdownMenu className="relative right-0 mt-0 w-72 rounded-card p-3 shadow-dropdown bg-card-elevated border border-border animate-[teamora-content-fade_180ms_ease-out_both]">
             <div className="flex items-center gap-3 px-2 pb-3 pt-1">
               <Avatar label={displayName.charAt(0).toUpperCase()} src={user?.avatar} className="h-14 w-14 text-lg" />
