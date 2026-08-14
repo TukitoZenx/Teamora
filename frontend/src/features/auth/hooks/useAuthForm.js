@@ -18,6 +18,7 @@ export const getFriendlyAuthError = (message = '') => {
   if (lower.includes('username is already in use') || lower.includes('username already exists'))
     return 'Username already exists.'
   if (lower.includes('authentication required')) return 'Session expired. Please sign in again.'
+  if (lower.includes('csrf')) return 'Something went wrong verifying this request. Please try again.'
   if (lower.includes('reset link') || lower.includes('expired')) return 'This reset link is invalid or has expired.'
   if (lower.includes('email service') || lower.includes('reset email'))
     return 'We could not send the reset email. Please try again later.'

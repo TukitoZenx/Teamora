@@ -1,14 +1,19 @@
-import api from '../../../services/api'
+import api, { ensureCsrfToken } from '../../../services/api'
+
+const withCsrf = async (fn) => {
+  await ensureCsrfToken()
+  return fn()
+}
 
 const extractUser = (data) => data?.user || null
 
 export const register = async (payload) => {
-  const { data } = await api.post('/api/auth/register', payload)
+  const { data } = await withCsrf(() => api.post('/api/auth/register', payload))
   return extractUser(data)
 }
 
 export const login = async (payload) => {
-  const { data } = await api.post('/api/auth/login', payload)
+  const { data } = await withCsrf(() => api.post('/api/auth/login', payload))
   return extractUser(data)
 }
 
@@ -23,7 +28,7 @@ export const getCurrentUser = async () => {
 }
 
 export const checkEmailAvailability = async (email) => {
-  const { data } = await api.post('/api/auth/check-email', { email })
+  const { data } = await withCsrf(() => api.post('/api/auth/check-email', { email }))
   return data
 }
 
@@ -33,12 +38,12 @@ export const completeProfile = async (payload) => {
 }
 
 export const forgotPassword = async (email) => {
-  const { data } = await api.post('/api/auth/forgot-password', { email })
+  const { data } = await withCsrf(() => api.post('/api/auth/forgot-password', { email }))
   return data
 }
 
 export const resetPassword = async ({ token, password }) => {
-  const { data } = await api.post(`/api/auth/reset-password/${encodeURIComponent(token)}`, { password })
+  const { data } = await withCsrf(() => api.post(`/api/auth/reset-password/${encodeURIComponent(token)}`, { password }))
   return data
 }
 
