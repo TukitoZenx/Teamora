@@ -65,17 +65,12 @@ export default function GlobalMeetings() {
     }
 
     window.addEventListener('resize', updateRect)
-    // Use capture phase for scroll listener to track all scroll events
     window.addEventListener('scroll', updateRect, true)
-
-    // Re-check periodically just in case layout shifts without triggering events
-    const interval = setInterval(updateRect, 500)
 
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', updateRect)
       window.removeEventListener('scroll', updateRect, true)
-      clearInterval(interval)
     }
   }, [isMaximized, portalTarget])
 

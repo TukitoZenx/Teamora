@@ -12,11 +12,8 @@ const clearMeetingSession = (workspaceId) => {
   try {
     sessionStorage.removeItem('teamora-global-active-meeting')
     sessionStorage.removeItem('teamora-in-call')
+    sessionStorage.removeItem('teamora-auto-join-meeting')
     if (workspaceId) {
-      sessionStorage.removeItem(`teamora-auto-join-meeting`)
-      if (sessionStorage.getItem('teamora-auto-join-meeting') === workspaceId) {
-        sessionStorage.removeItem('teamora-auto-join-meeting')
-      }
       clearStableMeetingClientId(workspaceId)
     }
   } catch {

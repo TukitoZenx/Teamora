@@ -14,6 +14,15 @@ const createError = (message, statusCode = 400) => {
 
 const getEntityId = (entity) => entity?._id || entity;
 
+const kickWorkspaceUser = (workspaceId, userId) => {
+  try {
+    const { forceCloseUser } = require('../collab/wsHub');
+    forceCloseUser(workspaceId, userId);
+  } catch {
+    // Hub not attached (tests / process startup).
+  }
+};
+
 const cleanWorkspace = (workspace, currentUserId) => {
   const data = workspace.toObject ? workspace.toObject() : workspace;
   delete data.__v;
@@ -1031,6 +1040,7 @@ const removeMember = async (ownerId, workspaceId, memberId) => {
     approval.revokedAt = new Date();
   }
   await workspace.save();
+  kickWorkspaceUser(workspaceId, memberId);
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
   await upsertRecentWorkspace(memberId, populated, 'previously_joined');
   return cleanWorkspace(populated, ownerId);
@@ -1104,6 +1114,7 @@ const leaveWorkspace = async (userId, workspaceId) => {
     });
 
     await markLegacyRoomArchived(workspaceId, userId, workspace.archivedAt);
+    kickWorkspaceUser(workspaceId, userId);
 
     return {
       success: true,
@@ -1129,6 +1140,7 @@ const leaveWorkspace = async (userId, workspaceId) => {
 
   workspace.active = workspace.members.length > 0;
   await workspace.save();
+  kickWorkspaceUser(workspaceId, userId);
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
   await upsertRecentWorkspace(userId, populated, 'previously_joined');
 

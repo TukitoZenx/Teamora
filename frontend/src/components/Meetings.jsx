@@ -624,17 +624,17 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
         setSelectedCam(deviceId)
         if (localStreamRef.current) {
           try {
-            localStreamRef.current.getVideoTracks().forEach((t) => t.stop())
             const newStream = await navigator.mediaDevices.getUserMedia({
               video: {
                 deviceId: deviceId ? { exact: deviceId } : undefined
               }
             })
             const newTrack = newStream.getVideoTracks()[0]
-            const oldTrack = localStreamRef.current.getVideoTracks()[0]
-            if (oldTrack) {
-              localStreamRef.current.removeTrack(oldTrack)
-            }
+            const oldTracks = localStreamRef.current.getVideoTracks()
+            oldTracks.forEach((t) => {
+              t.stop()
+              localStreamRef.current.removeTrack(t)
+            })
             localStreamRef.current.addTrack(newTrack)
             newTrack.enabled = camActive
 
@@ -1127,16 +1127,17 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
         participant: selfParticipant
       })
 
-      const meetingTitle = `Teamora Call · ${userName || 'Host'}`
-      socket.emit('meeting-started', {
-        workspaceId: roomId,
-        meetingId: `meet-${roomId}`,
-        title: meetingTitle,
-        organizer: userName,
-        startedAt: new Date().toISOString()
-      })
-      // Peers learn about the meeting via socket `meeting-started` +
-      // useMeetingNotifications. Organizer is not self-notified.
+      const knownPeers = Object.keys(participantsRef.current).filter((id) => id !== socketId)
+      if (knownPeers.length === 0) {
+        const meetingTitle = `Teamora Call · ${userName || 'Host'}`
+        socket.emit('meeting-started', {
+          workspaceId: roomId,
+          meetingId: `meet-${roomId}`,
+          title: meetingTitle,
+          organizer: userName,
+          startedAt: new Date().toISOString()
+        })
+      }
       setMeetingParticipants((prev) => ({
         ...prev,
         [socketId]: {
@@ -1882,6 +1883,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                 onClick={toggleMic}
                 className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${micActive ? 'bg-card border-border text-text hover:bg-primary/10' : 'bg-danger text-on-primary border-danger'}`}
                 title={micActive ? 'Mute' : 'Unmute'}
+                aria-label={micActive ? 'Mute microphone' : 'Unmute microphone'}
+                aria-pressed={!micActive}
               >
                 {micActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
               </button>
@@ -1890,6 +1893,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                 onClick={toggleCam}
                 className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${camActive ? 'bg-card border-border text-text hover:bg-primary/10' : 'bg-danger text-on-primary border-danger'}`}
                 title={camActive ? 'Camera off' : 'Camera on'}
+                aria-label={camActive ? 'Turn camera off' : 'Turn camera on'}
+                aria-pressed={camActive}
               >
                 {camActive ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
               </button>
@@ -1898,6 +1903,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                 onClick={toggleScreenShare}
                 className={`p-2.5 rounded-xl cursor-pointer transition-colors border ${screenSharingActive ? 'bg-success text-on-primary border-success' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title={screenSharingActive ? 'Stop sharing' : 'Share screen'}
+                aria-label={screenSharingActive ? 'Stop sharing screen' : 'Share screen'}
+                aria-pressed={screenSharingActive}
               >
                 <Tv className="w-4 h-4" />
               </button>
@@ -1909,6 +1916,8 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                 onClick={toggleHand}
                 className={`p-2.5 rounded-xl cursor-pointer border ${handRaised ? 'bg-warning text-on-primary border-warning' : 'bg-card border-border text-muted hover:bg-primary/10 hover:text-primary'}`}
                 title="Raise hand"
+                aria-label="Raise hand"
+                aria-pressed={handRaised}
               >
                 <Hand className="w-4 h-4" />
               </button>
@@ -2085,6 +2094,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               <button
                 type="button"
                 onClick={handleLeaveMeeting}
+                aria-label="Leave meeting"
                 className="px-4 py-2.5 bg-danger hover:bg-danger-hover text-on-primary rounded-xl text-xs font-semibold cursor-pointer border border-danger shadow-sm"
               >
                 Leave

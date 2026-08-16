@@ -89,7 +89,6 @@ export function AuthProvider({ children }) {
       } catch (error) {
         if (generation !== authGenerationRef.current) return null
         if (error.status === 401) {
-          if (sessionValidatedRef.current) return null
           clearSession()
           return null
         }

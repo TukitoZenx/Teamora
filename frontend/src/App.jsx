@@ -48,6 +48,7 @@ export default function App() {
   const location = useLocation()
   const workspacesRequestRef = useRef(null)
   const workspaceRequestRef = useRef(new Map())
+  const latestWorkspaceFetchRef = useRef(null)
   const [workspaces, setWorkspaces] = useState(() => readJsonCache(WORKSPACES_CACHE_KEY, []))
   const [recentWorkspaces, setRecentWorkspaces] = useState(() => readJsonCache(RECENT_WORKSPACES_CACHE_KEY, []))
   const [activeWorkspace, setActiveWorkspace] = useState(null)
@@ -387,9 +388,11 @@ export default function App() {
       }
 
       setWorkspaceLoading(true)
+      latestWorkspaceFetchRef.current = workspaceId
       const request = api
         .get(`/api/v1/workspaces/${workspaceId}`)
         .then(({ data }) => {
+          if (latestWorkspaceFetchRef.current !== workspaceId) return data.workspace
           setActiveWorkspace(data.workspace)
           cacheWorkspace(data.workspace)
           setLastWorkspaceId(data.workspace._id)

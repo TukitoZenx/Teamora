@@ -24,20 +24,28 @@ const extraClientUrls = String(process.env.CLIENT_URLS || '')
   .map((value) => normalizeUrl(value.trim()))
   .filter(Boolean);
 const productionClientUrl = 'https://teamora-ruby.vercel.app';
+const localDevOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000'
+];
 const allowedOrigins = new Set([
   clientUrl,
   productionClientUrl,
   'https://teamora.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000',
-  ...extraClientUrls
+  ...extraClientUrls,
+  ...(isProduction ? [] : localDevOrigins)
 ]);
-const isAllowedVercelPreview = (origin = '') => /^https:\/\/teamora(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+const isAllowedVercelPreview = (origin = '') => {
+  if (isProduction) return false;
+  return /^https:\/\/teamora(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+};
 
-const isAllowedOrigin = (origin = '') =>
-  !origin || allowedOrigins.has(origin) || isAllowedVercelPreview(origin) || isAllowedDevelopmentLanOrigin(origin);
+const isAllowedOrigin = (origin = '', { requireOrigin = false } = {}) => {
+  if (!origin) return !requireOrigin;
+  return allowedOrigins.has(origin) || isAllowedVercelPreview(origin) || isAllowedDevelopmentLanOrigin(origin);
+};
 
 const sessionStore = createSessionStore();
 const sessionMiddleware = createSessionMiddleware(sessionStore);
@@ -110,6 +118,16 @@ app.use(
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 app.use(requireJsonContentType);
+
+// Liveness / readiness before session + CSRF so probes do not create Mongo sessions.
+app.get(['/health', '/health/live'], (req, res) => {
+  res.status(200).json(getLiveness());
+});
+app.get('/health/ready', (req, res) => {
+  const body = getReadiness();
+  res.status(body.ready ? 200 : 503).json(body);
+});
+
 app.use(cookieParser());
 app.use(sessionMiddleware);
 app.use(passport.initialize());
@@ -118,17 +136,6 @@ app.use(passport.session());
 // (JSON Content-Type + CORS remain a first line of defence for browsers.)
 app.use(ensureCsrfCookie);
 app.use(verifyCsrf);
-
-// Liveness — process is up (Render/platform health check).
-app.get(['/health', '/health/live'], (req, res) => {
-  res.status(200).json(getLiveness());
-});
-
-// Readiness — Mongo connected; use for load-balancer routing / deploy gates.
-app.get('/health/ready', (req, res) => {
-  const body = getReadiness();
-  res.status(body.ready ? 200 : 503).json(body);
-});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/workspaces', workspaceRoutes);
