@@ -25,10 +25,14 @@ const upload = multer({
       return cb(new Error('Unsupported file type for import'));
     }
     const mime = String(file.mimetype || '').toLowerCase();
-    if (mime && !ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p))) {
-      // Soft check: some browsers send empty/odd MIME; extension remains authoritative.
-      if (mime !== 'application/msword' && mime !== 'application/vnd.ms-powerpoint') {
-        // still allow known office mimes
+    if (mime) {
+      const mimeAllowed =
+        ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p)) ||
+        mime === 'application/msword' ||
+        mime === 'application/vnd.ms-powerpoint' ||
+        mime === 'application/x-zip-compressed';
+      if (!mimeAllowed) {
+        return cb(new Error('Unsupported file type for import'));
       }
     }
     // Strip path components to prevent path-like names from propagating.
@@ -37,11 +41,18 @@ const upload = multer({
   }
 }).single('file');
 
+const MAX_PPTX_ZIP_ENTRIES = 400;
+const MAX_PPTX_SLIDES = 80;
+const MAX_SLIDE_XML_BYTES = 2 * 1024 * 1024;
+
 const parsePptxFromBuffer = async (buffer) => {
   return new Promise((resolve, reject) => {
     try {
       const zip = new AdmZip(buffer);
       const zipEntries = zip.getEntries();
+      if (zipEntries.length > MAX_PPTX_ZIP_ENTRIES) {
+        return reject(new Error('Presentation archive is too large'));
+      }
 
       const slideEntries = zipEntries
         .filter((entry) => entry.entryName.match(/ppt\/slides\/slide\d+\.xml/))
@@ -50,6 +61,9 @@ const parsePptxFromBuffer = async (buffer) => {
           const bMatch = b.entryName.match(/\d+/);
           return parseInt(aMatch[0], 10) - parseInt(bMatch[0], 10);
         });
+      if (slideEntries.length > MAX_PPTX_SLIDES) {
+        return reject(new Error('Presentation has too many slides'));
+      }
 
       const slides = [];
       let processed = 0;
@@ -58,7 +72,21 @@ const parsePptxFromBuffer = async (buffer) => {
 
       slideEntries.forEach((entry, index) => {
         try {
+          if (typeof entry.header?.size === 'number' && entry.header.size > MAX_SLIDE_XML_BYTES) {
+            processed++;
+            if (processed === slideEntries.length) {
+              resolve({ slides: slides.filter(Boolean) });
+            }
+            return;
+          }
           const xml = entry.getData().toString('utf8');
+          if (xml.length > MAX_SLIDE_XML_BYTES) {
+            processed++;
+            if (processed === slideEntries.length) {
+              resolve({ slides: slides.filter(Boolean) });
+            }
+            return;
+          }
           xml2js.parseString(xml, (err, result) => {
             if (err) {
               processed++;

@@ -526,7 +526,7 @@ export default function App() {
           error: { iconTheme: { primary: 'var(--tw-danger)', secondary: 'var(--tw-card)' } },
           duration: 3500
         }}
-        containerStyle={{ zIndex: 1300 }}
+        containerStyle={{ zIndex: 10000 }}
       >
         {(t) => (
           <ToastBar toast={t}>

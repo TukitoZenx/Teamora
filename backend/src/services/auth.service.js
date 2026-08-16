@@ -184,14 +184,9 @@ const checkEmailAvailability = async ({ email }) => {
 const login = async ({ email, password }) => {
   const input = validateLoginInput({ email, password });
   const user = await User.findOne({ email: input.email }).select('+password');
+  const passwordMatches = await comparePassword(input.password, user?.password);
 
-  if (!user || !user.password) {
-    throw createError('Invalid credentials', 401);
-  }
-
-  const passwordMatches = await comparePassword(input.password, user.password);
-
-  if (!passwordMatches) {
+  if (!user || !passwordMatches) {
     throw createError('Invalid credentials', 401);
   }
 

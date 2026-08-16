@@ -437,6 +437,8 @@ export default function LandingPage() {
                   <div key={item.q} className="overflow-hidden rounded-2xl border border-border bg-card">
                     <button
                       type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={`faq-panel-${idx}`}
                       onClick={() => setOpenFaq(isOpen ? null : idx)}
                       className="flex w-full items-center justify-between gap-4 p-5 text-left font-bold text-text transition-colors hover:text-primary"
                     >
@@ -448,6 +450,8 @@ export default function LandingPage() {
                     <AnimatePresence initial={false}>
                       {isOpen && (
                         <motion.div
+                          id={`faq-panel-${idx}`}
+                          role="region"
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}

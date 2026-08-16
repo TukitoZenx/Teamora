@@ -1160,6 +1160,7 @@ export default function Calendar({
                         <input
                           type="number"
                           min="1"
+                          max="10080"
                           value={reminderGapMinutes}
                           onChange={(event) => setReminderGapMinutes(event.target.value)}
                           className="mt-1 h-10 w-full rounded-input border border-border bg-card px-3 text-sm text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"

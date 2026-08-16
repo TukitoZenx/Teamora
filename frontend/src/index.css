@@ -329,6 +329,7 @@
 .skip-link:focus,
 .skip-link:focus-visible {
   left: 0 !important;
+  z-index: 10050 !important;
   outline: 2px solid #fff;
   outline-offset: 2px;
 }

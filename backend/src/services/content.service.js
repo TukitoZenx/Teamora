@@ -110,7 +110,8 @@ const putContent = async (userId, workspaceId, key, data) => {
     }
 
     // File tree: merge-by-id + tombstones (key `files` or explicit format).
-    if (nextData && (cleanKey === 'files' || nextData.format === 'files-v1' || Array.isArray(nextData.files))) {
+    // Do not trigger on an incidental `files` array in other payloads.
+    if (nextData && (cleanKey === 'files' || nextData.format === 'files-v1')) {
       const legacyExisting =
         existing?.data?.format === 'files-v1'
           ? existing.data

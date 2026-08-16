@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Sparkles, Loader2, Check } from 'lucide-react'
 import { getGenerateStream } from '../../services/aiClient'
 import toast from 'react-hot-toast'
@@ -19,6 +19,15 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [draftState, setDraftState] = useState(null)
+
+  useEffect(() => {
+    if (!isOpen || draftState) return undefined
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !isGenerating) onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isOpen, isGenerating, onClose, draftState])
 
   if (!isOpen && !draftState) return null
 
@@ -120,8 +129,13 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
 
   if (draftState) {
     return (
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] shadow-xl rounded-full bg-card border border-border p-1.5 flex items-center gap-1 animate-in fade-in slide-in-from-bottom-4 duration-200">
+      <div
+        role="toolbar"
+        aria-label="Accept or reject generated text"
+        className="fixed bottom-10 left-1/2 z-toast -translate-x-1/2 shadow-xl rounded-full bg-card border border-border p-1.5 flex items-center gap-1 animate-in fade-in slide-in-from-bottom-4 duration-200"
+      >
         <button
+          type="button"
           onClick={handleAccept}
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-green-600 hover:bg-green-50 rounded-full transition-colors"
         >
@@ -129,6 +143,7 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
         </button>
         <div className="w-px h-5 bg-border mx-1" />
         <button
+          type="button"
           onClick={handleReject}
           className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-full transition-colors"
         >
@@ -139,15 +154,24 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-generate-title"
+      className="teamora-scrim fixed inset-0 z-modal flex items-center justify-center p-4"
+    >
       <div className="w-full max-w-lg bg-card rounded-xl shadow-2xl overflow-hidden flex flex-col border border-border">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-card-sunken">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-600" />
-            <h3 className="font-semibold text-text">Smart Document Creation</h3>
+            <h3 id="ai-generate-title" className="font-semibold text-text">
+              Smart Document Creation
+            </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close"
             className="p-1.5 text-muted hover:text-text hover:bg-primary/10 rounded-full transition-colors"
           >
             <X className="w-4 h-4" />
@@ -155,7 +179,7 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
         </div>
 
         <div className="p-5">
-          <label className="block text-sm font-medium text-text mb-2">
+          <label htmlFor="ai-generate-prompt" className="block text-sm font-medium text-text mb-2">
             {hasSelection
               ? 'How should the selected text be rewritten, expanded, or transformed?'
               : 'What should the document contain?'}
@@ -166,6 +190,7 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
             </p>
           )}
           <textarea
+            id="ai-generate-prompt"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder={
@@ -180,12 +205,14 @@ export default function AiGenerateModal({ isOpen, onClose, quillRef, onGeneratin
 
         <div className="px-5 py-4 bg-card flex justify-end gap-2 border-t border-border">
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-muted hover:text-text hover:bg-primary/10 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleGenerate}
             disabled={!prompt.trim() || isGenerating}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-on-primary bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm"

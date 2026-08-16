@@ -134,11 +134,15 @@ const taskSchema = new mongoose.Schema(
     },
     reminderGapMinutes: {
       type: Number,
-      default: 0
+      default: 0,
+      min: 0,
+      max: 10080
     },
     reminderLimit: {
       type: Number,
-      default: 1
+      default: 1,
+      min: 1,
+      max: 10
     },
     remindersSent: {
       type: Number,

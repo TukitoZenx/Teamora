@@ -23,6 +23,29 @@ const kickWorkspaceUser = (workspaceId, userId) => {
   }
 };
 
+const kickWorkspaceEveryone = (workspaceId) => {
+  try {
+    const { forceCloseWorkspace } = require('../collab/wsHub');
+    forceCloseWorkspace(workspaceId);
+  } catch {
+    // Hub not attached (tests / process startup).
+  }
+};
+
+const invalidateInviteCode = () => `DEL${Date.now().toString(36).toUpperCase().slice(-8)}`;
+
+const clampReminderGapMinutes = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(Math.floor(n), 10080);
+};
+
+const clampReminderLimit = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(Math.max(Math.floor(n), 1), 10);
+};
+
 const cleanWorkspace = (workspace, currentUserId) => {
   const data = workspace.toObject ? workspace.toObject() : workspace;
   delete data.__v;
@@ -552,7 +575,7 @@ const deleteWorkspace = async (userId, workspaceId) => {
   // Owner field is kept for audit ("created by") but they are not an active member.
   workspace.members = [];
   // Invalidate invite so join links cannot reopen a deleted workspace.
-  workspace.inviteCode = `DEL${Date.now().toString(36).toUpperCase().slice(-8)}`;
+  workspace.inviteCode = invalidateInviteCode();
   // Clear pending access requests.
   if (Array.isArray(workspace.joinRequests)) {
     workspace.joinRequests.forEach((request) => {
@@ -928,8 +951,8 @@ const createTask = async (userId, workspaceId, payload) => {
     reminder: validateOptionalText(payload.reminder, 'Reminder', 40),
     reminderEnabled: Boolean(payload.reminderEnabled),
     reminderEmail: validateOptionalText(payload.reminderEmail, 'Reminder Email', 120),
-    reminderGapMinutes: Number(payload.reminderGapMinutes) || 0,
-    reminderLimit: Number(payload.reminderLimit) || 1,
+    reminderGapMinutes: clampReminderGapMinutes(payload.reminderGapMinutes),
+    reminderLimit: clampReminderLimit(payload.reminderLimit),
     remindersSent: 0,
     nextReminderTime: payload.reminderEnabled
       ? (() => {
@@ -978,8 +1001,10 @@ const updateTask = async (userId, workspaceId, taskId, payload) => {
   if (payload.reminderEnabled !== undefined) task.reminderEnabled = Boolean(payload.reminderEnabled);
   if (payload.reminderEmail !== undefined)
     task.reminderEmail = validateOptionalText(payload.reminderEmail, 'Reminder Email', 120);
-  if (payload.reminderGapMinutes !== undefined) task.reminderGapMinutes = Number(payload.reminderGapMinutes) || 0;
-  if (payload.reminderLimit !== undefined) task.reminderLimit = Number(payload.reminderLimit) || 1;
+  if (payload.reminderGapMinutes !== undefined) {
+    task.reminderGapMinutes = clampReminderGapMinutes(payload.reminderGapMinutes);
+  }
+  if (payload.reminderLimit !== undefined) task.reminderLimit = clampReminderLimit(payload.reminderLimit);
 
   if (payload.reminderEnabled && !task.nextReminderTime && (payload.date || payload.startTime)) {
     try {
@@ -1042,7 +1067,7 @@ const removeMember = async (ownerId, workspaceId, memberId) => {
   await workspace.save();
   kickWorkspaceUser(workspaceId, memberId);
   const populated = await populateWorkspace(Workspace.findById(workspace._id));
-  await upsertRecentWorkspace(memberId, populated, 'previously_joined');
+  await upsertRecentWorkspace(memberId, populated, 'removed');
   return cleanWorkspace(populated, ownerId);
 };
 
@@ -1104,6 +1129,7 @@ const leaveWorkspace = async (userId, workspaceId) => {
     workspace.active = false;
     workspace.archivedAt = new Date();
     workspace.archivedBy = userId;
+    workspace.inviteCode = invalidateInviteCode();
     // Owner field stays the creator — never reassigned on leave.
     await workspace.save();
 
@@ -1114,7 +1140,7 @@ const leaveWorkspace = async (userId, workspaceId) => {
     });
 
     await markLegacyRoomArchived(workspaceId, userId, workspace.archivedAt);
-    kickWorkspaceUser(workspaceId, userId);
+    kickWorkspaceEveryone(workspaceId);
 
     return {
       success: true,

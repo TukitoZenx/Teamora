@@ -1,6 +1,6 @@
 const passport = require('passport');
 const authService = require('../services/auth.service');
-const { rotateCsrfToken, ensureCsrfToken, saveSession } = require('../middleware/csrf.middleware');
+const { rotateCsrfToken, ensureCsrfToken, saveSession, clearCsrfCookie } = require('../middleware/csrf.middleware');
 
 const sessionCookieName = () => process.env.SESSION_COOKIE_NAME || 'teamora.sid';
 const { resolveClientUrl } = require('../utils/urlResolver');
@@ -99,6 +99,7 @@ const resetPassword = async (req, res, next) => {
 const logout = (req, res, next) => {
   if (!req.session) {
     res.clearCookie(sessionCookieName(), sessionCookieOptions());
+    clearCsrfCookie(res);
     return res.status(200).json({ success: true, message: 'Logged out' });
   }
 
@@ -108,6 +109,7 @@ const logout = (req, res, next) => {
     }
 
     res.clearCookie(sessionCookieName(), sessionCookieOptions());
+    clearCsrfCookie(res);
     return res.status(200).json({ success: true, message: 'Logged out' });
   });
 };

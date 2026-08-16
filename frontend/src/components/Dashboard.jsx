@@ -624,7 +624,15 @@ const WorkspaceLauncherCard = memo(function WorkspaceLauncherCard({
             type="button"
             onClick={handleDeleteAction}
             className="rounded-xl p-2 text-muted transition duration-normal hover:bg-danger/10 hover:text-danger"
-            aria-label="Delete Workspace"
+            aria-label={
+              isOwner && isActive
+                ? 'Delete workspace'
+                : isActive
+                  ? 'Leave workspace'
+                  : isTrashed
+                    ? 'Remove from trash history'
+                    : 'Remove from history'
+            }
           >
             <Trash2 className="h-4 w-4" />
           </button>
