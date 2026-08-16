@@ -101,9 +101,9 @@ const getTransport = () => {
         pool: true,
         maxConnections: 2,
         maxMessages: 50,
-        connectionTimeout: 60000,
-        greetingTimeout: 30000,
-        socketTimeout: 60000,
+        connectionTimeout: 10000,
+        greetingTimeout: 8000,
+        socketTimeout: 15000,
         tls: {
           rejectUnauthorized: parseBoolean(process.env.SMTP_TLS_REJECT_UNAUTHORIZED, true)
         }

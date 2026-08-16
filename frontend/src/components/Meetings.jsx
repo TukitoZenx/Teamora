@@ -120,7 +120,7 @@ function RemoteVideo({ stream, hidden }) {
       autoPlay
       playsInline
       muted
-      className={`h-full w-full bg-black object-cover object-center ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
+      className={`h-full w-full bg-black object-contain object-center ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
     />
   )
 }
@@ -139,7 +139,7 @@ function MiniVideo({ stream, isMe }) {
       autoPlay
       playsInline
       muted={isMe}
-      className={`h-full w-full bg-black object-cover object-center ${isMe ? 'scale-x-[-1]' : ''}`}
+      className={`h-full w-full bg-black object-contain object-center ${isMe ? 'scale-x-[-1]' : ''}`}
     />
   )
 }
@@ -202,7 +202,7 @@ function ParticipantTile({
               filter: 'none',
               display: showLocalVideo ? 'block' : 'none'
             }}
-            className="h-full w-full bg-black object-cover object-center transition-all scale-x-[-1]"
+            className="h-full w-full bg-black object-contain object-center transition-all scale-x-[-1]"
           />
           {!showLocalVideo && (
             <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
@@ -1776,7 +1776,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                     autoPlay
                     muted
                     playsInline
-                    className="h-full w-full object-cover scale-x-[-1] bg-black"
+                    className="h-full w-full object-contain scale-x-[-1] bg-black"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
