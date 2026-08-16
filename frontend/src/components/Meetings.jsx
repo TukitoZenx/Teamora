@@ -96,33 +96,55 @@ function RemoteAudio({ stream, audioOutputDeviceId }) {
   return <audio ref={audioRef} autoPlay playsInline style={{ display: 'none' }} />
 }
 
-function RemoteVideo({ stream, hidden }) {
-  const videoRef = useRef(null)
+function bindVideoStream(video, stream) {
+  if (!video || !stream) return
+  if (video.srcObject !== stream) video.srcObject = stream
+  video.muted = true
+  video.playsInline = true
+  video.play?.().catch(() => {})
+}
+
+/** Full camera frame (no crop) with a blurred fill so wide tiles have no black bars. */
+function FitVideo({ stream, videoRef, hidden, mirrored }) {
+  const bgRef = useRef(null)
+  const fallbackFgRef = useRef(null)
+  const fgRef = videoRef || fallbackFgRef
 
   useEffect(() => {
-    const video = videoRef.current
-    if (!video || !stream) return
-
-    if (video.srcObject !== stream) {
-      video.srcObject = stream
-    }
-
-    video.play?.().catch(() => {})
-
+    const bg = bgRef.current
+    const fg = fgRef.current
+    bindVideoStream(bg, stream)
+    bindVideoStream(fg, stream)
     return () => {
-      if (video) video.srcObject = null
+      if (bg) bg.srcObject = null
+      if (fg) fg.srcObject = null
     }
-  }, [stream])
+  }, [stream, fgRef])
 
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted
-      className={`h-full w-full bg-black object-contain object-center ${hidden ? 'opacity-0 absolute pointer-events-none' : ''}`}
-    />
+    <div className={`absolute inset-0 overflow-hidden bg-card-sunken ${hidden ? 'pointer-events-none opacity-0' : ''}`}>
+      <video
+        ref={bgRef}
+        autoPlay
+        playsInline
+        muted
+        aria-hidden
+        style={{ transform: mirrored ? 'scale(-1.2, 1.2)' : 'scale(1.2)' }}
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center blur-2xl opacity-80"
+      />
+      <video
+        ref={fgRef}
+        autoPlay
+        playsInline
+        muted
+        className={`relative z-[1] h-full w-full bg-transparent object-contain object-center ${mirrored ? 'scale-x-[-1]' : ''}`}
+      />
+    </div>
   )
+}
+
+function RemoteVideo({ stream, hidden }) {
+  return <FitVideo stream={stream} hidden={hidden} />
 }
 
 function MiniVideo({ stream, isMe }) {
@@ -139,7 +161,7 @@ function MiniVideo({ stream, isMe }) {
       autoPlay
       playsInline
       muted={isMe}
-      className={`h-full w-full bg-black object-contain object-center ${isMe ? 'scale-x-[-1]' : ''}`}
+      className={`h-full w-full bg-card-sunken object-cover object-center ${isMe ? 'scale-x-[-1]' : ''}`}
     />
   )
 }
@@ -186,24 +208,7 @@ function ParticipantTile({
     >
       {isMe ? (
         <>
-          <video
-            ref={(el) => {
-              if (localVideoRef) localVideoRef.current = el
-              if (el && localStream) {
-                if (el.srcObject !== localStream) el.srcObject = localStream
-                el.muted = true
-                el.play?.().catch(() => {})
-              }
-            }}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              filter: 'none',
-              display: showLocalVideo ? 'block' : 'none'
-            }}
-            className="h-full w-full bg-black object-contain object-center transition-all scale-x-[-1]"
-          />
+          <FitVideo stream={localStream} videoRef={localVideoRef} hidden={!showLocalVideo} mirrored />
           {!showLocalVideo && (
             <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
               <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
@@ -1771,13 +1776,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 max-w-md mx-auto">
               <div className="relative mb-5 h-48 w-full overflow-hidden rounded-2xl border border-border bg-card-sunken">
                 {lobbyPreview ? (
-                  <video
-                    ref={lobbyVideoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="h-full w-full object-contain scale-x-[-1] bg-black"
-                  />
+                  <FitVideo stream={lobbyPreview} videoRef={lobbyVideoRef} mirrored />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
                     <div className="flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-lg font-bold text-primary">
