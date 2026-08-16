@@ -388,6 +388,26 @@ function ActiveSpeakerVideo({
   )
 }
 
+function layoutFromContainerWidth(width, otherCount) {
+  if (!otherCount) {
+    return { rail: 'none', speakerPct: 100, railPct: 0, stripRem: 0, thumbClass: '' }
+  }
+  const w = width > 0 ? width : 1200
+  if (w >= 1200) {
+    return { rail: 'side', speakerPct: 75, railPct: 25, stripRem: 0, thumbClass: 'h-32 w-full' }
+  }
+  if (w >= 900) {
+    return { rail: 'side', speakerPct: 70, railPct: 30, stripRem: 0, thumbClass: 'h-32 w-full' }
+  }
+  if (w >= 600) {
+    return { rail: 'side', speakerPct: 60, railPct: 40, stripRem: 0, thumbClass: 'h-28 w-full' }
+  }
+  if (w >= 400) {
+    return { rail: 'strip', speakerPct: 100, railPct: 0, stripRem: 6.25, thumbClass: 'h-full w-28' }
+  }
+  return { rail: 'strip', speakerPct: 100, railPct: 0, stripRem: 4.75, thumbClass: 'h-full w-24' }
+}
+
 function ParticipantThumbnailList({
   participants,
   socketId,
@@ -402,12 +422,21 @@ function ParticipantThumbnailList({
   toggleFullscreen,
   camActive,
   peerStates,
-  userName
+  userName,
+  variant = 'side',
+  thumbClass = 'h-32 w-full'
 }) {
+  const isStrip = variant === 'strip'
   return (
-    <div className="flex flex-row overflow-x-auto overflow-y-hidden pb-2 shrink-0 w-full h-36 md:flex-col md:overflow-y-auto md:overflow-x-hidden md:w-64 md:h-full md:pb-0 md:pr-2 gap-3 no-scrollbar">
+    <div
+      className={
+        isStrip
+          ? 'flex h-full min-h-0 w-full flex-row gap-2 overflow-x-auto overflow-y-hidden no-scrollbar'
+          : 'flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto overflow-x-hidden no-scrollbar pr-0.5'
+      }
+    >
       {participants.map((part) => (
-        <div key={part.id} className="w-48 h-28 md:w-full md:h-36 shrink-0 relative">
+        <div key={part.id} className={`relative shrink-0 ${thumbClass}`}>
           <ParticipantTile
             participantId={part.id}
             part={part}
@@ -474,7 +503,9 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const [meetingChat, setMeetingChat] = useState([])
   const [meetingChatInput, setMeetingChatInput] = useState('')
   const [hostInfo, setHostInfo] = useState({ hostSocketId: '', hostName: '' })
-  const [layoutMode, setLayoutMode] = useState('grid') // grid | speaker
+  const [layoutMode, setLayoutMode] = useState('speaker') // grid | speaker
+  const stageRef = useRef(null)
+  const [stageWidth, setStageWidth] = useState(0)
   const [pinnedId, setPinnedId] = useState(null)
   const [peerStates, setPeerStates] = useState({})
   const [networkQuality, setNetworkQuality] = useState({}) // peerId -> 'good' | 'fair' | 'poor'
@@ -1762,6 +1793,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const speakerId = useMemo(() => {
     if (pinnedId && meetingParticipants[pinnedId]) return pinnedId
     if (activeSpeakerId && meetingParticipants[activeSpeakerId]) return activeSpeakerId
+    if (socketId && meetingParticipants[socketId]) return socketId
     return Object.keys(meetingParticipants)[0] || socketId
   }, [pinnedId, activeSpeakerId, meetingParticipants, socketId])
 
@@ -1779,6 +1811,29 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
   const otherParticipants = useMemo(() => {
     return participantsList.filter((p) => p.id !== speakerId)
   }, [participantsList, speakerId])
+
+  const speakerLayout = useMemo(
+    () => layoutFromContainerWidth(stageWidth, otherParticipants.length),
+    [stageWidth, otherParticipants.length]
+  )
+
+  useEffect(() => {
+    if (!inMeeting || layoutMode !== 'speaker') return undefined
+    const el = stageRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const apply = (nextWidth) => {
+      setStageWidth((prev) => (Math.abs(prev - nextWidth) < 2 ? prev : nextWidth))
+    }
+    const observer = new ResizeObserver((entries) => {
+      apply(entries[0]?.contentRect?.width || el.clientWidth || 0)
+    })
+    observer.observe(el)
+    const frame = window.requestAnimationFrame(() => apply(el.getBoundingClientRect().width))
+    return () => {
+      window.cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [inMeeting, layoutMode])
 
   const participantCount = participantsList.length || Object.keys(meetingParticipants).length || (inMeeting ? 1 : 0)
   const gridColsClass =
@@ -1846,9 +1901,22 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
               </button>
             </div>
           ) : layoutMode === 'speaker' ? (
-            <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden min-h-0 w-full h-full">
-              {/* Active Speaker Container */}
-              <div className="flex-grow flex-1 min-h-0 relative flex items-center justify-center overflow-hidden h-[65vh] md:h-full">
+            <div
+              ref={stageRef}
+              className="grid min-h-0 h-full w-full flex-1 overflow-hidden"
+              style={{
+                '--speaker-w': `${speakerLayout.speakerPct}%`,
+                '--rail-w': `${speakerLayout.railPct}%`,
+                '--strip-h': `${speakerLayout.stripRem}rem`,
+                gap: '0.75rem',
+                gridTemplateColumns:
+                  speakerLayout.rail === 'side'
+                    ? 'minmax(0, var(--speaker-w)) minmax(0, var(--rail-w))'
+                    : 'minmax(0, 1fr)',
+                gridTemplateRows: speakerLayout.rail === 'strip' ? 'minmax(0, 1fr) var(--strip-h)' : 'minmax(0, 1fr)'
+              }}
+            >
+              <div className="relative min-h-0 min-w-0 h-full w-full overflow-hidden">
                 <ActiveSpeakerVideo
                   participant={activeParticipant}
                   isMe={activeParticipant?.id === socketId}
@@ -1866,25 +1934,30 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
                   userName={userName}
                 />
               </div>
-              {/* Participant Sidebar */}
-              {otherParticipants.length > 0 && (
-                <ParticipantThumbnailList
-                  participants={otherParticipants}
-                  socketId={socketId}
-                  localVideoRef={localVideoRef}
-                  localStream={localStream}
-                  remoteStreams={remoteStreams}
-                  selectedSpeaker={selectedSpeaker}
-                  speakingMap={speakingMap}
-                  networkQuality={networkQuality}
-                  pinnedId={pinnedId}
-                  setPinnedId={setPinnedId}
-                  toggleFullscreen={toggleFullscreen}
-                  camActive={camActive}
-                  peerStates={peerStates}
-                  userName={userName}
-                />
-              )}
+              {speakerLayout.rail !== 'none' && otherParticipants.length > 0 ? (
+                <div
+                  className={`min-h-0 min-w-0 overflow-hidden ${speakerLayout.rail === 'strip' ? 'h-full' : 'h-full'}`}
+                >
+                  <ParticipantThumbnailList
+                    participants={otherParticipants}
+                    socketId={socketId}
+                    localVideoRef={localVideoRef}
+                    localStream={localStream}
+                    remoteStreams={remoteStreams}
+                    selectedSpeaker={selectedSpeaker}
+                    speakingMap={speakingMap}
+                    networkQuality={networkQuality}
+                    pinnedId={pinnedId}
+                    setPinnedId={setPinnedId}
+                    toggleFullscreen={toggleFullscreen}
+                    camActive={camActive}
+                    peerStates={peerStates}
+                    userName={userName}
+                    variant={speakerLayout.rail === 'strip' ? 'strip' : 'side'}
+                    thumbClass={speakerLayout.thumbClass}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className={`grid min-h-0 h-full flex-1 gap-3 overflow-hidden ${gridColsClass}`}>
