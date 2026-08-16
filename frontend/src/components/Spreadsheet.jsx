@@ -292,21 +292,13 @@ export default function Spreadsheet({
       fillDragRef.current = null
       if (!drag) return
 
-      // Find target cell from element under cursor
+      // Inactive cells render a div, not an input — resolve the target from the td.
       const el = document.elementFromPoint(upEvent.clientX, upEvent.clientY)
-      const input = el?.closest?.('td')?.querySelector?.('input') || (el?.tagName === 'INPUT' ? el : null)
-      if (!input) return
-      // Match ref key r-c
-      let targetR = null
-      let targetC = null
-      Object.entries(cellRefs.current).forEach(([key, node]) => {
-        if (node === input) {
-          const [r, c] = key.split('-').map(Number)
-          targetR = r
-          targetC = c
-        }
-      })
-      if (targetR == null || targetC == null) return
+      const td = el?.closest?.('td[data-row][data-col]')
+      if (!td) return
+      const targetR = Number(td.dataset.row)
+      const targetC = Number(td.dataset.col)
+      if (!Number.isFinite(targetR) || !Number.isFinite(targetC)) return
       if (targetR === drag.startR && targetC === drag.startC) return
 
       const sameCol = targetC === drag.startC
@@ -826,6 +818,8 @@ export default function Spreadsheet({
                       return (
                         <td
                           key={cIdx}
+                          data-row={rIdx}
+                          data-col={cIdx}
                           style={{
                             ...formatStyle,
                             width: colWidth(cIdx),

@@ -142,6 +142,7 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
   const slidesRef = useRef([blankSlide()])
   const yjsFlushTimerRef = useRef(null)
   const editorKeyRef = useRef(0)
+  const hydratedRef = useRef(false)
 
   const [slides, setSlidesState] = useState(() => [blankSlide()])
   const [activeSlide, setActiveSlide] = useState(0)
@@ -159,7 +160,7 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
   const flushToYjs = useCallback(async (list) => {
     const ydoc = ydocRef.current
     const slidesMap = slidesMapRef.current
-    if (!ydoc || !slidesMap) return
+    if (!ydoc || !slidesMap || !hydratedRef.current) return
     skipRemoteRef.current = true
     try {
       // Re-compress any oversized base64 images before durable save
@@ -186,6 +187,7 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
 
   const scheduleYjsFlush = useCallback(
     (list) => {
+      if (!hydratedRef.current) return
       if (yjsFlushTimerRef.current) window.clearTimeout(yjsFlushTimerRef.current)
       yjsFlushTimerRef.current = window.setTimeout(() => {
         yjsFlushTimerRef.current = null
@@ -214,6 +216,7 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
 
     const applyRemoteList = (list) => {
       if (skipRemoteRef.current) return
+      if (!list.length && !hydratedRef.current) return
       const next = list.length > 0 ? ensureSlideIds(list) : [blankSlide()]
       slidesRef.current = next
       setSlidesState(next)
@@ -262,31 +265,42 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
         await provider.pull()
         if (cancelled) return
         if (slidesMap.size > 0 || meta.get('legacySlidesImported')) {
+          if (yjsFlushTimerRef.current) {
+            window.clearTimeout(yjsFlushTimerRef.current)
+            yjsFlushTimerRef.current = null
+          }
+          hydratedRef.current = true
           rebuildFromMap()
           return
         }
         const legacy = readLegacySlides(workspaceId, activeFile.id)
         skipRemoteRef.current = true
+        if (yjsFlushTimerRef.current) {
+          window.clearTimeout(yjsFlushTimerRef.current)
+          yjsFlushTimerRef.current = null
+        }
+        hydratedRef.current = true
         if (legacy && legacy.length > 0) {
           writeSlidesToYjs(ydoc, slidesMap, legacy, [])
           meta.set('legacySlidesImported', true)
           await provider.flush()
         } else {
-          writeSlidesToYjs(ydoc, slidesMap, [blankSlide()], [])
+          writeSlidesToYjs(ydoc, slidesMap, [blankSlide({ id: `slide-${activeFile.id}-initial` })], [])
         }
         skipRemoteRef.current = false
       } catch {
         if (cancelled) return
-        if (slidesMap.size === 0) {
+        if (slidesMap.size > 0) {
+          hydratedRef.current = true
+        } else {
           const legacy = readLegacySlides(workspaceId, activeFile.id)
-          skipRemoteRef.current = true
           if (legacy && legacy.length > 0) {
+            skipRemoteRef.current = true
+            hydratedRef.current = true
             writeSlidesToYjs(ydoc, slidesMap, legacy, [])
             meta.set('legacySlidesImported', true)
-          } else {
-            writeSlidesToYjs(ydoc, slidesMap, [blankSlide()], [])
+            skipRemoteRef.current = false
           }
-          skipRemoteRef.current = false
         }
       } finally {
         if (!cancelled) rebuildFromMap()
@@ -303,12 +317,16 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
         window.cancelAnimationFrame(rebuildRafRef.current)
         rebuildRafRef.current = null
       }
-      // flush latest local state once on unmount
-      try {
-        flushToYjs(slidesRef.current)
-      } catch {
-        // ignore
+      // Only persist after the server deck has loaded. Flushing the local
+      // placeholder here created a new blank slide on every refresh.
+      if (hydratedRef.current) {
+        try {
+          flushToYjs(slidesRef.current)
+        } catch {
+          // ignore
+        }
       }
+      hydratedRef.current = false
       slidesMap.unobserve(scheduleRebuild)
       ydoc.off('update', onDocUpdate)
       try {
@@ -347,6 +365,7 @@ export default function PresentationSection({ workspaceId, activeFile, onDirtyCh
 
   const persistSlides = useCallback(
     async (snapshot) => {
+      if (!hydratedRef.current) return
       const list = ensureSlideIds(snapshot)
       slidesRef.current = list
       setSlidesState(list)

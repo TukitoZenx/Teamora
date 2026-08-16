@@ -27,7 +27,8 @@ import {
   SendToBack,
   Maximize2,
   Minimize2,
-  Underline
+  Underline,
+  Move
 } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import toast from 'react-hot-toast'
@@ -1818,8 +1819,8 @@ export default function Documents({
                       selected
                         ? 'ring-2 ring-primary/80 shadow-lg'
                         : item.kind === 'textbox'
-                          ? 'shadow-sm ring-1 ring-slate-300/80'
-                          : ''
+                          ? 'cursor-move shadow-sm ring-1 ring-slate-300/80'
+                          : 'cursor-move'
                     }`}
                     style={{
                       left: item.x,
@@ -1844,19 +1845,32 @@ export default function Documents({
                       setSelectedOverlayId(item.id)
                     }}
                     onMouseDown={(e) => {
-                      // Don't start drag when interacting with textarea or chrome controls.
-                      if (e.target.closest('textarea, button, select, input, label, [data-overlay-chrome]')) return
+                      if (e.target.closest('[data-overlay-chrome]')) return
+                      if (selected && e.target.closest('textarea, button, select, input, label')) return
                       startOverlayDrag(e, item, 'move')
                     }}
                   >
+                    {item.kind === 'textbox' && (
+                      <div
+                        data-overlay-chrome
+                        className="absolute inset-x-0 top-0 z-[60] flex h-4 cursor-grab items-center justify-center"
+                        onMouseDown={(e) => startOverlayDrag(e, item, 'move')}
+                        title="Drag to move"
+                      >
+                        <span className="h-0.5 w-8 rounded-full bg-slate-400/80" />
+                      </div>
+                    )}
                     <textarea
                       value={item.text || ''}
                       onChange={(e) => updateOverlay(item.id, { text: e.target.value })}
-                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => {
+                        if (selected) e.stopPropagation()
+                      }}
                       onFocus={() => setSelectedOverlayId(item.id)}
                       placeholder={item.kind === 'shape' ? 'Add shape text…' : 'Type in this text box…'}
-                      className="h-full w-full resize-none border-none bg-transparent px-3 py-2.5 outline-none placeholder:text-slate-400"
+                      className={`h-full w-full resize-none border-none bg-transparent px-3 outline-none placeholder:text-slate-400 ${item.kind === 'textbox' ? 'pt-5 pb-2.5' : 'py-2.5'}`}
                       style={{
+                        pointerEvents: selected ? 'auto' : 'none',
                         fontFamily: fontCss,
                         fontSize: item.fontSize,
                         color: item.color,
@@ -1873,6 +1887,14 @@ export default function Documents({
                           className="absolute -top-11 left-1/2 z-[80] flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-slate-200 bg-white px-1.5 py-1 shadow-lg"
                           onMouseDown={(e) => e.stopPropagation()}
                         >
+                          <button
+                            type="button"
+                            className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                            onMouseDown={(e) => startOverlayDrag(e, item, 'move')}
+                            title="Move"
+                          >
+                            <Move className="h-3.5 w-3.5" />
+                          </button>
                           <button
                             type="button"
                             className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-slate-600 hover:bg-slate-100"

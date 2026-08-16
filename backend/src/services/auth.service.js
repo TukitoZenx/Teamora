@@ -258,19 +258,17 @@ const forgotPassword = async ({ email }, clientUrl) => {
   await user.save({ validateBeforeSave: false });
 
   const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
-  try {
-    await sendPasswordResetEmail({ to: user.email, resetUrl });
-  } catch (error) {
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
-    await user.save({ validateBeforeSave: false });
-    console.error('Teamora forgot-password email delivery failed:', {
-      userId: user._id.toString(),
-      statusCode: error.statusCode,
-      message: error.message
+  // SMTP handshake can exceed the SPA request timeout. Persist the token,
+  // return immediately, and deliver the email in the background.
+  setImmediate(() => {
+    sendPasswordResetEmail({ to: user.email, resetUrl }).catch((error) => {
+      console.error('Teamora forgot-password email delivery failed:', {
+        userId: user._id.toString(),
+        statusCode: error.statusCode,
+        message: error.message
+      });
     });
-    throw error;
-  }
+  });
 
   return { message: RESET_SUCCESS_MESSAGE };
 };
