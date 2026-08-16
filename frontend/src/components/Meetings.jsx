@@ -104,47 +104,67 @@ function bindVideoStream(video, stream) {
   video.play?.().catch(() => {})
 }
 
-/** Full camera frame (no crop) with a blurred fill so wide tiles have no black bars. */
-function FitVideo({ stream, videoRef, hidden, mirrored }) {
-  const bgRef = useRef(null)
+const DEFAULT_MEET_ASPECT = 16 / 9
+
+function useStreamAspect(stream) {
+  const [aspect, setAspect] = useState(DEFAULT_MEET_ASPECT)
+
+  useEffect(() => {
+    if (!stream) return undefined
+    const read = () => {
+      const track = stream.getVideoTracks?.()[0]
+      const settings = track?.getSettings?.() || {}
+      if (settings.width > 0 && settings.height > 0) {
+        setAspect(settings.width / settings.height)
+      }
+    }
+    const track = stream.getVideoTracks?.()[0]
+    track?.addEventListener?.('unmute', read)
+    const timer = window.setTimeout(read, 350)
+    return () => {
+      window.clearTimeout(timer)
+      track?.removeEventListener?.('unmute', read)
+    }
+  }, [stream])
+
+  return stream ? aspect : DEFAULT_MEET_ASPECT
+}
+
+function FitVideo({ stream, videoRef, hidden, mirrored, onDimensions }) {
   const fallbackFgRef = useRef(null)
   const fgRef = videoRef || fallbackFgRef
 
   useEffect(() => {
-    const bg = bgRef.current
     const fg = fgRef.current
-    bindVideoStream(bg, stream)
     bindVideoStream(fg, stream)
+    const report = () => {
+      if (fg?.videoWidth > 0 && fg?.videoHeight > 0) {
+        onDimensions?.(fg.videoWidth, fg.videoHeight)
+      }
+    }
+    fg?.addEventListener('loadedmetadata', report)
+    fg?.addEventListener('resize', report)
+    report()
     return () => {
-      if (bg) bg.srcObject = null
+      fg?.removeEventListener('loadedmetadata', report)
+      fg?.removeEventListener('resize', report)
       if (fg) fg.srcObject = null
     }
-  }, [stream, fgRef])
+  }, [stream, fgRef, onDimensions])
 
   return (
-    <div className={`absolute inset-0 overflow-hidden bg-card-sunken ${hidden ? 'pointer-events-none opacity-0' : ''}`}>
-      <video
-        ref={bgRef}
-        autoPlay
-        playsInline
-        muted
-        aria-hidden
-        style={{ transform: mirrored ? 'scale(-1.2, 1.2)' : 'scale(1.2)' }}
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center blur-2xl opacity-80"
-      />
-      <video
-        ref={fgRef}
-        autoPlay
-        playsInline
-        muted
-        className={`relative z-[1] h-full w-full bg-transparent object-contain object-center ${mirrored ? 'scale-x-[-1]' : ''}`}
-      />
-    </div>
+    <video
+      ref={fgRef}
+      autoPlay
+      playsInline
+      muted
+      className={`absolute inset-0 h-full w-full bg-card-sunken object-cover object-center ${hidden ? 'pointer-events-none opacity-0' : ''} ${mirrored ? 'scale-x-[-1]' : ''}`}
+    />
   )
 }
 
-function RemoteVideo({ stream, hidden }) {
-  return <FitVideo stream={stream} hidden={hidden} />
+function RemoteVideo({ stream, hidden, onDimensions }) {
+  return <FitVideo stream={stream} hidden={hidden} onDimensions={onDimensions} />
 }
 
 function MiniVideo({ stream, isMe }) {
@@ -200,103 +220,124 @@ function ParticipantTile({
   const showLocalVideo = isMe && camActive && hasLiveVideoTrack(localStream)
   const showRemoteVideo = !isMe && part.camActive !== false && hasLiveVideoTrack(remoteStream)
   const label = isMe ? userName : part.user
+  const liveStream = isMe ? localStream : remoteStream
+  const trackAspect = useStreamAspect(showLocalVideo || showRemoteVideo ? liveStream : null)
+  const [frameAspect, setFrameAspect] = useState(null)
+  const aspect = frameAspect || trackAspect || DEFAULT_MEET_ASPECT
+  const handleDimensions = useCallback((width, height) => {
+    if (width > 0 && height > 0) setFrameAspect(width / height)
+  }, [])
 
   return (
-    <div
-      id={`participant-tile-${participantId}`}
-      className="bg-card rounded-2xl border border-border overflow-hidden relative w-full h-full min-h-0 group flex items-center justify-center shadow-card transition-all duration-300"
-    >
-      {isMe ? (
-        <>
-          <FitVideo stream={localStream} videoRef={localVideoRef} hidden={!showLocalVideo} mirrored />
-          {!showLocalVideo && (
-            <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
-                {initialsFor(label)}
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <RemoteVideo stream={remoteStream} hidden={!showRemoteVideo} />
-          {remoteStream && <RemoteAudio stream={remoteStream} audioOutputDeviceId={selectedSpeaker} />}
-          {!showRemoteVideo && (
-            <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
-                {initialsFor(label)}
-              </div>
-              {!remoteStream && (
-                <span className="absolute bottom-14 text-[10px] font-semibold text-muted">
-                  {peerState === 'connecting' ? 'Connecting…' : 'Waiting for media…'}
-                </span>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
+    <div className="flex h-full min-h-0 w-full items-center justify-center" style={{ containerType: 'size' }}>
       <div
-        className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-[3px] transition-all duration-300 ${
-          speaking ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)] scale-[0.98]' : 'ring-transparent'
-        }`}
-      />
-      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text pointer-events-none flex items-center gap-1.5 shadow-sm">
-            {part.user} {isMe && '(You)'}
-            {pinnedId === participantId && <span className="text-primary">• Pinned</span>}
-          </span>
-          {!isMe && networkQualityValue && (
-            <div
-              className={`p-1 rounded-full bg-card/85 border border-border backdrop-blur-sm ${
-                networkQualityValue === 'good'
-                  ? 'text-success'
-                  : networkQualityValue === 'fair'
-                    ? 'text-warning'
-                    : 'text-danger'
-              }`}
-              title={`Network: ${networkQualityValue}`}
-            >
-              {networkQualityValue === 'poor' ? <WifiOff className="w-3 h-3" /> : <Wifi className="w-3 h-3" />}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-1.5 items-center">
-          {!isMe && (
-            <button
-              type="button"
-              onClick={() => setPinnedId((cur) => (cur === participantId ? null : participantId))}
-              className={`p-1.5 rounded-full border pointer-events-auto cursor-pointer ${
-                pinnedId === participantId
-                  ? 'bg-primary text-on-primary border-primary'
-                  : 'bg-card/85 border-border text-muted hover:text-primary'
-              }`}
-              title={pinnedId === participantId ? 'Unpin' : 'Pin / spotlight'}
-            >
-              <Pin className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {!isMe && remoteStream && (
-            <button
-              type="button"
-              onClick={() => toggleFullscreen(participantId)}
-              className="p-1.5 rounded-full border bg-card/85 border-border text-muted hover:text-primary pointer-events-auto cursor-pointer"
-              title="Fullscreen"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {!part.micActive && (
-            <div className="p-1.5 bg-danger/90 text-on-primary rounded-full border border-danger">
-              <MicOff className="w-3.5 h-3.5" />
-            </div>
-          )}
-          {part.handRaised && (
-            <div className="p-1.5 bg-warning/90 text-on-primary rounded-full border border-warning animate-bounce">
-              <Hand className="w-3.5 h-3.5" />
-            </div>
-          )}
+        id={`participant-tile-${participantId}`}
+        className="group relative min-h-0 overflow-hidden rounded-2xl border border-border bg-card-sunken shadow-card transition-all duration-300"
+        style={{
+          '--ar': aspect,
+          aspectRatio: String(aspect),
+          width: 'min(100%, calc(100cqh * var(--ar)))',
+          height: 'min(100%, calc(100cqw / var(--ar)))'
+        }}
+      >
+        {isMe ? (
+          <>
+            <FitVideo
+              stream={localStream}
+              videoRef={localVideoRef}
+              hidden={!showLocalVideo}
+              mirrored
+              onDimensions={handleDimensions}
+            />
+            {!showLocalVideo && (
+              <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
+                  {initialsFor(label)}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <RemoteVideo stream={remoteStream} hidden={!showRemoteVideo} onDimensions={handleDimensions} />
+            {remoteStream && <RemoteAudio stream={remoteStream} audioOutputDeviceId={selectedSpeaker} />}
+            {!showRemoteVideo && (
+              <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
+                  {initialsFor(label)}
+                </div>
+                {!remoteStream && (
+                  <span className="absolute bottom-14 text-[10px] font-semibold text-muted">
+                    {peerState === 'connecting' ? 'Connecting…' : 'Waiting for media…'}
+                  </span>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        <div
+          className={`absolute inset-0 pointer-events-none z-[5] rounded-[inherit] ring-[3px] transition-all duration-300 ${
+            speaking ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)] scale-[0.98]' : 'ring-transparent'
+          }`}
+        />
+        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text pointer-events-none flex items-center gap-1.5 shadow-sm">
+              {part.user} {isMe && '(You)'}
+              {pinnedId === participantId && <span className="text-primary">• Pinned</span>}
+            </span>
+            {!isMe && networkQualityValue && (
+              <div
+                className={`p-1 rounded-full bg-card/85 border border-border backdrop-blur-sm ${
+                  networkQualityValue === 'good'
+                    ? 'text-success'
+                    : networkQualityValue === 'fair'
+                      ? 'text-warning'
+                      : 'text-danger'
+                }`}
+                title={`Network: ${networkQualityValue}`}
+              >
+                {networkQualityValue === 'poor' ? <WifiOff className="w-3 h-3" /> : <Wifi className="w-3 h-3" />}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-1.5 items-center">
+            {!isMe && (
+              <button
+                type="button"
+                onClick={() => setPinnedId((cur) => (cur === participantId ? null : participantId))}
+                className={`p-1.5 rounded-full border pointer-events-auto cursor-pointer ${
+                  pinnedId === participantId
+                    ? 'bg-primary text-on-primary border-primary'
+                    : 'bg-card/85 border-border text-muted hover:text-primary'
+                }`}
+                title={pinnedId === participantId ? 'Unpin' : 'Pin / spotlight'}
+              >
+                <Pin className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {!isMe && remoteStream && (
+              <button
+                type="button"
+                onClick={() => toggleFullscreen(participantId)}
+                className="p-1.5 rounded-full border bg-card/85 border-border text-muted hover:text-primary pointer-events-auto cursor-pointer"
+                title="Fullscreen"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {!part.micActive && (
+              <div className="p-1.5 bg-danger/90 text-on-primary rounded-full border border-danger">
+                <MicOff className="w-3.5 h-3.5" />
+              </div>
+            )}
+            {part.handRaised && (
+              <div className="p-1.5 bg-warning/90 text-on-primary rounded-full border border-warning animate-bounce">
+                <Hand className="w-3.5 h-3.5" />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1807,7 +1848,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
           ) : layoutMode === 'speaker' ? (
             <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden min-h-0 w-full h-full">
               {/* Active Speaker Container */}
-              <div className="flex-grow flex-1 min-h-0 relative flex items-center justify-center bg-black/20 rounded-2xl overflow-hidden h-[65vh] md:h-full">
+              <div className="flex-grow flex-1 min-h-0 relative flex items-center justify-center overflow-hidden h-[65vh] md:h-full">
                 <ActiveSpeakerVideo
                   participant={activeParticipant}
                   isMe={activeParticipant?.id === socketId}
@@ -1848,7 +1889,7 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
           ) : (
             <div className={`grid min-h-0 h-full flex-1 gap-3 overflow-hidden ${gridColsClass}`}>
               {Object.entries(meetingParticipants).map(([id, part]) => (
-                <div key={id} className="relative min-h-0 h-full overflow-hidden rounded-2xl border border-border">
+                <div key={id} className="relative min-h-0 h-full">
                   <ParticipantTile
                     participantId={id}
                     part={part}
