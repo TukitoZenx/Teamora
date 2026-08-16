@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Sparkles, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { v4 as uuidv4 } from 'uuid'
@@ -7,6 +7,15 @@ import { generateTasks } from '../services/aiClient'
 export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceId }) {
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !isGenerating) onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isOpen, isGenerating, onClose])
 
   if (!isOpen) return null
 
@@ -41,7 +50,12 @@ export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceI
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-task-title"
+      className="teamora-scrim fixed inset-0 z-modal flex items-center justify-center p-4"
+    >
       <div className="w-full max-w-lg bg-card rounded-xl shadow-2xl overflow-hidden flex flex-col border border-border">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card-sunken">
@@ -49,11 +63,15 @@ export default function AiTaskModal({ isOpen, onClose, onInsertTasks, workspaceI
             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 shadow-sm">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <h3 className="font-semibold text-text">AI Task Extractor</h3>
+            <h3 id="ai-task-title" className="font-semibold text-text">
+              AI Task Extractor
+            </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
             disabled={isGenerating}
+            aria-label="Close"
             className="p-1.5 text-muted hover:text-text hover:bg-muted/20 rounded-md transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />

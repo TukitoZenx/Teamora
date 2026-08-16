@@ -57,6 +57,16 @@ const cookieOptions = () => ({
   maxAge: 1000 * 60 * 60 * 24 * 30
 });
 
+const clearCsrfCookie = (res) => {
+  if (!res) return;
+  res.clearCookie('XSRF-TOKEN', {
+    httpOnly: false,
+    secure: usesHttps,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/'
+  });
+};
+
 /**
  * Ensure every session has a CSRF token and mirror it into a non-httpOnly cookie
  * (Double-Submit Cookie + synchronizer token stored in session).
@@ -116,6 +126,7 @@ module.exports = {
   saveSession,
   verifyCsrf,
   rotateCsrfToken,
+  clearCsrfCookie,
   generateToken,
   isExempt
 };

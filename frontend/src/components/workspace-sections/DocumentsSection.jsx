@@ -96,6 +96,7 @@ export default function DocumentsSection({
   const [isSaving, setIsSaving] = useState(false)
   const [editorReady, setEditorReady] = useState(false)
   const [activeUsersCount, setActiveUsersCount] = useState(1)
+  const presenceIdsRef = useRef(new Set())
 
   useEffect(() => {
     onDirtyChangeRef.current = onDirtyChange
@@ -110,6 +111,7 @@ export default function DocumentsSection({
     window.Quill = Quill
     mountEl.innerHTML = ''
     setEditorReady(false)
+    presenceIdsRef.current = new Set()
     setActiveUsersCount(1)
 
     const contentKey = `documents:${activeFile.id}`
@@ -125,8 +127,10 @@ export default function DocumentsSection({
       pollMs: 3000,
       user: { name: userName || 'User', color: presenceColor },
       onWsStatus: (status) => {
-        if (status === 'joined') setActiveUsersCount(2)
-        if (status === 'closed' || status === 'error') setActiveUsersCount(1)
+        if (status === 'closed' || status === 'error') {
+          presenceIdsRef.current = new Set()
+          setActiveUsersCount(1)
+        }
       },
       onAwareness: (msg) => {
         const cursors = cursorsRef.current
@@ -135,7 +139,8 @@ export default function DocumentsSection({
         const color = msg.user?.color || '#6366f1'
         try {
           cursors.createCursor(msg.clientId, name, color)
-          setActiveUsersCount((n) => Math.max(n, 2))
+          presenceIdsRef.current.add(msg.clientId)
+          setActiveUsersCount(1 + presenceIdsRef.current.size)
           if (msg.cursor && typeof msg.cursor.index === 'number') {
             cursors.moveCursor(msg.clientId, {
               index: msg.cursor.index,
@@ -154,7 +159,8 @@ export default function DocumentsSection({
         } catch {
           // ignore
         }
-        setActiveUsersCount(1)
+        if (clientId) presenceIdsRef.current.delete(clientId)
+        setActiveUsersCount(1 + presenceIdsRef.current.size)
       }
     })
     providerRef.current = provider

@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import * as authService from '../features/auth/services/auth'
-import { onUnauthorized } from '../services/api'
+import { clearCsrfToken, onUnauthorized } from '../services/api'
 
 const AuthContext = createContext(null) // create a global context for authentication state and actions
 const AUTH_CACHE_KEY = 'teamora-auth-user'
@@ -62,6 +62,7 @@ export function AuthProvider({ children }) {
     setSessionValidated(false)
     sessionCheckedRef.current = true
     setLoading(false)
+    clearCsrfToken()
   }, []) // at where this function is used ? ans : it is used to clear the session data when the user logs out or the session expires
 
   const refreshUser = useCallback(

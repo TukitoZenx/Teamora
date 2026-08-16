@@ -963,7 +963,7 @@ export default function PresentationModule({
         </div>
 
         <div
-          className="absolute bottom-8 z-[2147483001] flex items-center gap-4 rounded-full border border-white/10 bg-slate-900/80 px-5 py-2.5 opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100"
+          className="absolute bottom-8 z-[2147483001] flex items-center gap-4 rounded-full border border-white/10 bg-slate-900/80 px-5 py-2.5 opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100"
           onClick={(e) => e.stopPropagation()}
         >
           <button
