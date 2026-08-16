@@ -104,6 +104,17 @@ function bindVideoStream(video, stream) {
   video.play?.().catch(() => {})
 }
 
+const CALL_TILE_BG = '#2d2f34'
+const CALL_STAGE_BG = '#1e1f22'
+const AVATAR_COLORS = ['#5865f2', '#57f287', '#fee75c', '#eb459e', '#ed4245', '#3ba55c', '#faa61a', '#00b0f4']
+
+function avatarColorFor(name) {
+  const text = String(name || 'U')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) >>> 0
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length]
+}
+
 function FitVideo({ stream, videoRef, hidden, mirrored }) {
   const fallbackFgRef = useRef(null)
   const fgRef = videoRef || fallbackFgRef
@@ -122,7 +133,8 @@ function FitVideo({ stream, videoRef, hidden, mirrored }) {
       autoPlay
       playsInline
       muted
-      className={`absolute inset-0 h-full w-full bg-card-sunken object-cover object-center ${hidden ? 'pointer-events-none opacity-0' : ''} ${mirrored ? 'scale-x-[-1]' : ''}`}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+      className={`absolute inset-0 ${hidden ? 'pointer-events-none opacity-0' : ''} ${mirrored ? 'scale-x-[-1]' : ''}`}
     />
   )
 }
@@ -145,7 +157,8 @@ function MiniVideo({ stream, isMe }) {
       autoPlay
       playsInline
       muted={isMe}
-      className={`h-full w-full bg-card-sunken object-cover object-center ${isMe ? 'scale-x-[-1]' : ''}`}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+      className={isMe ? 'scale-x-[-1]' : ''}
     />
   )
 }
@@ -164,6 +177,22 @@ function hasLiveVideoTrack(stream) {
   return Boolean(stream?.getVideoTracks?.().some((track) => track.readyState === 'live' && track.enabled !== false))
 }
 
+function CallAvatar({ name, size = 48 }) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-full font-bold text-white"
+      style={{
+        width: size,
+        height: size,
+        background: avatarColorFor(name),
+        fontSize: Math.max(12, Math.round(size * 0.36))
+      }}
+    >
+      {initialsFor(name)}
+    </div>
+  )
+}
+
 function ParticipantTile({
   participantId,
   part,
@@ -179,25 +208,29 @@ function ParticipantTile({
   toggleFullscreen,
   camActive,
   peerState,
-  userName
+  userName,
+  compact = false
 }) {
   const showLocalVideo = isMe && camActive && hasLiveVideoTrack(localStream)
   const showRemoteVideo = !isMe && part.camActive !== false && hasLiveVideoTrack(remoteStream)
   const label = isMe ? userName : part.user
+  const displayName = `${label}${isMe ? ' (You)' : ''}`
 
   return (
     <div
       id={`participant-tile-${participantId}`}
-      className="group relative h-full min-h-0 w-full overflow-hidden bg-card-sunken"
+      className="group relative h-full min-h-0 w-full overflow-hidden"
+      style={{ background: CALL_TILE_BG, borderRadius: 8 }}
     >
       {isMe ? (
         <>
           <FitVideo stream={localStream} videoRef={localVideoRef} hidden={!showLocalVideo} mirrored />
           {!showLocalVideo && (
-            <div className="w-full h-full bg-gradient-to-tr from-primary/10 to-card-sunken flex items-center justify-center absolute inset-0">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
-                {initialsFor(label)}
-              </div>
+            <div
+              className="absolute inset-0 flex h-full w-full items-center justify-center"
+              style={{ background: CALL_TILE_BG }}
+            >
+              <CallAvatar name={label} size={compact ? 36 : 80} />
             </div>
           )}
         </>
@@ -206,12 +239,13 @@ function ParticipantTile({
           <RemoteVideo stream={remoteStream} hidden={!showRemoteVideo} />
           {remoteStream && <RemoteAudio stream={remoteStream} audioOutputDeviceId={selectedSpeaker} />}
           {!showRemoteVideo && (
-            <div className="absolute inset-0 flex h-full w-full items-center justify-center bg-gradient-to-tr from-primary/10 to-card-sunken">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xl font-bold text-primary shadow-md">
-                {initialsFor(label)}
-              </div>
-              {!remoteStream && (
-                <span className="absolute bottom-14 text-[10px] font-semibold text-muted">
+            <div
+              className="absolute inset-0 flex h-full w-full items-center justify-center"
+              style={{ background: CALL_TILE_BG }}
+            >
+              <CallAvatar name={label} size={compact ? 36 : 80} />
+              {!remoteStream && !compact && (
+                <span className="absolute bottom-14 text-[10px] font-semibold text-white/70">
                   {peerState === 'connecting' ? 'Connecting…' : 'Waiting for media…'}
                 </span>
               )}
@@ -225,13 +259,25 @@ function ParticipantTile({
           speaking ? 'ring-primary shadow-[0_0_20px_rgba(var(--color-primary),0.6)]' : 'ring-transparent'
         }`}
       />
-      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold bg-card/85 px-2.5 py-1.5 rounded-full border border-border text-text pointer-events-none flex items-center gap-1.5 shadow-sm">
-            {part.user} {isMe && '(You)'}
-            {pinnedId === participantId && <span className="text-primary">• Pinned</span>}
+      <div
+        className={`absolute z-10 flex items-center justify-between ${compact ? 'bottom-1.5 left-1.5 right-1.5' : 'bottom-2.5 left-2.5 right-2.5'}`}
+      >
+        <div className="flex min-w-0 items-center gap-1">
+          <span
+            className="truncate font-semibold text-white"
+            style={{
+              background: 'rgba(0,0,0,0.6)',
+              borderRadius: 6,
+              fontSize: compact ? 10 : 12,
+              lineHeight: 1.2,
+              maxWidth: compact ? 88 : 240,
+              padding: compact ? '2px 6px' : '4px 8px'
+            }}
+          >
+            {displayName}
+            {pinnedId === participantId ? ' · Pinned' : ''}
           </span>
-          {!isMe && networkQualityValue && (
+          {!isMe && !compact && networkQualityValue && (
             <div
               className={`p-1 rounded-full bg-card/85 border border-border backdrop-blur-sm ${
                 networkQualityValue === 'good'
@@ -246,8 +292,8 @@ function ParticipantTile({
             </div>
           )}
         </div>
-        <div className="flex gap-1.5 items-center">
-          {!isMe && (
+        <div className="flex items-center gap-1">
+          {!isMe && !compact && (
             <button
               type="button"
               onClick={() => setPinnedId((cur) => (cur === participantId ? null : participantId))}
@@ -261,7 +307,7 @@ function ParticipantTile({
               <Pin className="w-3.5 h-3.5" />
             </button>
           )}
-          {!isMe && remoteStream && (
+          {!isMe && remoteStream && !compact && (
             <button
               type="button"
               onClick={() => toggleFullscreen(participantId)}
@@ -272,13 +318,13 @@ function ParticipantTile({
             </button>
           )}
           {!part.micActive && (
-            <div className="p-1.5 bg-danger/90 text-on-primary rounded-full border border-danger">
-              <MicOff className="w-3.5 h-3.5" />
+            <div className={`${compact ? 'p-1' : 'p-1.5'} bg-danger/90 text-on-primary rounded-full`}>
+              <MicOff className={compact ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'} />
             </div>
           )}
           {part.handRaised && (
-            <div className="p-1.5 bg-warning/90 text-on-primary rounded-full border border-warning animate-bounce">
-              <Hand className="w-3.5 h-3.5" />
+            <div className={`${compact ? 'p-1' : 'p-1.5'} bg-warning/90 text-on-primary rounded-full animate-bounce`}>
+              <Hand className={compact ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'} />
             </div>
           )}
         </div>
@@ -332,29 +378,8 @@ function ActiveSpeakerVideo({
 }
 
 function layoutFromContainerWidth(width, otherCount) {
-  if (!otherCount) {
-    return { rail: 'none', speakerPct: 100, railPct: 0, stripRem: 0, thumbClass: '' }
-  }
-  const w = width > 0 ? width : 1200
-  if (w >= 1200) {
-    return { rail: 'side', speakerPct: 75, railPct: 25, stripRem: 0, thumbClass: 'min-h-[9rem] w-full flex-1 basis-0' }
-  }
-  if (w >= 900) {
-    return {
-      rail: 'side',
-      speakerPct: 70,
-      railPct: 30,
-      stripRem: 0,
-      thumbClass: 'min-h-[8.5rem] w-full flex-1 basis-0'
-    }
-  }
-  if (w >= 600) {
-    return { rail: 'side', speakerPct: 60, railPct: 40, stripRem: 0, thumbClass: 'min-h-[8rem] w-full flex-1 basis-0' }
-  }
-  if (w >= 400) {
-    return { rail: 'strip', speakerPct: 100, railPct: 0, stripRem: 7, thumbClass: 'h-full w-36' }
-  }
-  return { rail: 'strip', speakerPct: 100, railPct: 0, stripRem: 5.5, thumbClass: 'h-full w-28' }
+  if (!otherCount) return { rail: 'none' }
+  return { rail: width > 0 && width < 600 ? 'strip' : 'side' }
 }
 
 function ParticipantThumbnailList({
@@ -372,20 +397,35 @@ function ParticipantThumbnailList({
   camActive,
   peerStates,
   userName,
-  variant = 'side',
-  thumbClass = 'min-h-[9rem] w-full flex-1 basis-0'
+  variant = 'side'
 }) {
   const isStrip = variant === 'strip'
   return (
     <div
-      className={
-        isStrip
-          ? 'flex h-full min-h-0 w-full flex-row gap-px overflow-x-auto overflow-y-hidden no-scrollbar'
-          : 'flex h-full min-h-0 w-full flex-col gap-px overflow-y-auto overflow-x-hidden no-scrollbar'
-      }
+      className="no-scrollbar"
+      style={{
+        display: 'flex',
+        flexDirection: isStrip ? 'row' : 'column',
+        gap: 6,
+        width: isStrip ? '100%' : 108,
+        height: isStrip ? 90 : '100%',
+        overflowX: isStrip ? 'auto' : 'hidden',
+        overflowY: isStrip ? 'hidden' : 'auto',
+        flexShrink: 0
+      }}
     >
       {participants.map((part) => (
-        <div key={part.id} className={`relative ${isStrip ? 'shrink-0' : ''} ${thumbClass}`}>
+        <div
+          key={part.id}
+          className="relative shrink-0"
+          style={{
+            width: isStrip ? 108 : '100%',
+            aspectRatio: '4 / 3',
+            background: CALL_TILE_BG,
+            borderRadius: 8,
+            overflow: 'hidden'
+          }}
+        >
           <ParticipantTile
             participantId={part.id}
             part={part}
@@ -402,6 +442,7 @@ function ParticipantThumbnailList({
             camActive={camActive}
             peerState={peerStates[part.id]}
             userName={userName}
+            compact
           />
         </div>
       ))}
@@ -1854,60 +1895,71 @@ export default function Meetings({ socket, roomId, userName, isMaximized = true 
           ) : layoutMode === 'speaker' ? (
             <div
               ref={stageRef}
-              className="grid min-h-0 h-full w-full flex-1 overflow-hidden"
+              className="min-h-0 h-full w-full flex-1 overflow-hidden"
               style={{
-                '--speaker-w': `${speakerLayout.speakerPct}%`,
-                '--rail-w': `${speakerLayout.railPct}%`,
-                '--strip-h': `${speakerLayout.stripRem}rem`,
-                gap: 0,
-                gridTemplateColumns:
-                  speakerLayout.rail === 'side'
-                    ? 'minmax(0, var(--speaker-w)) minmax(0, var(--rail-w))'
-                    : 'minmax(0, 1fr)',
-                gridTemplateRows: speakerLayout.rail === 'strip' ? 'minmax(0, 1fr) var(--strip-h)' : 'minmax(0, 1fr)'
+                display: 'flex',
+                flexDirection: speakerLayout.rail === 'strip' ? 'column' : 'row',
+                gap: 6,
+                background: CALL_STAGE_BG,
+                padding: 8
               }}
             >
-              <div className="relative min-h-0 min-w-0 h-full w-full overflow-hidden">
-                <ActiveSpeakerVideo
-                  participant={activeParticipant}
-                  isMe={activeParticipant?.id === socketId}
-                  localVideoRef={localVideoRef}
-                  localStream={localStream}
-                  remoteStream={activeParticipant ? remoteStreams[activeParticipant.id]?.stream : null}
-                  selectedSpeaker={selectedSpeaker}
-                  speaking={activeParticipant ? speakingMap[activeParticipant.id] : false}
-                  networkQualityValue={activeParticipant ? networkQuality[activeParticipant.id] : null}
-                  pinnedId={pinnedId}
-                  setPinnedId={setPinnedId}
-                  toggleFullscreen={toggleFullscreen}
-                  camActive={camActive}
-                  peerState={activeParticipant ? peerStates[activeParticipant.id] : null}
-                  userName={userName}
-                />
-              </div>
-              {speakerLayout.rail !== 'none' && otherParticipants.length > 0 ? (
+              <div
+                className="relative min-h-0 min-w-0"
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
                 <div
-                  className={`min-h-0 min-w-0 overflow-hidden ${speakerLayout.rail === 'strip' ? 'h-full' : 'h-full'}`}
+                  className="relative min-h-0 min-w-0 overflow-hidden"
+                  style={{
+                    flex: 1,
+                    aspectRatio: '16 / 9',
+                    maxHeight: '100%',
+                    width: '100%',
+                    background: CALL_TILE_BG,
+                    borderRadius: 8
+                  }}
                 >
-                  <ParticipantThumbnailList
-                    participants={otherParticipants}
-                    socketId={socketId}
+                  <ActiveSpeakerVideo
+                    participant={activeParticipant}
+                    isMe={activeParticipant?.id === socketId}
                     localVideoRef={localVideoRef}
                     localStream={localStream}
-                    remoteStreams={remoteStreams}
+                    remoteStream={activeParticipant ? remoteStreams[activeParticipant.id]?.stream : null}
                     selectedSpeaker={selectedSpeaker}
-                    speakingMap={speakingMap}
-                    networkQuality={networkQuality}
+                    speaking={activeParticipant ? speakingMap[activeParticipant.id] : false}
+                    networkQualityValue={activeParticipant ? networkQuality[activeParticipant.id] : null}
                     pinnedId={pinnedId}
                     setPinnedId={setPinnedId}
                     toggleFullscreen={toggleFullscreen}
                     camActive={camActive}
-                    peerStates={peerStates}
+                    peerState={activeParticipant ? peerStates[activeParticipant.id] : null}
                     userName={userName}
-                    variant={speakerLayout.rail === 'strip' ? 'strip' : 'side'}
-                    thumbClass={speakerLayout.thumbClass}
                   />
                 </div>
+              </div>
+              {speakerLayout.rail !== 'none' && otherParticipants.length > 0 ? (
+                <ParticipantThumbnailList
+                  participants={otherParticipants}
+                  socketId={socketId}
+                  localVideoRef={localVideoRef}
+                  localStream={localStream}
+                  remoteStreams={remoteStreams}
+                  selectedSpeaker={selectedSpeaker}
+                  speakingMap={speakingMap}
+                  networkQuality={networkQuality}
+                  pinnedId={pinnedId}
+                  setPinnedId={setPinnedId}
+                  toggleFullscreen={toggleFullscreen}
+                  camActive={camActive}
+                  peerStates={peerStates}
+                  userName={userName}
+                  variant={speakerLayout.rail === 'strip' ? 'strip' : 'side'}
+                />
               ) : null}
             </div>
           ) : (
