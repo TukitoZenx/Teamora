@@ -82,7 +82,7 @@ export default function Whiteboard({
 
   // Sync elements changes to the active file content
   useEffect(() => {
-    if (activeFileId && Array.isArray(elements) && elements.length > 0) {
+    if (activeFileId && Array.isArray(elements)) {
       const timeout = setTimeout(() => {
         socket.emit('file-content-update', { roomId, fileId: activeFileId, content: elements })
       }, 500) // Throttled updates to reduce socket traffic

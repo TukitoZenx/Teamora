@@ -92,6 +92,9 @@ const putContent = async (userId, workspaceId, key, data) => {
     const existing = await WorkspaceContent.findOne({ workspace: workspaceId, key: cleanKey }).lean();
 
     // Collaborative documents: CRDT merge instead of blind overwrite.
+    if (nextData && nextData.format === 'yjs-v1' && !nextData.update && !nextData.state) {
+      throw createError('Yjs payload requires update or state', 400);
+    }
     if (nextData && nextData.format === 'yjs-v1' && (nextData.update || nextData.state)) {
       const existingState =
         existing?.data?.format === 'yjs-v1' && typeof existing.data.state === 'string' ? existing.data.state : null;

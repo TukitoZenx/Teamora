@@ -66,6 +66,11 @@ const forceCloseWorkspace = (workspaceId) => {
   activeHub.forceCloseWorkspace(String(workspaceId));
 };
 
+const forceCloseUser = (workspaceId, userId) => {
+  if (!activeHub || !workspaceId || !userId) return;
+  activeHub.forceCloseUser?.(String(workspaceId), String(userId));
+};
+
 /** Snapshot for readiness / ops probes (no secrets). */
 const getCollabStats = () => {
   if (!activeWss) {
@@ -143,7 +148,7 @@ const normalizeParticipant = (raw, extras = {}) => {
   return {
     socketId,
     clientId: String(nested.clientId || extras.clientId || socketId),
-    userId: String(nested.userId || extras.userId || ''),
+    userId: String(extras.userId || ''),
     user: nested.user || extras.user || 'User',
     micActive: nested.micActive !== false,
     camActive: nested.camActive !== false,
@@ -412,7 +417,36 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
     }
   };
 
-  activeHub = { forceCloseWorkspace: forceCloseWorkspaceInner };
+  const forceCloseUserInner = (workspaceId, userId) => {
+    const id = String(workspaceId || '');
+    const uid = String(userId || '');
+    if (!id || !uid) return;
+
+    const prefix = `${id}::`;
+    for (const [rk, set] of rooms.entries()) {
+      if (!rk.startsWith(prefix)) continue;
+      for (const peer of [...set]) {
+        if (String(peer.userId || '') !== uid) continue;
+        if (rk === roomKey(id, 'meetings')) {
+          removeParticipantNow(id, peer.socketId || peer.clientId);
+        }
+        try {
+          peer.rooms?.clear?.();
+          peer.close(4001, 'left workspace');
+        } catch {
+          try {
+            peer.terminate();
+          } catch {
+            // ignore
+          }
+        }
+        set.delete(peer);
+      }
+      if (set.size === 0) rooms.delete(rk);
+    }
+  };
+
+  activeHub = { forceCloseWorkspace: forceCloseWorkspaceInner, forceCloseUser: forceCloseUserInner };
 
   const leaveAll = (ws) => {
     if (!ws.rooms) return;
@@ -456,7 +490,7 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
         return;
       }
 
-      if (!isAllowedOrigin(req.headers.origin || '')) {
+      if (!isAllowedOrigin(req.headers.origin || '', { requireOrigin: process.env.NODE_ENV === 'production' })) {
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
         socket.destroy();
         return;
@@ -648,22 +682,39 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
               };
             }
           } else if (payloadType === 'meeting-leave' || event === 'receive-meeting-leave') {
-            const leaveId =
+            const requested =
               (typeof msg.payload === 'string' && msg.payload) || p.socketId || msg.socketId || ws.socketId;
-            removeParticipantNow(workspaceId, leaveId);
-            // Fanout already handled by removeParticipantNow; skip duplicate broadcast.
+            const selfIds = new Set([ws.socketId, ws.clientId, ws.userId].filter(Boolean).map(String));
+            if (!requested || !selfIds.has(String(requested))) {
+              return;
+            }
+            removeParticipantNow(workspaceId, requested);
             return;
           } else if (payloadType === 'meeting-ended' || event === 'receive-meeting-ended') {
             const meeting = activeMeetings.get(workspaceId);
+            if (!meeting) return;
+            const liveIds = Object.keys(meeting.participants || {});
+            const isHost =
+              meeting.hostSocketId && (meeting.hostSocketId === ws.socketId || meeting.hostSocketId === ws.clientId);
+            const isLast =
+              liveIds.length === 0 ||
+              (liveIds.length === 1 && (liveIds[0] === ws.socketId || liveIds[0] === ws.clientId));
+            if (!isHost && !isLast) return;
             activeMeetings.delete(workspaceId);
             msg.event = 'receive-meeting-ended';
-            msg.payload = { type: 'meeting-ended', workspaceId, meetingId: meeting?.meetingId || p.meetingId };
+            msg.payload = { type: 'meeting-ended', workspaceId, meetingId: meeting.meetingId || p.meetingId };
           } else if (event === 'receive-meeting-host' || payloadType === 'meeting-claim-host') {
             const meeting = activeMeetings.get(workspaceId);
-            if (meeting) {
-              meeting.hostSocketId = p.hostSocketId || ws.socketId;
-              meeting.hostName = p.hostName || meeting.hostName;
-            }
+            if (!meeting) return;
+            const hostId = meeting.hostSocketId;
+            const hostStillLive =
+              hostId &&
+              Object.values(meeting.participants || {}).some(
+                (part) => part.socketId === hostId || part.clientId === hostId
+              );
+            if (hostStillLive && hostId !== ws.socketId && hostId !== ws.clientId) return;
+            meeting.hostSocketId = ws.socketId || p.hostSocketId;
+            meeting.hostName = p.hostName || meeting.hostName;
           }
 
           if (!msg.event && event) msg.event = event;
@@ -733,6 +784,7 @@ const attachCollabWs = (server, { sessionMiddleware, isAllowedOrigin = () => tru
 module.exports = {
   attachCollabWs,
   forceCloseWorkspace,
+  forceCloseUser,
   closeCollabWs,
   getCollabStats,
   roomKey

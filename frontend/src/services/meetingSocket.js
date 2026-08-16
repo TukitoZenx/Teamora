@@ -210,7 +210,7 @@ export function createMeetingSocket(localChannel, { workspaceId, userName, userI
           try {
             window.dispatchEvent(
               new CustomEvent('teamora-workspace-deleted', {
-                detail: { workspaceId, message: 'This workspace was deleted by the owner.' }
+                detail: { workspaceId, message: 'You no longer have access to this workspace.' }
               })
             )
           } catch {

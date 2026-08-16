@@ -348,13 +348,10 @@ const findOrCreateGoogleUser = async (profile) => {
 
   if (existingUser) {
     let changed = false;
-    // Google has verified email ownership, so signing in via Google is safe.
-    // Keep any existing local password hash so the user can still use email
-    // login if they had one; only mark the provider when the account was
-    // pure-local and is now also Google-capable.
+    // Do not attach Google to an unverified local-only password account.
+    // Accounts already marked google (or previously linked) still sign in.
     if (existingUser.provider === 'local') {
-      existingUser.provider = 'google';
-      changed = true;
+      throw createError('An account with this email already exists. Sign in with your password.', 409);
     }
     if (!existingUser.avatar && profile.photos?.[0]?.value) {
       existingUser.avatar = profile.photos[0].value;

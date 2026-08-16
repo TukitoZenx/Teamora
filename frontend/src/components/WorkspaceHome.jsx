@@ -156,7 +156,7 @@ export default function WorkspaceHome({
   const isOwner = getOwnerId(workspace)?.toString() === getUserId(user)?.toString()
   const workspaceId = workspace?._id || workspace?.workspaceId
   // Real-time meeting start notifications for all workspace members
-  useMeetingNotifications(workspaceId, getDisplayName(user), user?._id || user?.id)
+  const { activeMeeting } = useMeetingNotifications(workspaceId, getDisplayName(user), user?._id || user?.id)
 
   // Detect owner delete while this member is still editing (API heartbeat).
   useEffect(() => {
@@ -198,7 +198,7 @@ export default function WorkspaceHome({
       window.removeEventListener('focus', onFocus)
     }
   }, [workspaceId])
-  const { joinMeeting, activeMeeting, activeMeetingWorkspace, inMeeting } = useMeeting()
+  const { joinMeeting, activeMeetingWorkspace, inMeeting } = useMeeting()
   const [workspaceFiles, setWorkspaceFiles] = useState(() => {
     if (!workspaceId) return []
     const stored = readStoredJson(fileStoreKey(workspaceId), null)
@@ -282,6 +282,9 @@ export default function WorkspaceHome({
             removedFilesRef.current,
             remoteRemoved
           )
+          const prevSig = JSON.stringify({ files: workspaceFilesRef.current, removed: removedFilesRef.current })
+          const nextSig = JSON.stringify({ files: merged.files, removed: merged.removed })
+          if (prevSig === nextSig) return
           setRemovedFiles(merged.removed)
           writeStoredJson(fileRemovedStoreKey(workspaceId), merged.removed)
           setWorkspaceFiles(merged.files)
