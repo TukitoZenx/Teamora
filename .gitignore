@@ -6,10 +6,13 @@ frontend/node_modules/
 
 # Environment files (never commit secrets)
 .env
-.env.local
-.env.*.local
-backend/.env
-frontend/.env
+.env.*
+.env*.local
+*.env
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
 
 # Build output
 dist/
